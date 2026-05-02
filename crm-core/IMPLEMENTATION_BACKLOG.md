@@ -18,7 +18,7 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 
 ### M1 — Foundation
 - [x] [T1.1 Bootstrap Next.js + TS strict + pnpm](#t11-bootstrap-nextjs--ts-strict--pnpm)
-- [ ] [T1.2 Tailwind + shadcn/ui setup](#t12-tailwind--shadcnui-setup)
+- [x] [T1.2 Tailwind + shadcn/ui setup](#t12-tailwind--shadcnui-setup)
 - [ ] [T1.3 Lint, format, type-check, CI mínima](#t13-lint-format-type-check-ci-m%C3%ADnima)
 - [ ] [T1.4 Prisma + Postgres en Docker para dev](#t14-prisma--postgres-en-docker-para-dev)
 - [ ] [T1.5 Estructura de carpetas + README de developer](#t15-estructura-de-carpetas--readme-de-developer)
@@ -130,10 +130,10 @@ Cada task usa este formato:
 - **Tests requeridos**: ninguno.
 - **Notas**: §1.
 - **Subtasks**:
-  - [ ] Instalar `tailwindcss`, `postcss`, `autoprefixer`.
-  - [ ] `npx shadcn-ui@latest init` con preset slate + class-based dark.
-  - [ ] Agregar componentes base (button, dialog, dropdown-menu, input, label, select, sheet, sonner, tabs, toast, tooltip).
-  - [ ] Variables CSS de tema (primario, fondo, header, kpi) listas para override por tenant.
+  - [x] Instalar `tailwindcss`, `postcss`, `autoprefixer`.
+  - [x] `npx shadcn-ui@latest init` con preset slate + class-based dark.
+  - [x] Agregar componentes base (button, dialog, dropdown-menu, input, label, select, sheet, sonner, tabs, toast, tooltip).
+  - [x] Variables CSS de tema (primario, fondo, header, kpi) listas para override por tenant.
 
 ### T1.3 Lint, format, type-check, CI mínima
 - **Objetivo**: garantías de calidad mecánicas.
