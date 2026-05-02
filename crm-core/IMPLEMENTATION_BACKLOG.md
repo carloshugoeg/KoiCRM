@@ -22,7 +22,7 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 - [x] [T1.2 Tailwind + shadcn/ui setup](#t12-tailwind--shadcnui-setup)
 - [x] [T1.3 Lint, format, type-check, CI mínima](#t13-lint-format-type-check-ci-m%C3%ADnima)
 - [x] [T1.4 Prisma + Postgres en Docker para dev](#t14-prisma--postgres-en-docker-para-dev)
-- [ ] [T1.5 Estructura de carpetas + README de developer](#t15-estructura-de-carpetas--readme-de-developer)
+- [x] [T1.5 Estructura de carpetas + README de developer](#t15-estructura-de-carpetas--readme-de-developer)
 
 ### M2 — Data model y migraciones
 
@@ -193,9 +193,9 @@ Cada task usa este formato:
   - `CONTRIBUTING.md` apunta a los 5 docs de planificación.
 - **Tests requeridos**: —
 - **Subtasks**:
-  - [ ] Crear directorios y README de cada feature/lib (un párrafo cada uno).
-  - [ ] README raíz con quickstart.
-  - [ ] CONTRIBUTING.md con flow de PR + reglas de agentes.
+  - [x] Crear directorios y README de cada feature/lib (un párrafo cada uno).
+  - [x] README raíz con quickstart.
+  - [x] CONTRIBUTING.md con flow de PR + reglas de agentes.
 
 ---
 
