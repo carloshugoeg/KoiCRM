@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: ["**"]
+    branches: ["main", "master"]
   pull_request:
     branches: ["main", "master"]
 jobs:
@@ -22,5 +22,5 @@ jobs:
           cache-dependency-path: crm-core/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm type-check
-      - run: pnpm lint
+      - run: pnpm lint:check
       - run: pnpm test
