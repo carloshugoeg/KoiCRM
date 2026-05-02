@@ -17,19 +17,22 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 ## Índice general
 
 ### M1 — Foundation
+
 - [x] [T1.1 Bootstrap Next.js + TS strict + pnpm](#t11-bootstrap-nextjs--ts-strict--pnpm)
 - [x] [T1.2 Tailwind + shadcn/ui setup](#t12-tailwind--shadcnui-setup)
-- [ ] [T1.3 Lint, format, type-check, CI mínima](#t13-lint-format-type-check-ci-m%C3%ADnima)
+- [x] [T1.3 Lint, format, type-check, CI mínima](#t13-lint-format-type-check-ci-m%C3%ADnima)
 - [ ] [T1.4 Prisma + Postgres en Docker para dev](#t14-prisma--postgres-en-docker-para-dev)
 - [ ] [T1.5 Estructura de carpetas + README de developer](#t15-estructura-de-carpetas--readme-de-developer)
 
 ### M2 — Data model y migraciones
+
 - [ ] [T2.1 Schema Prisma core + identidad](#t21-schema-prisma-core--identidad)
 - [ ] [T2.2 Schema Prisma negocio + custom fields](#t22-schema-prisma-negocio--custom-fields)
 - [ ] [T2.3 RLS policies y migraciones SQL](#t23-rls-policies-y-migraciones-sql)
 - [ ] [T2.4 Counter + ID generator de Deal](#t24-counter--id-generator-de-deal)
 
 ### M3 — Tenant / Auth / Roles
+
 - [ ] [T3.1 Auth.js v5 con email+password y OAuth Google](#t31-authjs-v5-con-emailpassword-y-oauth-google)
 - [ ] [T3.2 Onboarding: crear tenant, elegir industria, aplicar plantilla](#t32-onboarding-crear-tenant-elegir-industria-aplicar-plantilla)
 - [ ] [T3.3 Tenant resolver por slug + layout autenticado](#t33-tenant-resolver-por-slug--layout-autenticado)
@@ -38,6 +41,7 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 - [ ] [T3.6 Invitar usuarios + email transaccional](#t36-invitar-usuarios--email-transaccional)
 
 ### M4 — White label y configuración
+
 - [ ] [T4.1 TenantBranding + provider en layout](#t41-tenantbranding--provider-en-layout)
 - [ ] [T4.2 TenantSettings (locale, currency, dealIdPrefix)](#t42-tenantsettings-locale-currency-dealidprefix)
 - [ ] [T4.3 Catalog management UI (Settings → Catálogos)](#t43-catalog-management-ui-settings--cat%C3%A1logos)
@@ -45,6 +49,7 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 - [ ] [T4.5 Custom fields engine + UI básica](#t45-custom-fields-engine--ui-b%C3%A1sica)
 
 ### M5 — Core CRM
+
 - [ ] [T5.1 Client CRUD + detect-or-create](#t51-client-crud--detect-or-create)
 - [ ] [T5.2 Deal CRUD + ClientFormModal real](#t52-deal-crud--clientformmodal-real)
 - [ ] [T5.3 Pipeline kanban con DnD accesible](#t53-pipeline-kanban-con-dnd-accesible)
@@ -58,25 +63,30 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 - [ ] [T5.11 Print Report (Imprimir)](#t511-print-report-imprimir)
 
 ### M6 — Quotes, Payments, Attachments
+
 - [ ] [T6.1 S3 sign helper + upload directo](#t61-s3-sign-helper--upload-directo)
 - [ ] [T6.2 Quote CRUD + isVoid + alerta "Falta Cotización"](#t62-quote-crud--isvoid--alerta-falta-cotizaci%C3%B3n)
 - [ ] [T6.3 Payment CRUD + alerta "Falta Pago"](#t63-payment-crud--alerta-falta-pago)
 
 ### M7 — Follow-ups y Calendario
+
 - [ ] [T7.1 FollowUp CRUD + completar con result](#t71-followup-crud--completar-con-result)
 - [ ] [T7.2 CalendarView mensual con color-coding](#t72-calendarview-mensual-con-color-coding)
 - [ ] [T7.3 Alertas de overdue en card y panel](#t73-alertas-de-overdue-en-card-y-panel)
 
 ### M8 — Estadísticas, KPIs, charts
+
 - [ ] [T8.1 Aggregations server-side por sub-tab](#t81-aggregations-server-side-por-sub-tab)
 - [ ] [T8.2 Charts (Recharts) por sub-tab](#t82-charts-recharts-por-sub-tab)
 - [ ] [T8.3 Filtro de rango de fecha global del panel](#t83-filtro-de-rango-de-fecha-global-del-panel)
 
 ### M9 — Plantilla industria aquasistemas
+
 - [ ] [T9.1 IndustryTemplate aquasistemas (seed)](#t91-industrytemplate-aquasistemas-seed)
 - [ ] [T9.2 Aplicar plantilla en onboarding](#t92-aplicar-plantilla-en-onboarding)
 
 ### M10 — Hardening, tests, demo data
+
 - [ ] [T10.1 Test suite E2E (Playwright) cubriendo flujos clave](#t101-test-suite-e2e-playwright-cubriendo-flujos-clave)
 - [ ] [T10.2 Accesibilidad mínima (kanban teclado, aria-labels)](#t102-accesibilidad-m%C3%ADnima-kanban-teclado-aria-labels)
 - [ ] [T10.3 Performance pass (índices, paginación, queries)](#t103-performance-pass-%C3%ADndices-paginaci%C3%B3n-queries)
@@ -102,6 +112,7 @@ Cada task usa este formato:
 ## Milestone M1 — Foundation
 
 ### T1.1 Bootstrap Next.js + TS strict + pnpm
+
 - **Objetivo**: levantar el proyecto vacío con Next.js 14 App Router + TS strict + pnpm dentro de `crm-core/`.
 - **Archivos esperados**: `crm-core/package.json`, `tsconfig.json`, `next.config.mjs`, `app/layout.tsx`, `app/page.tsx`, `pnpm-lock.yaml`.
 - **Dependencias**: ninguna.
@@ -120,6 +131,7 @@ Cada task usa este formato:
   - [x] Confirmar build de prod sin warnings.
 
 ### T1.2 Tailwind + shadcn/ui setup
+
 - **Objetivo**: estilos listos con Tailwind 3 y shadcn/ui inicializado.
 - **Archivos esperados**: `tailwind.config.ts`, `app/globals.css`, `components.json`, `components/ui/*` (button, dialog, dropdown-menu, input, label, select, sheet, sonner, tabs, toast).
 - **Dependencias**: T1.1.
@@ -136,6 +148,7 @@ Cada task usa este formato:
   - [x] Variables CSS de tema (primario, fondo, header, kpi) listas para override por tenant.
 
 ### T1.3 Lint, format, type-check, CI mínima
+
 - **Objetivo**: garantías de calidad mecánicas.
 - **Archivos esperados**: `.eslintrc.json`, `.prettierrc`, `.github/workflows/ci.yml`, `lint-staged.config.js`, `.husky/pre-commit`.
 - **Dependencias**: T1.1.
@@ -146,12 +159,13 @@ Cada task usa este formato:
 - **Tests requeridos**: el CI corre vitest (aunque sin tests todavía pasa).
 - **Notas**: §17.
 - **Subtasks**:
-  - [ ] ESLint con `next/core-web-vitals` y `@typescript-eslint`.
-  - [ ] Prettier + plugin-tailwind.
-  - [ ] Husky pre-commit con lint-staged.
-  - [ ] CI workflow básico.
+  - [x] ESLint con `next/core-web-vitals` y `@typescript-eslint`.
+  - [x] Prettier + plugin-tailwind.
+  - [x] Husky pre-commit con lint-staged.
+  - [x] CI workflow básico.
 
 ### T1.4 Prisma + Postgres en Docker para dev
+
 - **Objetivo**: DB local lista para desarrollo.
 - **Archivos esperados**: `prisma/schema.prisma` (placeholder), `docker-compose.yml`, `.env.example`, `lib/db/client.ts`.
 - **Dependencias**: T1.1.
@@ -169,6 +183,7 @@ Cada task usa este formato:
   - [ ] README con comandos `db:up`, `db:reset`, `db:migrate`.
 
 ### T1.5 Estructura de carpetas + README de developer
+
 - **Objetivo**: dejar materializada la estructura de §2 y un README operativo.
 - **Archivos esperados**: directorios placeholder (`features/`, `lib/`, `tests/`, `docs/adr/`, `prisma/seed/`), `README.md`, `CONTRIBUTING.md`.
 - **Dependencias**: T1.1, T1.4.
@@ -187,6 +202,7 @@ Cada task usa este formato:
 ## Milestone M2 — Data model y migraciones
 
 ### T2.1 Schema Prisma core + identidad
+
 - **Objetivo**: Tenant, User, Membership, TenantBranding, TenantSettings, IndustryTemplate.
 - **Archivos esperados**: `prisma/schema.prisma`, `prisma/migrations/<ts>_init_identity/migration.sql`.
 - **Dependencias**: T1.4.
@@ -202,6 +218,7 @@ Cada task usa este formato:
   - [ ] Script de smoke test manual.
 
 ### T2.2 Schema Prisma negocio + custom fields
+
 - **Objetivo**: Pipeline, PipelineStage, CatalogItem, Deal, DealEquipment, Client, Quote, Payment, Attachment, FollowUp, Note, Activity, SavedView, Counter, CustomFieldDefinition.
 - **Archivos esperados**: actualizaciones a `prisma/schema.prisma`, nueva migración.
 - **Dependencias**: T2.1.
@@ -217,6 +234,7 @@ Cada task usa este formato:
   - [ ] Smoke test que crea pipeline + 3 stages + catalog items + deal + quote + payment + followup.
 
 ### T2.3 RLS policies y migraciones SQL
+
 - **Objetivo**: activar RLS en cada tabla de negocio con policy `tenantId = current_setting('app.tenant_id')`.
 - **Archivos esperados**: `prisma/migrations/<ts>_rls/migration.sql`.
 - **Dependencias**: T2.2.
@@ -236,6 +254,7 @@ Cada task usa este formato:
   - [ ] Test funcional con dos tenants.
 
 ### T2.4 Counter + ID generator de Deal
+
 - **Objetivo**: helper `generateDealId(tenantId, ownerInitials)` con secuencia atómica por tenant.
 - **Archivos esperados**: `lib/id/deal-id.ts`, `features/deals/queries.ts` (parcial).
 - **Dependencias**: T2.2.
@@ -255,6 +274,7 @@ Cada task usa este formato:
 ## Milestone M3 — Tenant / Auth / Roles
 
 ### T3.1 Auth.js v5 con email+password y OAuth Google
+
 - **Objetivo**: signin, signup, signout, password reset funcionando.
 - **Archivos esperados**: `app/(auth)/*`, `app/api/auth/[...nextauth]/route.ts`, `lib/auth/auth.ts`, `lib/auth/password.ts`.
 - **Dependencias**: T2.1.
@@ -274,6 +294,7 @@ Cada task usa este formato:
   - [ ] Rate limit en endpoints de auth.
 
 ### T3.2 Onboarding: crear tenant, elegir industria, aplicar plantilla
+
 - **Objetivo**: usuario nuevo crea su primer Tenant; elige industria; se aplica plantilla.
 - **Archivos esperados**: `app/app/(onboarding)/page.tsx`, `features/tenants/actions.ts`, `lib/industry/registry.ts`.
 - **Dependencias**: T3.1, T9.1 (mínimo: existencia de plantilla aquasistemas como única opción inicial).
@@ -291,6 +312,7 @@ Cada task usa este formato:
   - [ ] Redirect post-onboarding.
 
 ### T3.3 Tenant resolver por slug + layout autenticado
+
 - **Objetivo**: `app/app/[tenantSlug]/layout.tsx` resuelve tenant, valida membership, expone contexto.
 - **Archivos esperados**: `app/app/[tenantSlug]/layout.tsx`, `lib/tenant/resolve.ts`, `lib/tenant/context.ts`.
 - **Dependencias**: T3.1, T3.2.
@@ -306,6 +328,7 @@ Cada task usa este formato:
   - [ ] Header con dropdown de tenants disponibles si > 1.
 
 ### T3.4 RBAC + helpers de policy
+
 - **Objetivo**: helper `requireRole` y policies por feature.
 - **Archivos esperados**: `lib/auth/rbac.ts`, `features/<x>/policies.ts` (stubs por feature creada en M5+).
 - **Dependencias**: T3.3.
@@ -320,6 +343,7 @@ Cada task usa este formato:
   - [ ] Tests de matriz rol×acción.
 
 ### T3.5 withTenant() helper + tests de RLS
+
 - **Objetivo**: garantizar que toda consulta autenticada pasa por `withTenant`.
 - **Archivos esperados**: `lib/db/rls.ts`, ejemplo de uso en `features/tenants/queries.ts`.
 - **Dependencias**: T2.3, T3.3.
@@ -335,6 +359,7 @@ Cada task usa este formato:
   - [ ] Documentar la regla en `AGENT_RULES.md`.
 
 ### T3.6 Invitar usuarios + email transaccional
+
 - **Objetivo**: OWNER/ADMIN invita por email; recibe link con token; al aceptar, se crea Membership.
 - **Archivos esperados**: `features/users/actions.ts`, `app/app/[tenantSlug]/settings/users/page.tsx`, `lib/email/resend.ts`.
 - **Dependencias**: T3.4.
@@ -354,6 +379,7 @@ Cada task usa este formato:
 ## Milestone M4 — White label y configuración
 
 ### T4.1 TenantBranding + provider en layout
+
 - **Objetivo**: branding por tenant aplicado a UI.
 - **Archivos esperados**: `features/branding/*`, actualización `app/app/[tenantSlug]/layout.tsx`.
 - **Dependencias**: T3.3.
@@ -369,6 +395,7 @@ Cada task usa este formato:
   - [ ] Upload de logo (puede ser TODO hasta M6).
 
 ### T4.2 TenantSettings (locale, currency, dealIdPrefix)
+
 - **Objetivo**: panel de Settings → General con configuración del tenant.
 - **Archivos esperados**: `app/app/[tenantSlug]/settings/general/page.tsx`, `features/tenants/settings.ts`.
 - **Dependencias**: T3.3.
@@ -382,6 +409,7 @@ Cada task usa este formato:
   - [ ] Helpers `lib/intl/*` que reciben tenant settings.
 
 ### T4.3 Catalog management UI (Settings → Catálogos)
+
 - **Objetivo**: CRUD de `CatalogItem` agrupado por `catalogKey`.
 - **Archivos esperados**: `features/catalogs/*`, `app/app/[tenantSlug]/settings/catalogs/page.tsx`.
 - **Dependencias**: T3.4.
@@ -397,6 +425,7 @@ Cada task usa este formato:
   - [ ] Validación de borrado seguro.
 
 ### T4.4 Pipeline editor (Settings → Embudo)
+
 - **Objetivo**: editar Pipeline + sus PipelineStage (orden, label, color, icono, locked).
 - **Archivos esperados**: `features/pipeline/*`, `app/app/[tenantSlug]/settings/pipeline/page.tsx`.
 - **Dependencias**: T3.4.
@@ -413,6 +442,7 @@ Cada task usa este formato:
   - [ ] Validación de delete.
 
 ### T4.5 Custom fields engine + UI básica
+
 - **Objetivo**: crear/editar `CustomFieldDefinition` para Deal y Client.
 - **Archivos esperados**: `lib/config/custom-fields.ts`, `features/custom-fields/*`, `app/app/[tenantSlug]/settings/custom-fields/page.tsx`.
 - **Dependencias**: T3.4.
@@ -435,6 +465,7 @@ Cada task usa este formato:
 ## Milestone M5 — Core CRM
 
 ### T5.1 Client CRUD + detect-or-create
+
 - **Objetivo**: tabla `Client` con CRUD y lógica detect-or-create por `(name, company)`.
 - **Archivos esperados**: `features/clients/{actions,queries,schemas,policies}.ts`.
 - **Dependencias**: T2.2, T3.5.
@@ -450,6 +481,7 @@ Cada task usa este formato:
   - [ ] Test con duplicate-by-different-case.
 
 ### T5.2 Deal CRUD + ClientFormModal real
+
 - **Objetivo**: crear/editar Deal vía modal, con validaciones del demo y Client detect-or-create.
 - **Archivos esperados**: `features/deals/{actions,queries,schemas,policies,components/ClientFormModal.tsx}`.
 - **Dependencias**: T5.1, T2.4, T4.3, T4.4.
@@ -469,6 +501,7 @@ Cada task usa este formato:
   - [ ] Test E2E.
 
 ### T5.3 Pipeline kanban con DnD accesible
+
 - **Objetivo**: vista Embudo con kanban funcional.
 - **Archivos esperados**: `app/app/[tenantSlug]/pipeline/page.tsx`, `features/pipeline/components/Kanban.tsx`, server action `moveDeal`.
 - **Dependencias**: T5.2, T4.4.
@@ -487,6 +520,7 @@ Cada task usa este formato:
   - [ ] Keyboard navigation.
 
 ### T5.4 Filtros globales + KPIs del header
+
 - **Objetivo**: barra de filtros + KPIs dinámicos en Pipeline.
 - **Archivos esperados**: `features/pipeline/components/FilterBar.tsx`, `features/stats/queries.ts` parcial (Total Embudo, Ganado).
 - **Dependencias**: T5.3.
@@ -503,6 +537,7 @@ Cada task usa este formato:
   - [ ] UI de filtros (selects + date range).
 
 ### T5.5 DealDetail modal con tres paneles
+
 - **Objetivo**: modal completo de detalle de Deal.
 - **Archivos esperados**: `features/deals/components/DealDetailModal.tsx`.
 - **Dependencias**: T5.2, T6.x (parcial), T7.1.
@@ -520,6 +555,7 @@ Cada task usa este formato:
   - [ ] Lectura de Activity en panel derecho.
 
 ### T5.6 Activity log y history view
+
 - **Objetivo**: registrar todas las mutaciones relevantes y mostrarlas.
 - **Archivos esperados**: `features/activity/{actions,queries}.ts`, `features/deals/components/HistoryPanel.tsx`.
 - **Dependencias**: T5.2.
@@ -535,6 +571,7 @@ Cada task usa este formato:
   - [ ] UI timeline.
 
 ### T5.7 ClientsPage (sidebar + ficha + KPIs)
+
 - **Objetivo**: vista Clientes según §3.2 de DEMO_INVENTORY.
 - **Archivos esperados**: `app/app/[tenantSlug]/clients/{page.tsx,[clientId]/page.tsx}`, `features/clients/components/*`.
 - **Dependencias**: T5.1, T5.2.
@@ -553,6 +590,7 @@ Cada task usa este formato:
   - [ ] Timeline de deals.
 
 ### T5.8 ArchivePage paginada
+
 - **Objetivo**: tabla de deals archivados con paginación.
 - **Archivos esperados**: `app/app/[tenantSlug]/archive/page.tsx`, `features/deals/queries.ts`.
 - **Dependencias**: T5.5.
@@ -568,6 +606,7 @@ Cada task usa este formato:
   - [ ] Page indicator.
 
 ### T5.9 Búsqueda global (Cmd-K)
+
 - **Objetivo**: modal de búsqueda con resultados agrupados.
 - **Archivos esperados**: `features/search/*`, `components/CommandMenu.tsx`.
 - **Dependencias**: T5.2.
@@ -584,6 +623,7 @@ Cada task usa este formato:
   - [ ] Trigger global.
 
 ### T5.10 Notes en Deal y Client
+
 - **Objetivo**: CRUD de Notas, mostrarlas timestamped.
 - **Archivos esperados**: `features/notes/*`.
 - **Dependencias**: T5.2, T5.7.
@@ -598,6 +638,7 @@ Cada task usa este formato:
   - [ ] UI inline en DealDetail y ficha de cliente.
 
 ### T5.11 Print Report (Imprimir)
+
 - **Objetivo**: reporte imprimible del pipeline accesible desde el botón Printer del header.
 - **Archivos esperados**: `features/pipeline/components/PrintReport.tsx` (componente print-only, hidden on screen).
 - **Dependencias**: T5.3, T5.4.
@@ -622,6 +663,7 @@ Cada task usa este formato:
 ## Milestone M6 — Quotes, Payments, Attachments
 
 ### T6.1 S3 sign helper + upload directo
+
 - **Objetivo**: cliente sube archivos a S3 vía URL firmada.
 - **Archivos esperados**: `lib/storage/s3.ts`, `app/api/upload/sign/route.ts`, `features/attachments/*`.
 - **Dependencias**: T3.4.
@@ -637,6 +679,7 @@ Cada task usa este formato:
   - [ ] Helper client-side.
 
 ### T6.2 Quote CRUD + isVoid + alerta "Falta Cotización"
+
 - **Objetivo**: gestionar cotizaciones múltiples por deal.
 - **Archivos esperados**: `features/quotes/*`.
 - **Dependencias**: T5.5, T6.1.
@@ -652,6 +695,7 @@ Cada task usa este formato:
   - [ ] Lógica de alerta.
 
 ### T6.3 Payment CRUD + alerta "Falta Pago"
+
 - **Objetivo**: análogo a Quote para pagos.
 - **Archivos esperados**: `features/payments/*`.
 - **Dependencias**: T5.5, T6.1.
@@ -671,6 +715,7 @@ Cada task usa este formato:
 ## Milestone M7 — Follow-ups y Calendario
 
 ### T7.1 FollowUp CRUD + completar con result
+
 - **Objetivo**: gestionar seguimientos por deal.
 - **Archivos esperados**: `features/follow-ups/*`.
 - **Dependencias**: T5.5, T4.3 (catálogo `followupReason`).
@@ -685,6 +730,7 @@ Cada task usa este formato:
   - [ ] UI en DealDetail.
 
 ### T7.2 CalendarView mensual con color-coding
+
 - **Objetivo**: vista Calendario.
 - **Archivos esperados**: `app/app/[tenantSlug]/calendar/page.tsx`, `features/calendar/components/MonthGrid.tsx`.
 - **Dependencias**: T7.1.
@@ -701,6 +747,7 @@ Cada task usa este formato:
   - [ ] UI con día seleccionado.
 
 ### T7.3 Alertas de overdue en card y panel
+
 - **Objetivo**: indicadores visuales y panel de Alertas en Stats.
 - **Archivos esperados**: actualizaciones a card de pipeline + `app/app/[tenantSlug]/stats/alerts/page.tsx`.
 - **Dependencias**: T7.1.
@@ -718,6 +765,7 @@ Cada task usa este formato:
 ## Milestone M8 — Estadísticas, KPIs, charts
 
 ### T8.1 Aggregations server-side por sub-tab
+
 - **Objetivo**: queries SQL agregadas para los 7 sub-tabs de Stats.
 - **Archivos esperados**: `features/stats/queries.ts`.
 - **Dependencias**: T5.4.
@@ -736,6 +784,7 @@ Cada task usa este formato:
   - [ ] Alertas.
 
 ### T8.2 Charts (Recharts) por sub-tab
+
 - **Objetivo**: visualizaciones.
 - **Archivos esperados**: `app/app/[tenantSlug]/stats/*`, `components/charts/*`.
 - **Dependencias**: T8.1.
@@ -752,6 +801,7 @@ Cada task usa este formato:
   - [ ] Listado tabla con shadcn data-table.
 
 ### T8.3 Filtro de rango de fecha global del panel
+
 - **Objetivo**: rango aplicable a todas las sub-tabs.
 - **Archivos esperados**: `features/stats/components/RangePicker.tsx`.
 - **Dependencias**: T8.1.
@@ -769,6 +819,7 @@ Cada task usa este formato:
 ## Milestone M9 — Plantilla industria aquasistemas
 
 ### T9.1 IndustryTemplate aquasistemas (seed)
+
 - **Objetivo**: payload completo de la plantilla.
 - **Archivos esperados**: `prisma/seed/industry-aquasistemas.ts`.
 - **Dependencias**: T2.2, T4.3, T4.4.
@@ -785,6 +836,7 @@ Cada task usa este formato:
   - [ ] Test de aplicación.
 
 ### T9.2 Aplicar plantilla en onboarding
+
 - **Objetivo**: que T3.2 invoque la plantilla al crear tenant con `industrySlug=aquasistemas`.
 - **Archivos esperados**: `lib/industry/registry.ts`, ajuste de `createTenant`.
 - **Dependencias**: T9.1, T3.2.
@@ -803,6 +855,7 @@ Cada task usa este formato:
 ## Milestone M10 — Hardening, tests, demo data
 
 ### T10.1 Test suite E2E (Playwright) cubriendo flujos clave
+
 - **Objetivo**: cobertura E2E de los flujos críticos.
 - **Archivos esperados**: `tests/e2e/*.spec.ts`.
 - **Dependencias**: M5–M9.
@@ -817,6 +870,7 @@ Cada task usa este formato:
   - [ ] CI workflow.
 
 ### T10.2 Accesibilidad mínima (kanban teclado, aria-labels)
+
 - **Objetivo**: cubrir lo básico de a11y.
 - **Archivos esperados**: revisiones en componentes existentes.
 - **Dependencias**: M5.
@@ -832,6 +886,7 @@ Cada task usa este formato:
   - [ ] Fixes.
 
 ### T10.3 Performance pass (índices, paginación, queries)
+
 - **Objetivo**: validar performance con dataset de carga.
 - **Archivos esperados**: `tests/integration/perf.test.ts`, eventuales índices nuevos.
 - **Dependencias**: M5–M8.
@@ -847,6 +902,7 @@ Cada task usa este formato:
   - [ ] Índices adicionales si hace falta.
 
 ### T10.4 Demo tenant aquasistemas seed `pnpm seed:demo`
+
 - **Objetivo**: poblar tenant `demo-aqua` con datos representativos.
 - **Archivos esperados**: `prisma/seed/demo-aquasistemas.ts`, script `pnpm seed:demo`.
 - **Dependencias**: T9.1, M5–M7.
@@ -867,18 +923,18 @@ Cada task usa este formato:
 
 Cada item `V1-obligatorio` del inventario debe quedar cubierto por al menos una task. Verificación cruzada (no exhaustiva — el agente que cierre M10 debe validar la matriz completa):
 
-| Inventario | Tasks |
-|---|---|
-| Vistas Embudo / Clientes / Calendario / Archivo / Estadísticas | T5.3+T5.4 / T5.7 / T7.2 / T5.8 / T8.x |
-| Modales ClientForm / DealDetail / Search / Settings | T5.2 / T5.5 / T5.9 / T4.x |
-| Entidades Deal/Client/Collaborator/Stage/Channel/Equipment/ClientOverride | T2.2 + T5.1/T5.2 |
-| Enums stage/status/FU_REASONS | T9.1 (catálogos default) |
-| Reglas (id-gen, derivación cliente, alertas, días, overdue, history) | T2.4 / T5.1 / T6.2-T6.3 / T5.4-T5.5 / T7.3 / T5.6 |
-| KPIs | T8.1 / T8.2 / T5.4 |
-| Multitenant + auth + roles | M3 |
-| Custom fields + catálogos + branding + pipeline configurable | M4 |
-| Plantilla aquasistemas | M9 |
-| Print Report (§3.8 DEMO_INVENTORY) | T5.11 |
+| Inventario                                                                | Tasks                                             |
+| ------------------------------------------------------------------------- | ------------------------------------------------- |
+| Vistas Embudo / Clientes / Calendario / Archivo / Estadísticas            | T5.3+T5.4 / T5.7 / T7.2 / T5.8 / T8.x             |
+| Modales ClientForm / DealDetail / Search / Settings                       | T5.2 / T5.5 / T5.9 / T4.x                         |
+| Entidades Deal/Client/Collaborator/Stage/Channel/Equipment/ClientOverride | T2.2 + T5.1/T5.2                                  |
+| Enums stage/status/FU_REASONS                                             | T9.1 (catálogos default)                          |
+| Reglas (id-gen, derivación cliente, alertas, días, overdue, history)      | T2.4 / T5.1 / T6.2-T6.3 / T5.4-T5.5 / T7.3 / T5.6 |
+| KPIs                                                                      | T8.1 / T8.2 / T5.4                                |
+| Multitenant + auth + roles                                                | M3                                                |
+| Custom fields + catálogos + branding + pipeline configurable              | M4                                                |
+| Plantilla aquasistemas                                                    | M9                                                |
+| Print Report (§3.8 DEMO_INVENTORY)                                        | T5.11                                             |
 
 Items `V1-inferido` (toasts, "sin resultados", FilePreviewModal, ConfirmDialog, accesibilidad teclado, mobile responsive) — cubiertos transversalmente en M5/M6/M10. Si al cerrar M10 quedan sueltos, agregar tasks en este `.md`.
 

@@ -8,25 +8,25 @@ Este documento se lee **junto** con `DEMO_INVENTORY.md` (qué) y se ejecuta vía
 
 ## 1. Stack y justificación
 
-| Capa | Elección | Por qué |
-|---|---|---|
-| Frontend + backend | **Next.js 14 (App Router) + TypeScript strict** | RSC reduce JS al cliente; Server Actions evitan boilerplate de API; un solo build, un solo deploy. |
-| Estilos | **Tailwind CSS 3 + shadcn/ui (Radix)** | Productividad alta, componentes accesibles. NO se copia código del demo; shadcn instala primitives en el repo. |
-| Charts | **Recharts** | Mismo motor que el demo, librería pública; sólo se usa la API, no se porta código. |
-| Form / validación | **React Hook Form + Zod** | Schemas Zod compartidos entre client y server. |
-| ORM / DB | **Prisma + PostgreSQL 15+** | Schema declarativo, migraciones versionadas. RLS en Postgres es nativo. |
-| Auth | **Auth.js v5 (NextAuth)** | Sessions con cookies httpOnly, providers email + OAuth Google, soporta MFA y RBAC propio. Clerk queda documentado como swap-in si se prefiere managed. |
-| Object storage | **S3-compatible (R2 default)** | Uploads firmados, sin pasar binarios por la app. |
-| Email transaccional | **Resend** (default), Postmark/SES alternativos | Para invitaciones, password reset, alertas. |
-| Logger | **pino** + correlación por requestId | Liviano, JSON-first. |
-| Tests | **Vitest** (unit), **Postgres real en Docker** (integration), **Playwright** (E2E) | RLS sólo se valida con Postgres real. |
-| Drag & drop | **@dnd-kit/core** | Accesible (keyboard sensor), liviano, no requiere react-beautiful-dnd. |
-| Toasts | **sonner** | Stack-friendly, accesible. |
-| Date utils | **date-fns** + `Intl.DateTimeFormat` con `es-GT` | TZ explícito por tenant. |
-| Currency | `Intl.NumberFormat(locale, {style:'currency', currency})` | Por tenant. |
-| Lint / format | **ESLint + Prettier** | Pre-commit con `lint-staged`. |
-| Package manager | **pnpm** | Espacio en disco, monorepo-friendly si más adelante. |
-| Node version | LTS actual (20+) | Soporta server actions y stream APIs. |
+| Capa                | Elección                                                                           | Por qué                                                                                                                                                |
+| ------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Frontend + backend  | **Next.js 14 (App Router) + TypeScript strict**                                    | RSC reduce JS al cliente; Server Actions evitan boilerplate de API; un solo build, un solo deploy.                                                     |
+| Estilos             | **Tailwind CSS 3 + shadcn/ui (Radix)**                                             | Productividad alta, componentes accesibles. NO se copia código del demo; shadcn instala primitives en el repo.                                         |
+| Charts              | **Recharts**                                                                       | Mismo motor que el demo, librería pública; sólo se usa la API, no se porta código.                                                                     |
+| Form / validación   | **React Hook Form + Zod**                                                          | Schemas Zod compartidos entre client y server.                                                                                                         |
+| ORM / DB            | **Prisma + PostgreSQL 15+**                                                        | Schema declarativo, migraciones versionadas. RLS en Postgres es nativo.                                                                                |
+| Auth                | **Auth.js v5 (NextAuth)**                                                          | Sessions con cookies httpOnly, providers email + OAuth Google, soporta MFA y RBAC propio. Clerk queda documentado como swap-in si se prefiere managed. |
+| Object storage      | **S3-compatible (R2 default)**                                                     | Uploads firmados, sin pasar binarios por la app.                                                                                                       |
+| Email transaccional | **Resend** (default), Postmark/SES alternativos                                    | Para invitaciones, password reset, alertas.                                                                                                            |
+| Logger              | **pino** + correlación por requestId                                               | Liviano, JSON-first.                                                                                                                                   |
+| Tests               | **Vitest** (unit), **Postgres real en Docker** (integration), **Playwright** (E2E) | RLS sólo se valida con Postgres real.                                                                                                                  |
+| Drag & drop         | **@dnd-kit/core**                                                                  | Accesible (keyboard sensor), liviano, no requiere react-beautiful-dnd.                                                                                 |
+| Toasts              | **sonner**                                                                         | Stack-friendly, accesible.                                                                                                                             |
+| Date utils          | **date-fns** + `Intl.DateTimeFormat` con `es-GT`                                   | TZ explícito por tenant.                                                                                                                               |
+| Currency            | `Intl.NumberFormat(locale, {style:'currency', currency})`                          | Por tenant.                                                                                                                                            |
+| Lint / format       | **ESLint + Prettier**                                                              | Pre-commit con `lint-staged`.                                                                                                                          |
+| Package manager     | **pnpm**                                                                           | Espacio en disco, monorepo-friendly si más adelante.                                                                                                   |
+| Node version        | LTS actual (20+)                                                                   | Soporta server actions y stream APIs.                                                                                                                  |
 
 **Lo que NO se usa**: localforage, Express, persistencia en JSON file, base64 para imágenes en DB, Redux global, react-beautiful-dnd, zustand global. Cada uno tiene un reemplazo arriba.
 
@@ -132,6 +132,7 @@ crm-core/
 ```
 
 **Convenciones**:
+
 - Cada feature en `features/*` es autónoma: queries, actions, schemas, policies, componentes, tests.
 - Componentes de `components/*` son agnósticos de dominio.
 - `lib/*` es plumbing puro (sin lógica de dominio).
@@ -157,6 +158,7 @@ PostgreSQL                            ← RLS como segunda línea
 ```
 
 **Reglas**:
+
 - Nunca llamar Prisma desde un componente directo. Pasar por `features/<x>/queries.ts` o `actions.ts`.
 - Toda action/query autenticada se ejecuta dentro de `withTenant(tenantId, fn)` que setea `app.tenant_id` en una transacción Postgres y la RLS filtra.
 - Nunca asumir tenant del cliente. Resolver server-side desde session + slug URL.
@@ -238,12 +240,12 @@ Permitidas sólo en código superuser (admin del SaaS), nunca expuesto en la UI 
 
 ## 5. Modelo de autorización (RBAC)
 
-| Rol | Permisos |
-|---|---|
-| `OWNER` | Todo lo del tenant + transferir/eliminar tenant + facturación. |
-| `ADMIN` | Todo excepto borrar tenant: settings, branding, catálogos, custom fields, invitar/remover usuarios (no OWNER). |
-| `MEMBER` | CRUD de deals/clients/follow-ups/quotes/payments suyos y compartidos; lectura completa del tenant. |
-| `VIEWER` | Sólo lectura. |
+| Rol      | Permisos                                                                                                       |
+| -------- | -------------------------------------------------------------------------------------------------------------- |
+| `OWNER`  | Todo lo del tenant + transferir/eliminar tenant + facturación.                                                 |
+| `ADMIN`  | Todo excepto borrar tenant: settings, branding, catálogos, custom fields, invitar/remover usuarios (no OWNER). |
+| `MEMBER` | CRUD de deals/clients/follow-ups/quotes/payments suyos y compartidos; lectura completa del tenant.             |
+| `VIEWER` | Sólo lectura.                                                                                                  |
 
 - Verificación en **dos lugares**: server action (defensa en profundidad) y query (filtro). RLS garantiza el aislamiento de tenant; RBAC es a nivel app.
 - Helper `requireRole(action, role)` lanza si no cumple.
@@ -327,6 +329,7 @@ model CustomFieldDefinition {
 ```
 
 Cada tabla extensible (Deal, Client, Quote, Payment) tiene `customData Json?`. Validación:
+
 - `lib/config/custom-fields.ts` deriva un `Zod.object({ ... })` desde las definitions vigentes.
 - Server actions validan input contra ese schema antes de persistir.
 - Limites V1: sin relaciones entre custom fields, sin fórmulas, sin validaciones server-side custom (más allá de tipo).
@@ -604,11 +607,11 @@ Generación de Deal.id: en transacción incrementar y formatear `{prefix}-{count
 
 ## 9. Estrategia de seeds
 
-| Seed | Cuándo | Contenido |
-|---|---|---|
-| `seed/core.ts` | Bootstrap inicial (dev y demo). | `IndustryTemplate(slug=aquasistemas)`. En dev: usuario admin `dev@local`. NUNCA en prod. |
-| `seed/industry-aquasistemas.ts` | Aplicada en onboarding cuando un tenant elige industria. | Pipeline default 6 stages, CatalogItems para equipment/channels/status/followupReason, branding default (colores AquaCRM), `dealIdPrefix=AQX`. |
-| `seed/demo-aquasistemas.ts` | Comando opcional `pnpm seed:demo`. | Tenant "demo-aqua", usuario owner demo, 4 colaboradores (Roberto/Emanuel/Jhonatan/Leticia), 30 deals representativos sin imágenes, follow-ups variados. |
+| Seed                            | Cuándo                                                   | Contenido                                                                                                                                               |
+| ------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `seed/core.ts`                  | Bootstrap inicial (dev y demo).                          | `IndustryTemplate(slug=aquasistemas)`. En dev: usuario admin `dev@local`. NUNCA en prod.                                                                |
+| `seed/industry-aquasistemas.ts` | Aplicada en onboarding cuando un tenant elige industria. | Pipeline default 6 stages, CatalogItems para equipment/channels/status/followupReason, branding default (colores AquaCRM), `dealIdPrefix=AQX`.          |
+| `seed/demo-aquasistemas.ts`     | Comando opcional `pnpm seed:demo`.                       | Tenant "demo-aqua", usuario owner demo, 4 colaboradores (Roberto/Emanuel/Jhonatan/Leticia), 30 deals representativos sin imágenes, follow-ups variados. |
 
 Todo seed reproducible (idempotente). Datos demo siempre marcados con flag (`Tenant.slug` empieza con `demo-`). Nunca usados como persistencia real.
 
@@ -695,13 +698,14 @@ Todo seed reproducible (idempotente). Datos demo siempre marcados con flag (`Ten
 
 ## 17. Testing
 
-| Nivel | Herramienta | Cobertura objetivo |
-|---|---|---|
-| Unit | Vitest | Funciones puras, schemas, helpers de fechas/IDs/RLS context. |
-| Integration | Vitest + Postgres real (testcontainers) | Repos, server actions, RLS aislamiento, Counter de deal id, custom-fields engine. |
-| E2E | Playwright | Login, crear deal, mover en kanban, cerrar como ganado, agregar follow-up, completar follow-up, branding por tenant. |
+| Nivel       | Herramienta                             | Cobertura objetivo                                                                                                   |
+| ----------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Unit        | Vitest                                  | Funciones puras, schemas, helpers de fechas/IDs/RLS context.                                                         |
+| Integration | Vitest + Postgres real (testcontainers) | Repos, server actions, RLS aislamiento, Counter de deal id, custom-fields engine.                                    |
+| E2E         | Playwright                              | Login, crear deal, mover en kanban, cerrar como ganado, agregar follow-up, completar follow-up, branding por tenant. |
 
 **Tests obligatorios desde M3**:
+
 - `tests/integration/rls.test.ts`: dos tenants, cada uno crea deals, ningún tenant ve los del otro vía Prisma. Si esto falla, BLOQUEA merge.
 - `tests/integration/counter.test.ts`: 50 creates concurrentes mantienen secuencia única por tenant.
 
@@ -727,6 +731,7 @@ CI corre los tres niveles en GitHub Actions; PR no se mergea sin verde.
 ## 19. Configuración / env
 
 `.env.example`:
+
 ```
 DATABASE_URL=postgres://app_user:...@localhost:5432/koicrm
 DATABASE_ADMIN_URL=postgres://admin_user:...@localhost:5432/koicrm
@@ -800,14 +805,14 @@ Las decisiones grandes ya tomadas en este plan **no requieren ADR retro** — vi
 
 ## 24. Línea aquasistemas vs core (regla anti-leakage)
 
-| Pertenece a CORE | Pertenece a PLANTILLA aquasistemas | Pertenece a TENANT |
-|---|---|---|
-| Tablas Deal/Client/Pipeline/CatalogItem… | Catálogo equipment (Bomba, Jacuzzi…) | Logo, colores, datos reales |
-| Engine de custom fields | Custom fields opcionales (post-V1: pH, dureza) | Sus catálogos editados |
-| Engine de pipeline configurable | Pipeline default 6 stages | Stages renombrados/agregados |
-| Engine de branding | Branding default | Branding final |
-| RLS, RBAC, auth, billing | — | Memberships y roles |
-| ID generator parametrizado | `dealIdPrefix=AQX` default | Prefix custom |
-| Locale/currency engine | `es-GT` + `GTQ` default | Locale propio |
+| Pertenece a CORE                         | Pertenece a PLANTILLA aquasistemas             | Pertenece a TENANT           |
+| ---------------------------------------- | ---------------------------------------------- | ---------------------------- |
+| Tablas Deal/Client/Pipeline/CatalogItem… | Catálogo equipment (Bomba, Jacuzzi…)           | Logo, colores, datos reales  |
+| Engine de custom fields                  | Custom fields opcionales (post-V1: pH, dureza) | Sus catálogos editados       |
+| Engine de pipeline configurable          | Pipeline default 6 stages                      | Stages renombrados/agregados |
+| Engine de branding                       | Branding default                               | Branding final               |
+| RLS, RBAC, auth, billing                 | —                                              | Memberships y roles          |
+| ID generator parametrizado               | `dealIdPrefix=AQX` default                     | Prefix custom                |
+| Locale/currency engine                   | `es-GT` + `GTQ` default                        | Locale propio                |
 
 **Regla**: si un agente necesita escribir la palabra "aquasistemas", "AQX", "Bomba", "Jacuzzi" o equivalentes en `app/`, `features/`, `components/` o `lib/`, está mal. Esos términos sólo pueden aparecer en `prisma/seed/industry-aquasistemas.ts`, `prisma/seed/demo-aquasistemas.ts` o tests.

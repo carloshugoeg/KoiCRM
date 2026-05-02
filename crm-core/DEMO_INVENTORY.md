@@ -22,15 +22,15 @@ Inventario exhaustivo del demo `hardcoded-demo/` (AquaCRM) — fuente de verdad 
 
 ## 2. Mapa de pantallas (tabs raíz)
 
-| Tab | Label UI | Layout | Sub-tabs internas | Categoría |
-|---|---|---|---|---|
-| `pipeline` | Embudo | Kanban horizontal con N columnas (una por stage) + filtros globales arriba | — | V1-obligatorio |
-| `clientes` | Clientes | Split-view: sidebar A-Z izquierda + ficha de cliente derecha | — | V1-obligatorio |
-| `calendario` | Calendario | Grid mensual 7×N + panel lateral del día seleccionado | — | V1-obligatorio |
-| `archivo` | Archivo | Tabla paginada (10 por página) | — | V1-obligatorio |
-| `estadisticas` | Estadísticas | Panel multi-tab con KPIs y charts | Resumen, Listado, Embudo, Equipo, Canal, Productos, Alertas | V1-obligatorio |
-| (modal) | Búsqueda Global | Dialog full-screen, Cmd-K | Resultados agrupados por entidad | V1-obligatorio |
-| (panel) | Settings | Panel modal multi-tab | Apariencia, Usuarios, Equipos, Canales, Embudo | V1-obligatorio |
+| Tab            | Label UI        | Layout                                                                     | Sub-tabs internas                                           | Categoría      |
+| -------------- | --------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------- | -------------- |
+| `pipeline`     | Embudo          | Kanban horizontal con N columnas (una por stage) + filtros globales arriba | —                                                           | V1-obligatorio |
+| `clientes`     | Clientes        | Split-view: sidebar A-Z izquierda + ficha de cliente derecha               | —                                                           | V1-obligatorio |
+| `calendario`   | Calendario      | Grid mensual 7×N + panel lateral del día seleccionado                      | —                                                           | V1-obligatorio |
+| `archivo`      | Archivo         | Tabla paginada (10 por página)                                             | —                                                           | V1-obligatorio |
+| `estadisticas` | Estadísticas    | Panel multi-tab con KPIs y charts                                          | Resumen, Listado, Embudo, Equipo, Canal, Productos, Alertas | V1-obligatorio |
+| (modal)        | Búsqueda Global | Dialog full-screen, Cmd-K                                                  | Resultados agrupados por entidad                            | V1-obligatorio |
+| (panel)        | Settings        | Panel modal multi-tab                                                      | Apariencia, Usuarios, Equipos, Canales, Embudo              | V1-obligatorio |
 
 **Top-level shell**:
 
@@ -282,34 +282,34 @@ Diálogo genérico de confirmación, usado en "Limpiar todos los datos", elimina
 
 ### 5.1 Deal (Oportunidad) — `V1-obligatorio`
 
-| Campo | Tipo | Notas |
-|---|---|---|
-| `id` | string | Auto-gen `{counter}-AQX-{initials}-{YY}` (ej. `0032-AQX-RO-26`). Legacy `d1..d30`. **En el real**: `tenantPrefix` reemplaza `AQX`, año 4 dígitos. |
-| `created` | string `YYYY-MM-DD` | Inmutable. |
-| `createdAt` | ISO 8601 | Timestamp con ms. |
-| `stageEntryTime` | int (ms epoch) | Momento de entrada al stage actual. |
-| `stage` | enum string | Ver §6.1. |
-| `status` | enum string | Default `activo`. Ver §6.2. |
-| `isArchived` | boolean | Soft-archive. Excluido del kanban activo. |
-| `name` | string, requerido | Persona contacto. |
-| `company` | string | |
-| `phone` | string | `XXXX-XXXX`. |
-| `whatsapp` | string | `+502 XXXX-XXXX`. |
-| `email` | string opcional | |
-| `notes` | array `{text, timestamp}` | Notas timestamped. |
-| `equipment` | array string | De catálogo Equipment. |
-| `equipmentCustom` | string | Texto libre alternativo. |
-| `quote` (legacy) | string | Migrado a `quotes[]`. |
-| `quotes` | array `{number, date, photoUrl, isVoid}` | Múltiples cotizaciones. |
-| `paymentDoc` (legacy) | string | Migrado a `paymentDocs[]`. |
-| `paymentDocs` | array `{number, date, photoUrl, isVoid}` | Múltiples comprobantes. |
-| `followUp` (legacy) | string `YYYY-MM-DD` | Migrado a `followUps[]`. |
-| `followUps` | array `{date, reason, result?, completed, completedAt?}` | Multi follow-up. |
-| `value` | number | GTQ. |
-| `collab` | string FK → Collaborator.id | Requerido. |
-| `assignedTo` | string | Casi siempre `""`. Posible secondary owner; **decisión-pendiente** si se mantiene en el real. |
-| `channel` | string FK → Channel.id | Requerido. |
-| `history` | array `{action, timestamp, details?}` | Audit log. |
+| Campo                 | Tipo                                                     | Notas                                                                                                                                             |
+| --------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                  | string                                                   | Auto-gen `{counter}-AQX-{initials}-{YY}` (ej. `0032-AQX-RO-26`). Legacy `d1..d30`. **En el real**: `tenantPrefix` reemplaza `AQX`, año 4 dígitos. |
+| `created`             | string `YYYY-MM-DD`                                      | Inmutable.                                                                                                                                        |
+| `createdAt`           | ISO 8601                                                 | Timestamp con ms.                                                                                                                                 |
+| `stageEntryTime`      | int (ms epoch)                                           | Momento de entrada al stage actual.                                                                                                               |
+| `stage`               | enum string                                              | Ver §6.1.                                                                                                                                         |
+| `status`              | enum string                                              | Default `activo`. Ver §6.2.                                                                                                                       |
+| `isArchived`          | boolean                                                  | Soft-archive. Excluido del kanban activo.                                                                                                         |
+| `name`                | string, requerido                                        | Persona contacto.                                                                                                                                 |
+| `company`             | string                                                   |                                                                                                                                                   |
+| `phone`               | string                                                   | `XXXX-XXXX`.                                                                                                                                      |
+| `whatsapp`            | string                                                   | `+502 XXXX-XXXX`.                                                                                                                                 |
+| `email`               | string opcional                                          |                                                                                                                                                   |
+| `notes`               | array `{text, timestamp}`                                | Notas timestamped.                                                                                                                                |
+| `equipment`           | array string                                             | De catálogo Equipment.                                                                                                                            |
+| `equipmentCustom`     | string                                                   | Texto libre alternativo.                                                                                                                          |
+| `quote` (legacy)      | string                                                   | Migrado a `quotes[]`.                                                                                                                             |
+| `quotes`              | array `{number, date, photoUrl, isVoid}`                 | Múltiples cotizaciones.                                                                                                                           |
+| `paymentDoc` (legacy) | string                                                   | Migrado a `paymentDocs[]`.                                                                                                                        |
+| `paymentDocs`         | array `{number, date, photoUrl, isVoid}`                 | Múltiples comprobantes.                                                                                                                           |
+| `followUp` (legacy)   | string `YYYY-MM-DD`                                      | Migrado a `followUps[]`.                                                                                                                          |
+| `followUps`           | array `{date, reason, result?, completed, completedAt?}` | Multi follow-up.                                                                                                                                  |
+| `value`               | number                                                   | GTQ.                                                                                                                                              |
+| `collab`              | string FK → Collaborator.id                              | Requerido.                                                                                                                                        |
+| `assignedTo`          | string                                                   | Casi siempre `""`. Posible secondary owner; **decisión-pendiente** si se mantiene en el real.                                                     |
+| `channel`             | string FK → Channel.id                                   | Requerido.                                                                                                                                        |
+| `history`             | array `{action, timestamp, details?}`                    | Audit log.                                                                                                                                        |
 
 **Notas**: en el demo `phone` aparece como requerido; en algunos seeds está vacío. Las validaciones del form sí lo exigen.
 
@@ -329,33 +329,33 @@ Campos derivados:
 
 ### 5.3 Collaborator (Asesor) — `V1-obligatorio`
 
-| Campo | Tipo | Notas |
-|---|---|---|
-| `id` | string | Defaults: `roberto`, `emanuel`, `jhonatan`, `leticia`. User-creados con prefix `u{epoch_ms}`. |
-| `name` | string | |
-| `avatar` | string 2 chars | Iniciales (RO/EM/JH/LE). |
-| `color` | hex string | Color de marca. |
-| `photoUrl` | base64 string | En el real: URL a object storage. |
+| Campo      | Tipo           | Notas                                                                                         |
+| ---------- | -------------- | --------------------------------------------------------------------------------------------- |
+| `id`       | string         | Defaults: `roberto`, `emanuel`, `jhonatan`, `leticia`. User-creados con prefix `u{epoch_ms}`. |
+| `name`     | string         |                                                                                               |
+| `avatar`   | string 2 chars | Iniciales (RO/EM/JH/LE).                                                                      |
+| `color`    | hex string     | Color de marca.                                                                               |
+| `photoUrl` | base64 string  | En el real: URL a object storage.                                                             |
 
 ### 5.4 PipelineStage — `V1-obligatorio`
 
-| Campo | Tipo | Notas |
-|---|---|---|
-| `id` | string | `prospecto`, `contactado`, `cotizacion`, `negociacion`, `ganado`, `perdido`. |
-| `label` | string | "Prospecto", "Contactado", … |
-| `sublabel` | string | "Lead nuevo", "En conversación", … |
-| `color` | hex | |
-| `iconName` | string | De `STAGE_ICON_OPTIONS` (User, Phone, DollarSign, Flame, CheckCircle2, XCircle). |
-| `locked` | boolean | `ganado` y `perdido` por default. |
+| Campo      | Tipo    | Notas                                                                            |
+| ---------- | ------- | -------------------------------------------------------------------------------- |
+| `id`       | string  | `prospecto`, `contactado`, `cotizacion`, `negociacion`, `ganado`, `perdido`.     |
+| `label`    | string  | "Prospecto", "Contactado", …                                                     |
+| `sublabel` | string  | "Lead nuevo", "En conversación", …                                               |
+| `color`    | hex     |                                                                                  |
+| `iconName` | string  | De `STAGE_ICON_OPTIONS` (User, Phone, DollarSign, Flame, CheckCircle2, XCircle). |
+| `locked`   | boolean | `ganado` y `perdido` por default.                                                |
 
 ### 5.5 Channel (Canal de venta) — `V1-obligatorio`
 
-| Campo | Tipo | Notas |
-|---|---|---|
-| `id` | string | `sala`, `telefono`, `whatsapp`, etc. User-creados con prefix `ch{epoch_ms}`. |
-| `label` | string | "Sala de Ventas", "Teléfono", "WhatsApp", "Instagram 2026". |
-| `color` | hex | |
-| `icon` | objeto/string | En el JSON queda `{}` vacío (asignación incompleta del demo). En el real: `iconKey` referenciando catálogo de iconos lucide. |
+| Campo   | Tipo          | Notas                                                                                                                        |
+| ------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `id`    | string        | `sala`, `telefono`, `whatsapp`, etc. User-creados con prefix `ch{epoch_ms}`.                                                 |
+| `label` | string        | "Sala de Ventas", "Teléfono", "WhatsApp", "Instagram 2026".                                                                  |
+| `color` | hex           |                                                                                                                              |
+| `icon`  | objeto/string | En el JSON queda `{}` vacío (asignación incompleta del demo). En el real: `iconKey` referenciando catálogo de iconos lucide. |
 
 Defaults: sala (#9333ea Store), telefono (#059669 Phone), whatsapp (#16a34a Smartphone). Deals referencian también `facebook` e `instagram` aunque no estén en defaults.
 
@@ -541,23 +541,23 @@ Lo único industry-specific que el demo expone:
 
 Top-level keys (`sf-*`):
 
-| Key | Tipo | Notas |
-|---|---|---|
-| `sf-deals` | array Deal | 32 items en seed. |
-| `sf-dealCounter` | int (stringified) | Próximo número (ej. 32). |
-| `sf-collaborators` | array Collaborator | 7 (4 default + 3 user). |
-| `sf-stages` | array Stage | 6 default. |
-| `sf-equipment` | array string | 8 default. |
-| `sf-channels` | array Channel | 4 (3 default + 1 user). |
-| `sf-clientOverrides` | array ClientOverride | 0 en seed. |
-| `sf-isDark` | boolean | |
-| `sf-showArchived` | boolean | |
-| `sf-customLogo` | base64 string | |
-| `sf-customBgColorDark` | hex | |
-| `sf-customBgColorLight` | hex | |
-| `sf-customBgImage` | base64 string | |
-| `sf-headerBgColor` | hex | |
-| `sf-kpiBgColor` | hex | |
+| Key                     | Tipo                 | Notas                    |
+| ----------------------- | -------------------- | ------------------------ |
+| `sf-deals`              | array Deal           | 32 items en seed.        |
+| `sf-dealCounter`        | int (stringified)    | Próximo número (ej. 32). |
+| `sf-collaborators`      | array Collaborator   | 7 (4 default + 3 user).  |
+| `sf-stages`             | array Stage          | 6 default.               |
+| `sf-equipment`          | array string         | 8 default.               |
+| `sf-channels`           | array Channel        | 4 (3 default + 1 user).  |
+| `sf-clientOverrides`    | array ClientOverride | 0 en seed.               |
+| `sf-isDark`             | boolean              |                          |
+| `sf-showArchived`       | boolean              |                          |
+| `sf-customLogo`         | base64 string        |                          |
+| `sf-customBgColorDark`  | hex                  |                          |
+| `sf-customBgColorLight` | hex                  |                          |
+| `sf-customBgImage`      | base64 string        |                          |
+| `sf-headerBgColor`      | hex                  |                          |
+| `sf-kpiBgColor`         | hex                  |                          |
 
 Persistencia: POST a `/api/data` con todo el state serializado. Server escribe `data/app-data.json`. Sin auth, sin concurrencia, sin tenant. **NO se traslada al real.**
 
@@ -614,40 +614,40 @@ Persistencia: POST a `/api/data` con todo el state serializado. Server escribe `
 
 ## 13. Iconografía (lucide-react)
 
-| Icono | Uso |
-|---|---|
-| `LayoutDashboard` | Tab Embudo |
-| `Users` | Tab Clientes |
-| `Calendar`, `CalendarCheck` | Tab Calendario, follow-ups |
-| `Archive` | Tab Archivo |
-| `BarChart2` | Tab Estadísticas |
-| `Plus` | Add buttons |
-| `Search` | Search input |
-| `Droplets` | Logo default |
-| `Settings` | Botón settings |
-| `Printer` | Botón imprimir |
-| `Sun` / `Moon` | Toggle theme |
-| `ChevronLeft/Right/Down` | Navegación |
-| `User` | Filtro asesor / stage prospecto |
-| `Smartphone` | Filtro canal / canal whatsapp |
-| `Package` | Filtro equipo |
-| `AlertTriangle` | Filtro alertas |
-| `Clock` | Tiempo |
-| `Phone` | Phone field / canal teléfono / stage contactado |
-| `MessageSquare` | WhatsApp field |
-| `Mail` | Email field |
-| `Building2` | Empresa |
-| `Edit3`, `Save`, `X` | Edit / save / close |
-| `Hash` | Quote reference |
-| `StickyNote` | Notas |
-| `History` | History timeline |
-| `Star` | Equipment custom fallback |
-| `RotateCcw` | Limpiar filtros |
-| `DollarSign` | Stage cotización |
-| `Flame` | Stage negociación |
-| `CheckCircle2` | Stage ganado |
-| `XCircle` | Stage perdido |
-| `Store` | Canal sala |
+| Icono                                             | Uso                                                      |
+| ------------------------------------------------- | -------------------------------------------------------- |
+| `LayoutDashboard`                                 | Tab Embudo                                               |
+| `Users`                                           | Tab Clientes                                             |
+| `Calendar`, `CalendarCheck`                       | Tab Calendario, follow-ups                               |
+| `Archive`                                         | Tab Archivo                                              |
+| `BarChart2`                                       | Tab Estadísticas                                         |
+| `Plus`                                            | Add buttons                                              |
+| `Search`                                          | Search input                                             |
+| `Droplets`                                        | Logo default                                             |
+| `Settings`                                        | Botón settings                                           |
+| `Printer`                                         | Botón imprimir                                           |
+| `Sun` / `Moon`                                    | Toggle theme                                             |
+| `ChevronLeft/Right/Down`                          | Navegación                                               |
+| `User`                                            | Filtro asesor / stage prospecto                          |
+| `Smartphone`                                      | Filtro canal / canal whatsapp                            |
+| `Package`                                         | Filtro equipo                                            |
+| `AlertTriangle`                                   | Filtro alertas                                           |
+| `Clock`                                           | Tiempo                                                   |
+| `Phone`                                           | Phone field / canal teléfono / stage contactado          |
+| `MessageSquare`                                   | WhatsApp field                                           |
+| `Mail`                                            | Email field                                              |
+| `Building2`                                       | Empresa                                                  |
+| `Edit3`, `Save`, `X`                              | Edit / save / close                                      |
+| `Hash`                                            | Quote reference                                          |
+| `StickyNote`                                      | Notas                                                    |
+| `History`                                         | History timeline                                         |
+| `Star`                                            | Equipment custom fallback                                |
+| `RotateCcw`                                       | Limpiar filtros                                          |
+| `DollarSign`                                      | Stage cotización                                         |
+| `Flame`                                           | Stage negociación                                        |
+| `CheckCircle2`                                    | Stage ganado                                             |
+| `XCircle`                                         | Stage perdido                                            |
+| `Store`                                           | Canal sala                                               |
 | `Waves`, `Thermometer`, `Zap`, `Wind`, `Activity` | Equipment icons (Bomba/Sauna/Calentador/Filtro/Hidrojet) |
 
 ---
@@ -664,49 +664,49 @@ Persistencia: POST a `/api/data` con todo el state serializado. Server escribe `
 
 ## 15. Gaps del demo (deben diseñarse de cero)
 
-| Gap | Impacto | Categoría |
-|---|---|---|
-| No hay autenticación | Cualquier usuario ve todo. | V1-obligatorio (Auth.js) |
-| No hay multitenancy | Un único negocio. | V1-obligatorio (Tenant) |
-| No hay roles/permisos | Sin RBAC. | V1-obligatorio (RBAC) |
-| Persistencia file-based sin concurrencia | Race conditions. | V1-obligatorio (Postgres + RLS) |
-| Imágenes en base64 en JSON 5MB | Inviable a escala. | V1-obligatorio (Object storage) |
-| Búsqueda client-side full | No escala. | V1-obligatorio (índices BD + search server) |
-| Search modal feedback | Sin "sin resultados". | V1-inferido |
-| Notificaciones | No hay. Follow-up overdue no avisa. | V1-inferido (in-app) / Post-V1 (email) |
-| Sin auditoría usuario | History no atribuye al usuario que actuó. | V1-obligatorio (Activity con userId) |
-| Sin CSV/Excel import-export | El primer cliente lo pide. | Decisión-pendiente |
-| Sin i18n | Hardcoded es-GT. | Decisión-pendiente (i18n V1 vs Post-V1) |
-| Sin MFA / password reset | Auth básica. | V1-inferido (Auth.js soporta) |
-| Sin email transaccional | Onboarding/invitación rotas. | V1-obligatorio (proveedor TBD) |
-| Mobile responsive | Demo funciona pero no está optimizado. | V1-inferido |
-| Accesibilidad teclado | DnD no accesible. | V1-inferido (`@dnd-kit` con keyboard sensor) |
-| Validaciones server-side | Demo sólo client. | V1-obligatorio (Zod) |
-| Detección duplicados de cliente | Demo lo intenta pero el flujo es tosco. | V1-obligatorio (UX explícito) |
-| Soft-delete vs hard-delete | Sólo archive. | Decisión-pendiente |
-| Multi-pipeline por tenant | Demo: 1 pipeline. | Decisión-pendiente |
-| Recargas concurrentes (multi-usuario) | Demo: state local. | V1-obligatorio (RSC + revalidate) |
-| Custom fields | Demo: estructura fija. | V1-obligatorio (engine de custom fields) |
-| Branding por tenant | Demo: global. | V1-obligatorio (TenantBranding) |
+| Gap                                      | Impacto                                   | Categoría                                    |
+| ---------------------------------------- | ----------------------------------------- | -------------------------------------------- |
+| No hay autenticación                     | Cualquier usuario ve todo.                | V1-obligatorio (Auth.js)                     |
+| No hay multitenancy                      | Un único negocio.                         | V1-obligatorio (Tenant)                      |
+| No hay roles/permisos                    | Sin RBAC.                                 | V1-obligatorio (RBAC)                        |
+| Persistencia file-based sin concurrencia | Race conditions.                          | V1-obligatorio (Postgres + RLS)              |
+| Imágenes en base64 en JSON 5MB           | Inviable a escala.                        | V1-obligatorio (Object storage)              |
+| Búsqueda client-side full                | No escala.                                | V1-obligatorio (índices BD + search server)  |
+| Search modal feedback                    | Sin "sin resultados".                     | V1-inferido                                  |
+| Notificaciones                           | No hay. Follow-up overdue no avisa.       | V1-inferido (in-app) / Post-V1 (email)       |
+| Sin auditoría usuario                    | History no atribuye al usuario que actuó. | V1-obligatorio (Activity con userId)         |
+| Sin CSV/Excel import-export              | El primer cliente lo pide.                | Decisión-pendiente                           |
+| Sin i18n                                 | Hardcoded es-GT.                          | Decisión-pendiente (i18n V1 vs Post-V1)      |
+| Sin MFA / password reset                 | Auth básica.                              | V1-inferido (Auth.js soporta)                |
+| Sin email transaccional                  | Onboarding/invitación rotas.              | V1-obligatorio (proveedor TBD)               |
+| Mobile responsive                        | Demo funciona pero no está optimizado.    | V1-inferido                                  |
+| Accesibilidad teclado                    | DnD no accesible.                         | V1-inferido (`@dnd-kit` con keyboard sensor) |
+| Validaciones server-side                 | Demo sólo client.                         | V1-obligatorio (Zod)                         |
+| Detección duplicados de cliente          | Demo lo intenta pero el flujo es tosco.   | V1-obligatorio (UX explícito)                |
+| Soft-delete vs hard-delete               | Sólo archive.                             | Decisión-pendiente                           |
+| Multi-pipeline por tenant                | Demo: 1 pipeline.                         | Decisión-pendiente                           |
+| Recargas concurrentes (multi-usuario)    | Demo: state local.                        | V1-obligatorio (RSC + revalidate)            |
+| Custom fields                            | Demo: estructura fija.                    | V1-obligatorio (engine de custom fields)     |
+| Branding por tenant                      | Demo: global.                             | V1-obligatorio (TenantBranding)              |
 
 ---
 
 ## 16. Mapeo demo → producto real (resumen)
 
-| Concepto demo | Concepto real |
-|---|---|
-| `sf-deals` | tabla `Deal` con `tenantId` |
-| `sf-collaborators` | tabla `User` + `Membership(role)` |
-| `sf-stages` | tabla `PipelineStage` ligada a `Pipeline` (un pipeline por tenant en V1) |
-| `sf-channels`, `sf-equipment` | tabla `CatalogItem(tenantId, catalogKey, label, color, iconKey, metadata)` |
-| `sf-clientOverrides` | tabla `Client` (deja de ser override; es entidad propia con `customData JSONB`) |
-| `sf-customLogo` etc. | tabla `TenantBranding` |
-| Base64 photos | URL a object storage |
-| `data/app-data.json` | Postgres + RLS |
-| `dealCounter` | secuencia/`Counter` por tenant |
-| `AQX` prefijo | `tenantPrefix` en `TenantSettings` |
-| Estructura fija de Deal | Deal core + `customData JSONB` + `CustomFieldDefinition` |
-| `history` array embebido | tabla `Activity(tenantId, dealId, userId, type, payload, ts)` |
+| Concepto demo                 | Concepto real                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------- |
+| `sf-deals`                    | tabla `Deal` con `tenantId`                                                     |
+| `sf-collaborators`            | tabla `User` + `Membership(role)`                                               |
+| `sf-stages`                   | tabla `PipelineStage` ligada a `Pipeline` (un pipeline por tenant en V1)        |
+| `sf-channels`, `sf-equipment` | tabla `CatalogItem(tenantId, catalogKey, label, color, iconKey, metadata)`      |
+| `sf-clientOverrides`          | tabla `Client` (deja de ser override; es entidad propia con `customData JSONB`) |
+| `sf-customLogo` etc.          | tabla `TenantBranding`                                                          |
+| Base64 photos                 | URL a object storage                                                            |
+| `data/app-data.json`          | Postgres + RLS                                                                  |
+| `dealCounter`                 | secuencia/`Counter` por tenant                                                  |
+| `AQX` prefijo                 | `tenantPrefix` en `TenantSettings`                                              |
+| Estructura fija de Deal       | Deal core + `customData JSONB` + `CustomFieldDefinition`                        |
+| `history` array embebido      | tabla `Activity(tenantId, dealId, userId, type, payload, ts)`                   |
 
 ---
 
