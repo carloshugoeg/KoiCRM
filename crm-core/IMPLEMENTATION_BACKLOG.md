@@ -21,7 +21,7 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 - [x] [T1.1 Bootstrap Next.js + TS strict + pnpm](#t11-bootstrap-nextjs--ts-strict--pnpm)
 - [x] [T1.2 Tailwind + shadcn/ui setup](#t12-tailwind--shadcnui-setup)
 - [x] [T1.3 Lint, format, type-check, CI mínima](#t13-lint-format-type-check-ci-m%C3%ADnima)
-- [ ] [T1.4 Prisma + Postgres en Docker para dev](#t14-prisma--postgres-en-docker-para-dev)
+- [x] [T1.4 Prisma + Postgres en Docker para dev](#t14-prisma--postgres-en-docker-para-dev)
 - [ ] [T1.5 Estructura de carpetas + README de developer](#t15-estructura-de-carpetas--readme-de-developer)
 
 ### M2 — Data model y migraciones
@@ -177,10 +177,10 @@ Cada task usa este formato:
 - **Notas**: §4.3, §19.
 - **Riesgos**: olvidar el usuario sin BYPASSRLS rompe las pruebas de RLS de M3.
 - **Subtasks**:
-  - [ ] Compose con Postgres + script init que crea `app_user` y `admin_user`.
-  - [ ] `.env.example` con `DATABASE_URL` y `DATABASE_ADMIN_URL`.
-  - [ ] Singleton Prisma con `globalThis` para hot-reload.
-  - [ ] README con comandos `db:up`, `db:reset`, `db:migrate`.
+  - [x] Compose con Postgres + script init que crea `app_user` y `admin_user`.
+  - [x] `.env.example` con `DATABASE_URL` y `DATABASE_ADMIN_URL`.
+  - [x] Singleton Prisma con `globalThis` para hot-reload.
+  - [x] README con comandos `db:up`, `db:reset`, `db:migrate`.
 
 ### T1.5 Estructura de carpetas + README de developer
 
