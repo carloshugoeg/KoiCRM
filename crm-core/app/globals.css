@@ -10,8 +10,11 @@
     --color-header: 220 25% 15%;
     --color-kpi: 220 90% 56%;
 
+    /* Wire shadcn tokens to tenant tokens so JS overrides take effect */
+    --primary: var(--color-primary);
+    --background: var(--color-background);
+
     /* shadcn/ui design tokens */
-    --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
@@ -20,7 +23,6 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 220 90% 56%;
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -43,10 +45,15 @@
   }
 
   .dark {
-    --color-background: 222.2 84% 4.9%;
-    --color-header: 220 25% 10%;
+    --color-primary: 220 80% 65%;
+    --color-kpi: 220 80% 65%;
+    --color-background: 220 20% 10%;
+    --color-header: 220 30% 8%;
 
-    --background: 222.2 84% 4.9%;
+    /* Wire shadcn tokens to tenant tokens */
+    --primary: var(--color-primary);
+    --background: var(--color-background);
+
     --foreground: 210 40% 98%;
 
     --card: 222.2 84% 4.9%;
@@ -55,7 +62,6 @@
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 220 90% 56%;
     --primary-foreground: 222.2 47.4% 11.2%;
 
     --secondary: 217.2 32.6% 17.5%;
