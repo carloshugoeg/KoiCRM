@@ -26,10 +26,10 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 
 ### M2 — Data model y migraciones
 
-- [ ] [T2.1 Schema Prisma core + identidad](#t21-schema-prisma-core--identidad)
-- [ ] [T2.2 Schema Prisma negocio + custom fields](#t22-schema-prisma-negocio--custom-fields)
-- [ ] [T2.3 RLS policies y migraciones SQL](#t23-rls-policies-y-migraciones-sql)
-- [ ] [T2.4 Counter + ID generator de Deal](#t24-counter--id-generator-de-deal)
+- [x] [T2.1 Schema Prisma core + identidad](#t21-schema-prisma-core--identidad)
+- [x] [T2.2 Schema Prisma negocio + custom fields](#t22-schema-prisma-negocio--custom-fields)
+- [x] [T2.3 RLS policies y migraciones SQL](#t23-rls-policies-y-migraciones-sql)
+- [x] [T2.4 Counter + ID generator de Deal](#t24-counter--id-generator-de-deal)
 
 ### M3 — Tenant / Auth / Roles
 
@@ -213,9 +213,9 @@ Cada task usa este formato:
 - **Tests requeridos**: integration `tests/integration/identity.test.ts` que crea tenant+user+membership y verifica unicidad.
 - **Notas**: §4.1.
 - **Subtasks**:
-  - [ ] Definir modelos según §4.1 + §6.
-  - [ ] Migración generada.
-  - [ ] Script de smoke test manual.
+  - [x] Definir modelos según §4.1 + §6.
+  - [x] Migración generada.
+  - [x] Script de smoke test manual.
 
 ### T2.2 Schema Prisma negocio + custom fields
 
@@ -229,9 +229,9 @@ Cada task usa este formato:
 - **Tests requeridos**: integration que inserta un Deal con todas sus relaciones.
 - **Notas**: §7.
 - **Subtasks**:
-  - [ ] Modelos según §7.1–7.12.
-  - [ ] Migración aplicada.
-  - [ ] Smoke test que crea pipeline + 3 stages + catalog items + deal + quote + payment + followup.
+  - [x] Modelos según §7.1–7.12.
+  - [x] Migración aplicada.
+  - [x] Smoke test que crea pipeline + 3 stages + catalog items + deal + quote + payment + followup.
 
 ### T2.3 RLS policies y migraciones SQL
 
@@ -248,10 +248,10 @@ Cada task usa este formato:
 - **Notas**: §4.3.
 - **Riesgos**: olvidar una tabla. **Mitigación**: test que verifica para cada tabla con `tenantId` que existe la policy (consulta a `pg_policies`).
 - **Subtasks**:
-  - [ ] SQL `ALTER TABLE … ENABLE ROW LEVEL SECURITY` para cada tabla.
-  - [ ] Policy `tenant_isolation` por tabla.
-  - [ ] Test que enumera tablas y verifica policy.
-  - [ ] Test funcional con dos tenants.
+  - [x] SQL `ALTER TABLE … ENABLE ROW LEVEL SECURITY` para cada tabla.
+  - [x] Policy `tenant_isolation` por tabla.
+  - [x] Test que enumera tablas y verifica policy.
+  - [x] Test funcional con dos tenants.
 
 ### T2.4 Counter + ID generator de Deal
 
@@ -265,9 +265,9 @@ Cada task usa este formato:
 - **Tests requeridos**: integration `tests/integration/deal-id.test.ts`.
 - **Notas**: §7.12, §7.1 de DEMO_INVENTORY.
 - **Subtasks**:
-  - [ ] Helper que recibe `tx` y `tenantId`.
-  - [ ] Uso de `SELECT ... FOR UPDATE` o upsert atómico.
-  - [ ] Test de unicidad bajo carga.
+  - [x] Helper que recibe `tx` y `tenantId`.
+  - [x] Uso de `SELECT ... FOR UPDATE` o upsert atómico.
+  - [x] Test de unicidad bajo carga.
 
 ---
 

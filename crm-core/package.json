@@ -16,6 +16,7 @@
     "lint:check": "next lint && prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.config.integration.ts",
     "prepare": "husky",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
@@ -52,6 +53,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.17.57",
+    "@types/pg": "^8.20.0",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
@@ -63,6 +65,7 @@
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "lint-staged": "^16.4.0",
+    "pg": "^8.20.0",
     "postcss": "^8.5.13",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
