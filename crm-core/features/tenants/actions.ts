@@ -29,14 +29,19 @@ export async function createTenantAction(
   const existing = await prisma.tenant.findUnique({ where: { slug } })
   if (existing) return { ok: false, error: "Ese slug ya está en uso. Elige otro." }
 
-  const tenant = await prisma.$transaction(async (tx) => {
-    const t = await tx.tenant.create({ data: { name, slug, industrySlug } })
-    await tx.membership.create({
-      data: { userId: session.user.id, tenantId: t.id, role: "OWNER" },
+  try {
+    const tenant = await prisma.$transaction(async (tx) => {
+      const t = await tx.tenant.create({ data: { name, slug, industrySlug } })
+      await tx.membership.create({
+        data: { userId: session.user.id, tenantId: t.id, role: "OWNER" },
+      })
+      await applyIndustryTemplate(t.id, industrySlug, tx)
+      return t
     })
-    await applyIndustryTemplate(t.id, industrySlug, tx)
-    return t
-  })
-
-  return { ok: true, slug: tenant.slug }
+    return { ok: true, slug: tenant.slug }
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code
+    if (code === "P2002") return { ok: false, error: "Ese slug ya está en uso. Elige otro." }
+    throw err
+  }
 }
