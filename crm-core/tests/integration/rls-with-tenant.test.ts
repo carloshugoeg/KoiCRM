@@ -35,6 +35,12 @@ beforeAll(async () => {
   await Promise.all([
     prismaAdmin.deal.create({ data: { id: `deal-a-${suffix}`, tenantId: tenantAId, pipelineId: pipelineA.id, stageId: stageA.id, ownerId: userAId, name: "Deal A", channelKey: "web", statusKey: "active", value: 100 } }),
     prismaAdmin.deal.create({ data: { id: `deal-b-${suffix}`, tenantId: tenantBId, pipelineId: pipelineB.id, stageId: stageB.id, ownerId: userBId, name: "Deal B", channelKey: "web", statusKey: "active", value: 200 } }),
+    prismaAdmin.catalogItem.createMany({
+      data: [
+        { tenantId: tenantAId, catalogKey: "channel", key: "web", label: "Web", order: 0 },
+        { tenantId: tenantBId, catalogKey: "channel", key: "web", label: "Web", order: 0 },
+      ],
+    }),
   ])
 })
 
@@ -73,12 +79,20 @@ describe("withTenant RLS isolation", () => {
       withTenant(tenantAId, (tx) => tx.catalogItem.findMany()),
       withTenant(tenantBId, (tx) => tx.catalogItem.findMany()),
     ])
+    expect(catA.length).toBeGreaterThan(0)
+    expect(catB.length).toBeGreaterThan(0)
     expect(catA.every((c) => c.tenantId === tenantAId)).toBe(true)
     expect(catB.every((c) => c.tenantId === tenantBId)).toBe(true)
   })
 
-  it("memberships are isolated per tenant", async () => {
-    const members = await withTenant(tenantAId, (tx) => tx.membership.findMany())
-    expect(members.every((m) => m.tenantId === tenantAId)).toBe(true)
+  it("pipeline stages are isolated per tenant", async () => {
+    const [stagesA, stagesB] = await Promise.all([
+      withTenant(tenantAId, (tx) => tx.pipelineStage.findMany()),
+      withTenant(tenantBId, (tx) => tx.pipelineStage.findMany()),
+    ])
+    expect(stagesA.length).toBeGreaterThan(0)
+    expect(stagesB.length).toBeGreaterThan(0)
+    expect(stagesA.every((s) => s.tenantId === tenantAId)).toBe(true)
+    expect(stagesB.every((s) => s.tenantId === tenantBId)).toBe(true)
   })
 })
