@@ -68,6 +68,7 @@ Una task solo se marca como done cuando **todo** lo siguiente es cierto:
   - Tests que validen la plantilla aquasistemas.
 - Si te encuentras escribiendo un `if (industry === 'aquasistemas')` en `app/`, `features/`, `components/` o `lib/`, **es bug**. Convierte el caso en configuración, custom field, o regla de catálogo.
 - Ver §24 de `ARCHITECTURE_PLAN.md` para la tabla completa core / plantilla / tenant.
+- **`withTenant()` es obligatorio**: cualquier query a tablas de negocio (Deal, Client, Pipeline, CatalogItem, etc.) desde server actions o API routes DEBE pasar por `withTenant(tenantId, tx => ...)` de `lib/db/rls.ts`. No existe excepción para "una query rápida". Si no tienes el tenantId disponible en ese punto, es señal de que falta resolver el tenant antes.
 
 ---
 
