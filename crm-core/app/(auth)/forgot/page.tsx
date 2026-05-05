@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -56,5 +56,5 @@ function ForgotForm() {
 }
 
 export default function ForgotPage() {
-  return <Suspense><ForgotForm /></Suspense>
+  return <ForgotForm />
 }
