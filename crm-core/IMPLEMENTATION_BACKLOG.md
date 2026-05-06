@@ -33,12 +33,12 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 
 ### M3 — Tenant / Auth / Roles
 
-- [ ] [T3.1 Auth.js v5 con email+password y OAuth Google](#t31-authjs-v5-con-emailpassword-y-oauth-google)
-- [ ] [T3.2 Onboarding: crear tenant, elegir industria, aplicar plantilla](#t32-onboarding-crear-tenant-elegir-industria-aplicar-plantilla)
-- [ ] [T3.3 Tenant resolver por slug + layout autenticado](#t33-tenant-resolver-por-slug--layout-autenticado)
-- [ ] [T3.4 RBAC + helpers de policy](#t34-rbac--helpers-de-policy)
-- [ ] [T3.5 withTenant() helper + tests de RLS](#t35-withtenant-helper--tests-de-rls)
-- [ ] [T3.6 Invitar usuarios + email transaccional](#t36-invitar-usuarios--email-transaccional)
+- [x] [T3.1 Auth.js v5 con email+password y OAuth Google](#t31-authjs-v5-con-emailpassword-y-oauth-google)
+- [x] [T3.2 Onboarding: crear tenant, elegir industria, aplicar plantilla](#t32-onboarding-crear-tenant-elegir-industria-aplicar-plantilla)
+- [x] [T3.3 Tenant resolver por slug + layout autenticado](#t33-tenant-resolver-por-slug--layout-autenticado)
+- [x] [T3.4 RBAC + helpers de policy](#t34-rbac--helpers-de-policy)
+- [x] [T3.5 withTenant() helper + tests de RLS](#t35-withtenant-helper--tests-de-rls)
+- [x] [T3.6 Invitar usuarios + email transaccional](#t36-invitar-usuarios--email-transaccional)
 
 ### M4 — White label y configuración
 
@@ -287,11 +287,11 @@ Cada task usa este formato:
 - **Tests requeridos**: E2E Playwright signup → verify email → signin → signout.
 - **Notas**: §1, §16.
 - **Subtasks**:
-  - [ ] Adapter Prisma para Auth.js v5.
-  - [ ] Páginas `/signin`, `/signup`, `/forgot`, `/reset`.
+  - [x] Adapter Prisma para Auth.js v5.
+  - [x] Páginas `/signin`, `/signup`, `/forgot`, `/reset`.
   - [ ] Provider Google.
-  - [ ] Email de verificación + reset (mock en dev, Resend en prod).
-  - [ ] Rate limit en endpoints de auth.
+  - [x] Email de verificación + reset (mock en dev, Resend en prod).
+  - [x] Rate limit en endpoints de auth.
 
 ### T3.2 Onboarding: crear tenant, elegir industria, aplicar plantilla
 
@@ -306,10 +306,10 @@ Cada task usa este formato:
 - **Tests requeridos**: E2E "primer login → onboarding → pipeline vacío".
 - **Notas**: §7.11, §9.
 - **Subtasks**:
-  - [ ] Form de creación con validación de slug.
-  - [ ] Server action `createTenant({name, slug, industrySlug})`.
-  - [ ] `applyIndustryTemplate(tenantId, slug)` ejecuta dentro de transacción.
-  - [ ] Redirect post-onboarding.
+  - [x] Form de creación con validación de slug.
+  - [x] Server action `createTenant({name, slug, industrySlug})`.
+  - [x] `applyIndustryTemplate(tenantId, slug)` ejecuta dentro de transacción.
+  - [x] Redirect post-onboarding.
 
 ### T3.3 Tenant resolver por slug + layout autenticado
 
@@ -323,9 +323,9 @@ Cada task usa este formato:
 - **Tests requeridos**: E2E "usuario sin acceso a tenant X recibe 404".
 - **Notas**: §4.2.
 - **Subtasks**:
-  - [ ] `resolveTenant(slug, session)` en server.
-  - [ ] Tenant context provider para client components.
-  - [ ] Header con dropdown de tenants disponibles si > 1.
+  - [x] `resolveTenant(slug, session)` en server.
+  - [x] Tenant context provider para client components.
+  - [x] Header con dropdown de tenants disponibles si > 1.
 
 ### T3.4 RBAC + helpers de policy
 
@@ -339,8 +339,8 @@ Cada task usa este formato:
 - **Tests requeridos**: integration `rbac.test.ts` con múltiples combinaciones.
 - **Notas**: §5.
 - **Subtasks**:
-  - [ ] Tipos y helper centralizado.
-  - [ ] Tests de matriz rol×acción.
+  - [x] Tipos y helper centralizado.
+  - [x] Tests de matriz rol×acción.
 
 ### T3.5 withTenant() helper + tests de RLS
 
@@ -354,9 +354,9 @@ Cada task usa este formato:
 - **Tests requeridos**: integration que verifica que sin `withTenant` no se ven filas.
 - **Notas**: §4.3.
 - **Subtasks**:
-  - [ ] Implementación.
-  - [ ] Test extra que llama a 5 queries de distintas tablas y verifica aislamiento.
-  - [ ] Documentar la regla en `AGENT_RULES.md`.
+  - [x] Implementación.
+  - [x] Test extra que llama a 5 queries de distintas tablas y verifica aislamiento.
+  - [x] Documentar la regla en `AGENT_RULES.md`.
 
 ### T3.6 Invitar usuarios + email transaccional
 
@@ -370,9 +370,9 @@ Cada task usa este formato:
 - **Tests requeridos**: E2E "invitar → aceptar → ver tenant".
 - **Notas**: §16.
 - **Subtasks**:
-  - [ ] Tabla `Invitation(tenantId, email, role, token, expiresAt, acceptedAt)`.
-  - [ ] Email template (Resend en prod, log en dev).
-  - [ ] UI de Settings → Usuarios con lista, invitar, cambiar rol, remover.
+  - [x] Tabla `Invitation(tenantId, email, role, token, expiresAt, acceptedAt)`.
+  - [x] Email template (Resend en prod, log en dev).
+  - [x] UI de Settings → Usuarios con lista, invitar, cambiar rol, remover.
 
 ---
 
