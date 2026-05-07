@@ -22,6 +22,9 @@ export async function updateStageAction(raw: unknown): Promise<{ ok: boolean; er
     return { ok: false, error: "Acceso denegado." }
   }
 
+  const stage = await prisma.pipelineStage.findUnique({ where: { id, tenantId } })
+  if (!stage) return { ok: false, error: "Etapa no encontrada." }
+
   await withTenant(tenantId, async (tx) => {
     await tx.pipelineStage.update({ where: { id }, data: fields })
   })
@@ -77,6 +80,7 @@ export async function deleteStageAction(raw: unknown): Promise<{ ok: boolean; er
   // Verify stage belongs to this tenant
   const stage = await prisma.pipelineStage.findUnique({ where: { id, tenantId } })
   if (!stage) return { ok: false, error: "Etapa no encontrada." }
+  if (stage.locked) return { ok: false, error: "No se puede eliminar una etapa bloqueada." }
 
   const dealCount = await prisma.deal.count({ where: { stageId: id } })
   if (dealCount > 0) {

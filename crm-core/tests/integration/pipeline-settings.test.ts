@@ -49,9 +49,37 @@ describe("Pipeline stage management", () => {
     expect(stages[2].key).toBe("contactado")
   })
 
-  it("blocks deletion of a stage with deals by verifying deal count", async () => {
-    const count = await prismaAdmin.deal.count({ where: { stageId: stageIds[0] } })
-    expect(count).toBe(0) // no deals, deletion would be allowed
+  it("blocks deletion of a stage that has deals", async () => {
+    // Create a user to own the deal
+    const user = await prismaAdmin.user.create({
+      data: { email: `pipeline-test-${Date.now()}@test.com`, emailVerified: new Date() },
+    })
+
+    // Create a deal in the first stage (stageIds[0])
+    const dealId = `TEST-PIPE-${Date.now()}`
+    await withTenant(tenantId, async (tx) => {
+      await tx.deal.create({
+        data: {
+          id: dealId,
+          tenantId,
+          pipelineId,
+          stageId: stageIds[0],
+          ownerId: user.id,
+          channelKey: "sala",
+          statusKey: "activo",
+          name: "Test Deal",
+          value: 1000,
+        },
+      })
+    })
+
+    // Verify a deletion would be blocked (count > 0)
+    const dealCount = await prismaAdmin.deal.count({ where: { stageId: stageIds[0] } })
+    expect(dealCount).toBeGreaterThan(0)
+
+    // Cleanup deal and user
+    await prismaAdmin.deal.delete({ where: { id: dealId } })
+    await prismaAdmin.user.delete({ where: { id: user.id } })
   })
 
   it("updates stage label and color", async () => {
