@@ -73,7 +73,7 @@ export async function deleteCatalogItemAction(raw: unknown): Promise<{ ok: boole
     return { ok: false, error: "Acceso denegado." }
   }
 
-  const item = await prisma.catalogItem.findUnique({ where: { id } })
+  const item = await prisma.catalogItem.findUnique({ where: { id, tenantId } })
   if (!item) return { ok: false, error: "Item no encontrado." }
 
   const usage = await getCatalogItemUsageCount(tenantId, item.catalogKey as CatalogKey, item.key)
@@ -102,6 +102,11 @@ export async function reorderCatalogItemsAction(raw: unknown): Promise<{ ok: boo
   } catch {
     return { ok: false, error: "Acceso denegado." }
   }
+
+  const count = await prisma.catalogItem.count({
+    where: { id: { in: orderedIds }, tenantId, catalogKey: parsed.data.catalogKey },
+  })
+  if (count !== orderedIds.length) return { ok: false, error: "IDs inválidos." }
 
   await withTenant(tenantId, async (tx) => {
     await Promise.all(
