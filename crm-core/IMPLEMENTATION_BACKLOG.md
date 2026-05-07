@@ -46,7 +46,7 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 - [x] [T4.2 TenantSettings (locale, currency, dealIdPrefix)](#t42-tenantsettings-locale-currency-dealidprefix)
 - [x] [T4.3 Catalog management UI (Settings → Catálogos)](#t43-catalog-management-ui-settings--cat%C3%A1logos)
 - [x] [T4.4 Pipeline editor (Settings → Embudo)](#t44-pipeline-editor-settings--embudo)
-- [ ] [T4.5 Custom fields engine + UI básica](#t45-custom-fields-engine--ui-b%C3%A1sica)
+- [x] [T4.5 Custom fields engine + UI básica](#t45-custom-fields-engine--ui-b%C3%A1sica)
 
 ### M5 — Core CRM
 
@@ -455,10 +455,10 @@ Cada task usa este formato:
 - **Notas**: §7.2.
 - **Riesgos**: explosión de complejidad. Limitar alcance V1.
 - **Subtasks**:
-  - [ ] CRUD de definitions.
-  - [ ] Engine schema-builder.
-  - [ ] Renderer de fields en forms.
-  - [ ] Renderer de fields en vistas de detalle.
+  - [x] CRUD de definitions.
+  - [x] Engine schema-builder.
+  - [x] Renderer de fields en forms.
+  - [x] Renderer de fields en vistas de detalle.
 
 ---
 
