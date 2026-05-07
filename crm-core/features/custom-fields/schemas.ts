@@ -24,5 +24,5 @@ export const reorderCustomFieldsSchema = z.object({
   tenantId: z.string().min(1),
   tenantSlug: z.string().min(1),
   entity: z.enum(["Deal", "Client"]),
-  orderedIds: z.array(z.string()),
+  orderedIds: z.array(z.string()).min(1),
 })

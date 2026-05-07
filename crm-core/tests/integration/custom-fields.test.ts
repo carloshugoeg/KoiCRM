@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest"
 import { prismaAdmin, disconnectAll } from "./helpers"
 import { withTenant } from "@/lib/db/rls"
 import { buildCustomFieldSchema } from "@/lib/config/custom-fields"
+import type { CustomFieldDef } from "@/lib/config/custom-fields"
 
 describe("Custom fields engine", () => {
   let tenantId: string
@@ -85,5 +86,27 @@ describe("Custom fields engine", () => {
     // cleanup
     await prismaAdmin.deal.delete({ where: { id: dealId } })
     await prismaAdmin.user.delete({ where: { id: user.id } })
+  })
+
+  it("buildCustomFieldSchema validates multiselect with options", () => {
+    const defs: CustomFieldDef[] = [
+      { key: "tags", label: "Etiquetas", type: "multiselect", required: false, options: ["urgente", "vip", "nuevo"] },
+    ]
+    const schema = buildCustomFieldSchema(defs)
+    const good = schema.safeParse({ tags: ["urgente", "vip"] })
+    expect(good.success).toBe(true)
+    const bad = schema.safeParse({ tags: ["invalido"] })
+    expect(bad.success).toBe(false)
+  })
+
+  it("buildCustomFieldSchema rejects empty required number field", () => {
+    const defs: CustomFieldDef[] = [
+      { key: "qty", label: "Cantidad", type: "number", required: true, options: null },
+    ]
+    const schema = buildCustomFieldSchema(defs)
+    const bad = schema.safeParse({ qty: NaN })
+    expect(bad.success).toBe(false)
+    const good = schema.safeParse({ qty: 5 })
+    expect(good.success).toBe(true)
   })
 })

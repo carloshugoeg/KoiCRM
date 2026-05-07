@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth/auth"
 import { prisma } from "@/lib/db/client"
 import { withTenant } from "@/lib/db/rls"
@@ -26,20 +27,27 @@ export async function createCustomFieldAction(raw: unknown): Promise<{ ok: boole
     return { ok: false, error: "Acceso denegado." }
   }
 
-  await withTenant(tenantId, async (tx) => {
-    await tx.customFieldDefinition.create({
-      data: {
-        tenantId,
-        entity: data.entity,
-        key: data.key,
-        label: data.label,
-        type: data.type,
-        options: data.options ?? undefined,
-        required: data.required,
-        order: data.order,
-      },
+  try {
+    await withTenant(tenantId, async (tx) => {
+      await tx.customFieldDefinition.create({
+        data: {
+          tenantId,
+          entity: data.entity,
+          key: data.key,
+          label: data.label,
+          type: data.type,
+          options: data.options ?? undefined,
+          required: data.required,
+          order: data.order,
+        },
+      })
     })
-  })
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return { ok: false, error: "Ya existe un campo con esa clave para esta entidad." }
+    }
+    throw e
+  }
   revalidatePath(`/app/${tenantSlug}/settings/custom-fields`, "page")
   return { ok: true }
 }

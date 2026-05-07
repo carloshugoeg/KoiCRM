@@ -17,7 +17,7 @@ function buildFieldSchema(def: CustomFieldDef): z.ZodTypeAny {
       return def.required ? base.min(1, `${def.label} es requerido`) : base.optional()
     }
     case "number": {
-      const base = z.coerce.number()
+      const base = z.coerce.number({ message: `${def.label} es requerido` })
       return def.required ? base : base.optional()
     }
     case "date": {
