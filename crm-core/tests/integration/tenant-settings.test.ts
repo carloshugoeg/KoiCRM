@@ -43,4 +43,11 @@ describe("TenantSettings", () => {
     expect(result).toMatch(/1[,.]?500/)
     expect(result).toMatch(/\$|USD/)
   })
+
+  it("formatDate formats a date with locale and timezone", () => {
+    const date = new Date("2025-01-15T12:00:00Z")
+    const result = formatDate(date, { locale: "es-GT", timezone: "America/Guatemala" })
+    expect(result).toMatch(/ene|Jan|enero/i)
+    expect(result).toMatch(/15/)
+  })
 })

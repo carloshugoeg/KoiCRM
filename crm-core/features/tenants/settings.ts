@@ -15,7 +15,7 @@ const updateSettingsSchema = z.object({
   phoneFormat: z.string().max(20),
   whatsappCountryCode: z.string().max(10),
   dealIdPrefix: z.string().min(1).max(10).toUpperCase(),
-  dealIdYearDigits: z.number().int().min(2).max(4),
+  dealIdYearDigits: z.union([z.literal(2), z.literal(4)]),
 })
 
 export async function updateTenantSettingsAction(

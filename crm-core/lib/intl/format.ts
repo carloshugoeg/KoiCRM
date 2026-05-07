@@ -1,4 +1,4 @@
-type IntlSettings = {
+export type IntlSettings = {
   locale: string
   currency: string
   timezone?: string
