@@ -43,7 +43,7 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 ### M4 — White label y configuración
 
 - [x] [T4.1 TenantBranding + provider en layout](#t41-tenantbranding--provider-en-layout)
-- [ ] [T4.2 TenantSettings (locale, currency, dealIdPrefix)](#t42-tenantsettings-locale-currency-dealidprefix)
+- [x] [T4.2 TenantSettings (locale, currency, dealIdPrefix)](#t42-tenantsettings-locale-currency-dealidprefix)
 - [ ] [T4.3 Catalog management UI (Settings → Catálogos)](#t43-catalog-management-ui-settings--cat%C3%A1logos)
 - [ ] [T4.4 Pipeline editor (Settings → Embudo)](#t44-pipeline-editor-settings--embudo)
 - [ ] [T4.5 Custom fields engine + UI básica](#t45-custom-fields-engine--ui-b%C3%A1sica)
@@ -405,8 +405,8 @@ Cada task usa este formato:
 - **Tests requeridos**: integration que cambia `currency=USD` y verifica formateo.
 - **Notas**: §6, §21.
 - **Subtasks**:
-  - [ ] Form con validación.
-  - [ ] Helpers `lib/intl/*` que reciben tenant settings.
+  - [x] Form con validación.
+  - [x] Helpers `lib/intl/*` que reciben tenant settings.
 
 ### T4.3 Catalog management UI (Settings → Catálogos)
 
