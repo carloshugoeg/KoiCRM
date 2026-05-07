@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 
 type Tx = Omit<
   PrismaClient,

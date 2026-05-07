@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db/client"
+import type { prisma } from "@/lib/db/client"
 
 export interface StageConfig {
   key: string
