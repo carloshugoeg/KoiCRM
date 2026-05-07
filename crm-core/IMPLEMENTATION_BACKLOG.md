@@ -42,7 +42,7 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 
 ### M4 — White label y configuración
 
-- [ ] [T4.1 TenantBranding + provider en layout](#t41-tenantbranding--provider-en-layout)
+- [x] [T4.1 TenantBranding + provider en layout](#t41-tenantbranding--provider-en-layout)
 - [ ] [T4.2 TenantSettings (locale, currency, dealIdPrefix)](#t42-tenantsettings-locale-currency-dealidprefix)
 - [ ] [T4.3 Catalog management UI (Settings → Catálogos)](#t43-catalog-management-ui-settings--cat%C3%A1logos)
 - [ ] [T4.4 Pipeline editor (Settings → Embudo)](#t44-pipeline-editor-settings--embudo)
@@ -390,9 +390,9 @@ Cada task usa este formato:
 - **Tests requeridos**: E2E "cambiar color primario y verlo reflejado".
 - **Notas**: §6.
 - **Subtasks**:
-  - [ ] CSS variables aplicadas en root.
-  - [ ] Settings UI para colores y productName.
-  - [ ] Upload de logo (puede ser TODO hasta M6).
+  - [x] CSS variables aplicadas en root.
+  - [x] Settings UI para colores y productName.
+  - [x] Upload de logo (puede ser TODO hasta M6).
 
 ### T4.2 TenantSettings (locale, currency, dealIdPrefix)
 
