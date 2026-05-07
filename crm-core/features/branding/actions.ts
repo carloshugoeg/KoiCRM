@@ -28,7 +28,11 @@ export async function updateBrandingAction(
 
   const { tenantId, tenantSlug, ...fields } = parsed.data
 
-  await requireRole(session, tenantId, ["OWNER", "ADMIN"])
+  try {
+    await requireRole(session, tenantId, ["OWNER", "ADMIN"])
+  } catch {
+    return { ok: false, error: "Acceso denegado." }
+  }
 
   await withTenant(tenantId, async (tx) => {
     await tx.tenantBranding.upsert({
@@ -38,6 +42,6 @@ export async function updateBrandingAction(
     })
   })
 
-  revalidatePath(`/app/${tenantSlug}`)
+  revalidatePath(`/app/${tenantSlug}`, "layout")
   return { ok: true }
 }
