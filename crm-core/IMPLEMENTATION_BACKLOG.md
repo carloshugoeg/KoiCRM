@@ -45,7 +45,7 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 - [x] [T4.1 TenantBranding + provider en layout](#t41-tenantbranding--provider-en-layout)
 - [x] [T4.2 TenantSettings (locale, currency, dealIdPrefix)](#t42-tenantsettings-locale-currency-dealidprefix)
 - [x] [T4.3 Catalog management UI (Settings → Catálogos)](#t43-catalog-management-ui-settings--cat%C3%A1logos)
-- [ ] [T4.4 Pipeline editor (Settings → Embudo)](#t44-pipeline-editor-settings--embudo)
+- [x] [T4.4 Pipeline editor (Settings → Embudo)](#t44-pipeline-editor-settings--embudo)
 - [ ] [T4.5 Custom fields engine + UI básica](#t45-custom-fields-engine--ui-b%C3%A1sica)
 
 ### M5 — Core CRM
@@ -437,9 +437,9 @@ Cada task usa este formato:
 - **Tests requeridos**: integration "reordenar stages no rompe deals".
 - **Notas**: §7.3.
 - **Subtasks**:
-  - [ ] Reorder server action.
-  - [ ] Form de stage.
-  - [ ] Validación de delete.
+  - [x] Reorder server action.
+  - [x] Form de stage.
+  - [x] Validación de delete.
 
 ### T4.5 Custom fields engine + UI básica
 
