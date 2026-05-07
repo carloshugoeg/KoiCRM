@@ -44,7 +44,7 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 
 - [x] [T4.1 TenantBranding + provider en layout](#t41-tenantbranding--provider-en-layout)
 - [x] [T4.2 TenantSettings (locale, currency, dealIdPrefix)](#t42-tenantsettings-locale-currency-dealidprefix)
-- [ ] [T4.3 Catalog management UI (Settings → Catálogos)](#t43-catalog-management-ui-settings--cat%C3%A1logos)
+- [x] [T4.3 Catalog management UI (Settings → Catálogos)](#t43-catalog-management-ui-settings--cat%C3%A1logos)
 - [ ] [T4.4 Pipeline editor (Settings → Embudo)](#t44-pipeline-editor-settings--embudo)
 - [ ] [T4.5 Custom fields engine + UI básica](#t45-custom-fields-engine--ui-b%C3%A1sica)
 
@@ -420,9 +420,9 @@ Cada task usa este formato:
 - **Tests requeridos**: integration "crear, listar, marcar inactivo".
 - **Notas**: §7.4.
 - **Subtasks**:
-  - [ ] Server actions CRUD.
-  - [ ] UI con tabs por catálogo.
-  - [ ] Validación de borrado seguro.
+  - [x] Server actions CRUD.
+  - [x] UI con tabs por catálogo.
+  - [x] Validación de borrado seguro.
 
 ### T4.4 Pipeline editor (Settings → Embudo)
 
