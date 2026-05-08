@@ -2,8 +2,10 @@
 
 import Link from "next/link"
 import { signOut } from "next-auth/react"
+import { Search } from "lucide-react"
 import { useTenant } from "@/lib/tenant/context"
 import { Button } from "@/components/ui/button"
+import { CommandMenu } from "@/components/CommandMenu"
 import type { Membership, Tenant } from "@prisma/client"
 
 type MembershipWithTenant = Membership & { tenant: Pick<Tenant, "slug" | "name"> }
@@ -35,11 +37,24 @@ export function TenantHeader({ memberships }: Props) {
           ))}
         </nav>
       )}
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-muted-foreground text-xs gap-2"
+          onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }))}
+        >
+          <Search className="h-3.5 w-3.5" />
+          Buscar
+          <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+            ⌘K
+          </kbd>
+        </Button>
         <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: "/signin" })}>
           Salir
         </Button>
       </div>
+      <CommandMenu tenantId={tenant.id} tenantSlug={tenant.slug} />
     </header>
   )
 }

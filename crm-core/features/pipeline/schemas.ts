@@ -1,5 +1,16 @@
 import { z } from "zod"
 
+export const pipelineFiltersSchema = z.object({
+  owner: z.string().optional(),
+  channel: z.string().optional(),
+  equipment: z.string().optional(),
+  alerts: z.enum(["missingQuote", "missingPayment"]).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+})
+
+export type PipelineFiltersParams = z.infer<typeof pipelineFiltersSchema>
+
 export const updateStageSchema = z.object({
   tenantId: z.string().min(1),
   tenantSlug: z.string().min(1),

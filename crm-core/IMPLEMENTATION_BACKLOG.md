@@ -48,19 +48,19 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 - [x] [T4.4 Pipeline editor (Settings → Embudo)](#t44-pipeline-editor-settings--embudo)
 - [x] [T4.5 Custom fields engine + UI básica](#t45-custom-fields-engine--ui-b%C3%A1sica)
 
-### M5 — Core CRM
+### M5 — Core CRM ✅
 
-- [ ] [T5.1 Client CRUD + detect-or-create](#t51-client-crud--detect-or-create)
-- [ ] [T5.2 Deal CRUD + ClientFormModal real](#t52-deal-crud--clientformmodal-real)
-- [ ] [T5.3 Pipeline kanban con DnD accesible](#t53-pipeline-kanban-con-dnd-accesible)
-- [ ] [T5.4 Filtros globales + KPIs del header](#t54-filtros-globales--kpis-del-header)
-- [ ] [T5.5 DealDetail modal con tres paneles](#t55-dealdetail-modal-con-tres-paneles)
-- [ ] [T5.6 Activity log y history view](#t56-activity-log-y-history-view)
-- [ ] [T5.7 ClientsPage (sidebar + ficha + KPIs)](#t57-clientspage-sidebar--ficha--kpis)
-- [ ] [T5.8 ArchivePage paginada](#t58-archivepage-paginada)
-- [ ] [T5.9 Búsqueda global (Cmd-K)](#t59-b%C3%BAsqueda-global-cmd-k)
-- [ ] [T5.10 Notes en Deal y Client](#t510-notes-en-deal-y-client)
-- [ ] [T5.11 Print Report (Imprimir)](#t511-print-report-imprimir)
+- [x] [T5.1 Client CRUD + detect-or-create](#t51-client-crud--detect-or-create)
+- [x] [T5.2 Deal CRUD + ClientFormModal real](#t52-deal-crud--clientformmodal-real)
+- [x] [T5.3 Pipeline kanban con DnD accesible](#t53-pipeline-kanban-con-dnd-accesible)
+- [x] [T5.4 Filtros globales + KPIs del header](#t54-filtros-globales--kpis-del-header)
+- [x] [T5.5 DealDetail modal con tres paneles](#t55-dealdetail-modal-con-tres-paneles)
+- [x] [T5.6 Activity log y history view](#t56-activity-log-y-history-view)
+- [x] [T5.7 ClientsPage (sidebar + ficha + KPIs)](#t57-clientspage-sidebar--ficha--kpis)
+- [x] [T5.8 ArchivePage paginada](#t58-archivepage-paginada)
+- [x] [T5.9 Búsqueda global (Cmd-K)](#t59-b%C3%BAsqueda-global-cmd-k)
+- [x] [T5.10 Notes en Deal y Client](#t510-notes-en-deal-y-client)
+- [x] [T5.11 Print Report (Imprimir)](#t511-print-report-imprimir)
 
 ### M6 — Quotes, Payments, Attachments
 

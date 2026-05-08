@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db/client"
 
-type PrismaTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+export type PrismaTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 export async function withTenant<T>(
   tenantId: string,
