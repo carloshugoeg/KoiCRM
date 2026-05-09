@@ -62,11 +62,11 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 - [x] [T5.10 Notes en Deal y Client](#t510-notes-en-deal-y-client)
 - [x] [T5.11 Print Report (Imprimir)](#t511-print-report-imprimir)
 
-### M6 — Quotes, Payments, Attachments
+### M6 — Quotes, Payments, Attachments ✅
 
-- [ ] [T6.1 S3 sign helper + upload directo](#t61-s3-sign-helper--upload-directo)
-- [ ] [T6.2 Quote CRUD + isVoid + alerta "Falta Cotización"](#t62-quote-crud--isvoid--alerta-falta-cotizaci%C3%B3n)
-- [ ] [T6.3 Payment CRUD + alerta "Falta Pago"](#t63-payment-crud--alerta-falta-pago)
+- [x] [T6.1 S3 sign helper + upload directo](#t61-s3-sign-helper--upload-directo)
+- [x] [T6.2 Quote CRUD + isVoid + alerta "Falta Cotización"](#t62-quote-crud--isvoid--alerta-falta-cotizaci%C3%B3n)
+- [x] [T6.3 Payment CRUD + alerta "Falta Pago"](#t63-payment-crud--alerta-falta-pago)
 
 ### M7 — Follow-ups y Calendario
 
@@ -662,7 +662,7 @@ Cada task usa este formato:
 
 ## Milestone M6 — Quotes, Payments, Attachments
 
-### T6.1 S3 sign helper + upload directo
+### T6.1 S3 sign helper + upload directo ✅
 
 - **Objetivo**: cliente sube archivos a S3 vía URL firmada.
 - **Archivos esperados**: `lib/storage/s3.ts`, `app/api/upload/sign/route.ts`, `features/attachments/*`.
@@ -674,11 +674,11 @@ Cada task usa este formato:
 - **Tests requeridos**: integration con MinIO local.
 - **Notas**: §16.
 - **Subtasks**:
-  - [ ] AWS SDK v3 cliente.
-  - [ ] Endpoint sign.
-  - [ ] Helper client-side.
+  - [x] AWS SDK v3 cliente.
+  - [x] Endpoint sign.
+  - [x] Helper client-side.
 
-### T6.2 Quote CRUD + isVoid + alerta "Falta Cotización"
+### T6.2 Quote CRUD + isVoid + alerta "Falta Cotización" ✅
 
 - **Objetivo**: gestionar cotizaciones múltiples por deal.
 - **Archivos esperados**: `features/quotes/*`.
@@ -690,11 +690,11 @@ Cada task usa este formato:
 - **Tests requeridos**: integration con casos mixtos (todas void, una activa, etc.); E2E.
 - **Notas**: §7.4 de DEMO_INVENTORY.
 - **Subtasks**:
-  - [ ] Server actions.
-  - [ ] UI en DealDetail.
-  - [ ] Lógica de alerta.
+  - [x] Server actions.
+  - [x] UI en DealDetail.
+  - [x] Lógica de alerta.
 
-### T6.3 Payment CRUD + alerta "Falta Pago"
+### T6.3 Payment CRUD + alerta "Falta Pago" ✅
 
 - **Objetivo**: análogo a Quote para pagos.
 - **Archivos esperados**: `features/payments/*`.
@@ -706,9 +706,9 @@ Cada task usa este formato:
 - **Tests requeridos**: integration; E2E.
 - **Notas**: §7.4 de DEMO_INVENTORY.
 - **Subtasks**:
-  - [ ] Server actions.
-  - [ ] UI.
-  - [ ] Alerta.
+  - [x] Server actions.
+  - [x] UI.
+  - [x] Alerta.
 
 ---
 
