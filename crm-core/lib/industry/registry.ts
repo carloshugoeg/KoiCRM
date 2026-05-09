@@ -8,6 +8,8 @@ export interface StageConfig {
   iconKey: string
   order: number
   locked?: boolean
+  requiresQuote?: boolean
+  requiresPayment?: boolean
 }
 
 export interface CatalogItemConfig {
@@ -31,12 +33,12 @@ const AQUASISTEMAS: IndustryConfig = {
   slug: "aquasistemas",
   name: "Sistemas de agua y piscinas",
   stages: [
-    { key: "nuevo",        label: "Nuevo",              color: "#6366f1", iconKey: "circle",       order: 0 },
-    { key: "contactado",   label: "Contactado",          color: "#f59e0b", iconKey: "phone",        order: 1 },
-    { key: "propuesta",    label: "Propuesta enviada",   color: "#3b82f6", iconKey: "file-text",    order: 2 },
-    { key: "negociacion",  label: "En negociación",      color: "#8b5cf6", iconKey: "handshake",    order: 3 },
-    { key: "ganado",       label: "Ganado",              color: "#22c55e", iconKey: "check-circle", order: 4, locked: true },
-    { key: "perdido",      label: "Perdido",             color: "#ef4444", iconKey: "x-circle",     order: 5, locked: true },
+    { key: "nuevo",        label: "Nuevo",              color: "#6366f1", iconKey: "circle",       order: 0, requiresQuote: false, requiresPayment: false },
+    { key: "contactado",   label: "Contactado",          color: "#f59e0b", iconKey: "phone",        order: 1, requiresQuote: true, requiresPayment: false },
+    { key: "propuesta",    label: "Propuesta enviada",   color: "#3b82f6", iconKey: "file-text",    order: 2, requiresQuote: true, requiresPayment: false },
+    { key: "negociacion",  label: "En negociación",      color: "#8b5cf6", iconKey: "handshake",    order: 3, requiresQuote: true, requiresPayment: false },
+    { key: "ganado",       label: "Ganado",              color: "#22c55e", iconKey: "check-circle", order: 4, locked: true, requiresQuote: true, requiresPayment: true },
+    { key: "perdido",      label: "Perdido",             color: "#ef4444", iconKey: "x-circle",     order: 5, locked: true, requiresQuote: false, requiresPayment: false },
   ],
   catalogItems: [
     { catalogKey: "channel", key: "whatsapp", label: "WhatsApp",  color: "#22c55e", order: 0 },
@@ -84,6 +86,8 @@ export async function applyIndustryTemplate(
           iconKey: s.iconKey,
           order: s.order,
           locked: s.locked ?? false,
+          requiresQuote: s.requiresQuote ?? false,
+          requiresPayment: s.requiresPayment ?? false,
         })),
       },
     },
