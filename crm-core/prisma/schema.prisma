@@ -314,13 +314,14 @@ model Attachment {
   clientId  String?
   url       String
   mimeType  String
-  size      Int
+  size      BigInt
   key       String
   createdAt DateTime @default(now())
 
   deal   Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
   client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
+  @@unique([tenantId, key])
   @@index([tenantId, dealId])
 }
 
