@@ -26,7 +26,8 @@ const mockDeleteObject = vi.mocked(deleteObject);
 let tenantId: string;
 let userId: string;
 
-const fakeKey = "tenant-id/deals/deal-id/file.png";
+// fakeKey is set after tenantId is known (see beforeAll)
+let fakeKey: string;
 const fakeUrl = "https://pub.example.com/tenant-id/deals/deal-id/file.png";
 const fakeMimeType = "image/png";
 const fakeSize = 2048;
@@ -48,6 +49,7 @@ beforeAll(async () => {
     },
   });
   tenantId = tenant.id;
+  fakeKey = `${tenantId}/deals/deal-id/file.png`;
 
   const user = await prismaAdmin.user.create({
     data: { email: `attachment-user-${Date.now()}@test.com` },
@@ -133,6 +135,35 @@ describe("confirmUpload", () => {
     const settings = await prismaAdmin.tenantSettings.findUnique({ where: { tenantId } });
     expect(settings!.storageUsedBytes).toBe(BigInt(fakeSize));
   });
+
+  it("returns storage_limit_exceeded when quota is exceeded", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: userId } } as Session);
+
+    // Set storageMaxBytes to 0 to guarantee limit exceeded
+    await prismaAdmin.tenantSettings.update({
+      where: { tenantId },
+      data: { storageMaxBytes: BigInt(0) },
+    });
+
+    const uniqueKey = `${tenantId}/deals/deal-id/quota-test-${Date.now()}.png`;
+    const result = await confirmUpload(tenantId, {
+      key: uniqueKey,
+      url: fakeUrl,
+      mimeType: fakeMimeType,
+      size: fakeSize,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("storage_limit_exceeded");
+    }
+
+    // Reset storageMaxBytes
+    await prismaAdmin.tenantSettings.update({
+      where: { tenantId },
+      data: { storageMaxBytes: BigInt(10 * 1024 * 1024) },
+    });
+  });
 });
 
 // ── deleteAttachment tests ────────────────────────────────────────────────────
@@ -150,8 +181,9 @@ describe("deleteAttachment", () => {
   it("returns { ok: false, code: 'not_found' } when attachment doesn't exist", async () => {
     mockAuth.mockResolvedValueOnce({ user: { id: userId } } as Session);
 
-    // Use a valid cuid format but non-existent id
-    const result = await deleteAttachment(tenantId, "clxxxxxxxxxxxxxxxxxx99");
+    // "c" + 24 zeros is a valid CUID-shaped string that will never exist in the DB
+    const nonExistentId = "c" + "0".repeat(24);
+    const result = await deleteAttachment(tenantId, nonExistentId);
 
     expect(result.ok).toBe(false);
     expect((result as { ok: false; code: string }).code).toBe("not_found");
