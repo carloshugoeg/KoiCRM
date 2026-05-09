@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "TenantSettings" ADD COLUMN "fileSizeMaxBytes" BIGINT NOT NULL DEFAULT 104857600;

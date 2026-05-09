@@ -141,6 +141,7 @@ model TenantSettings {
   defaultPipelineId   String?
   storageMaxBytes     BigInt  @default(8589934592)
   storageUsedBytes    BigInt  @default(0)
+  fileSizeMaxBytes    BigInt  @default(104857600)  // 100 MiB per file
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
