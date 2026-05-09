@@ -1,0 +1,275 @@
+import { describe, it, expect, beforeAll, afterAll, vi, type Mock } from "vitest";
+import type { Session } from "next-auth";
+import { randomBytes } from "crypto";
+import { prismaAdmin, cleanDatabase, disconnectAll } from "./helpers";
+
+/** Generate a cuid-compatible string (starts with 'c', lowercase hex). */
+function makeCuid(): string {
+  return "c" + randomBytes(12).toString("hex");
+}
+
+// ── Mocks must be declared before any imports that use them ──────────────────
+
+vi.mock("@/lib/auth/auth", () => ({
+  auth: vi.fn(),
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
+// Import actions AFTER mocks are declared
+import {
+  createQuote,
+  voidQuote,
+  deleteQuote,
+} from "@/features/quotes/actions";
+import { auth } from "@/lib/auth/auth";
+
+const mockAuth = auth as unknown as Mock<() => Promise<Session | null>>;
+
+// ── Test data ────────────────────────────────────────────────────────────────
+
+let tenantId: string;
+let userId: string;
+let dealId: string;
+
+// ── Setup ────────────────────────────────────────────────────────────────────
+
+beforeAll(async () => {
+  await cleanDatabase();
+
+  const tenant = await prismaAdmin.tenant.create({
+    data: {
+      slug: `quote-test-${Date.now()}`,
+      name: "Quote Test Tenant",
+      settings: {
+        create: {
+          storageUsedBytes: BigInt(0),
+        },
+      },
+    },
+  });
+  tenantId = tenant.id;
+
+  const user = await prismaAdmin.user.create({
+    data: { email: `quote-user-${Date.now()}@test.com` },
+  });
+  userId = user.id;
+
+  await prismaAdmin.membership.create({
+    data: { userId, tenantId, role: "MEMBER" },
+  });
+
+  // Create pipeline + stages
+  const pipeline = await prismaAdmin.pipeline.create({
+    data: { tenantId, name: "Test Pipeline", isDefault: true },
+  });
+
+  const stage1 = await prismaAdmin.pipelineStage.create({
+    data: {
+      tenantId,
+      pipelineId: pipeline.id,
+      key: "contactado",
+      label: "Contactado",
+      color: "#3B82F6",
+      iconKey: "circle",
+      order: 0,
+      requiresQuote: true,
+      requiresPayment: false,
+    },
+  });
+
+  await prismaAdmin.pipelineStage.create({
+    data: {
+      tenantId,
+      pipelineId: pipeline.id,
+      key: "nuevo",
+      label: "Nuevo",
+      color: "#6B7280",
+      iconKey: "circle",
+      order: 1,
+      requiresQuote: false,
+      requiresPayment: false,
+    },
+  });
+
+  // Create a Deal in Stage 1 — use a cuid-compatible ID (Deal.id has no @default)
+  const deal = await prismaAdmin.deal.create({
+    data: {
+      id: makeCuid(),
+      tenantId,
+      pipelineId: pipeline.id,
+      stageId: stage1.id,
+      ownerId: userId,
+      name: "Deal for Quote Tests",
+      channelKey: "web",
+      statusKey: "active",
+      value: 1000,
+    },
+  });
+  dealId = deal.id;
+});
+
+afterAll(async () => {
+  await cleanDatabase();
+  await disconnectAll();
+});
+
+// ── createQuote tests ────────────────────────────────────────────────────────
+
+describe("createQuote", () => {
+  it("creates a quote and records quoteAdded Activity row", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: userId } } as Session);
+
+    const result = await createQuote(tenantId, {
+      dealId,
+      number: "COT-001",
+      date: new Date("2026-01-15"),
+    });
+
+    expect(result.ok).toBe(true);
+
+    // Verify quote row exists in DB
+    const quote = await prismaAdmin.quote.findFirst({ where: { dealId, number: "COT-001" } });
+    expect(quote).not.toBeNull();
+    expect(quote!.tenantId).toBe(tenantId);
+    expect(quote!.dealId).toBe(dealId);
+    expect(quote!.number).toBe("COT-001");
+    expect(quote!.isVoid).toBe(false);
+
+    // Verify activity row was recorded
+    const activity = await prismaAdmin.activity.findFirst({
+      where: { entityId: dealId, type: "quoteAdded" },
+    });
+    expect(activity).not.toBeNull();
+    expect(activity!.tenantId).toBe(tenantId);
+    expect(activity!.entity).toBe("Deal");
+  });
+
+  it("returns unauthorized when session is missing", async () => {
+    mockAuth.mockResolvedValueOnce(null);
+
+    const result = await createQuote(tenantId, {
+      dealId,
+      number: "COT-002",
+      date: new Date(),
+    });
+
+    expect(result.ok).toBe(false);
+    expect((result as { ok: false; code: string }).code).toBe("unauthorized");
+  });
+
+  it("returns unauthorized when role is VIEWER", async () => {
+    // Create a viewer user
+    const viewerUser = await prismaAdmin.user.create({
+      data: { email: `viewer-${Date.now()}@test.com` },
+    });
+    await prismaAdmin.membership.create({
+      data: { userId: viewerUser.id, tenantId, role: "VIEWER" },
+    });
+
+    mockAuth.mockResolvedValueOnce({ user: { id: viewerUser.id } } as Session);
+
+    const result = await createQuote(tenantId, {
+      dealId,
+      number: "COT-003",
+      date: new Date(),
+    });
+
+    expect(result.ok).toBe(false);
+    expect((result as { ok: false; code: string }).code).toBe("unauthorized");
+  });
+});
+
+// ── voidQuote tests ──────────────────────────────────────────────────────────
+
+describe("voidQuote", () => {
+  it("sets isVoid=true on existing quote", async () => {
+    // Create a quote to void
+    const quote = await prismaAdmin.quote.create({
+      data: {
+        tenantId,
+        dealId,
+        number: "COT-VOID-001",
+        date: new Date("2026-02-01"),
+      },
+    });
+
+    mockAuth.mockResolvedValueOnce({ user: { id: userId } } as Session);
+
+    const result = await voidQuote(tenantId, quote.id);
+
+    expect(result.ok).toBe(true);
+
+    const updated = await prismaAdmin.quote.findUnique({ where: { id: quote.id } });
+    expect(updated!.isVoid).toBe(true);
+  });
+});
+
+// ── deleteQuote tests ────────────────────────────────────────────────────────
+
+describe("deleteQuote", () => {
+  it("MEMBER cannot delete (only ADMIN+ can)", async () => {
+    const quote = await prismaAdmin.quote.create({
+      data: {
+        tenantId,
+        dealId,
+        number: "COT-DEL-MEMBER-001",
+        date: new Date("2026-03-01"),
+      },
+    });
+
+    mockAuth.mockResolvedValueOnce({ user: { id: userId } } as Session);
+
+    const result = await deleteQuote(tenantId, quote.id);
+
+    expect(result.ok).toBe(false);
+    expect((result as { ok: false; code: string }).code).toBe("unauthorized");
+
+    // Row should still exist
+    const still = await prismaAdmin.quote.findUnique({ where: { id: quote.id } });
+    expect(still).not.toBeNull();
+  });
+
+  it("ADMIN can delete a quote (row is gone)", async () => {
+    // Create an admin user
+    const adminUser = await prismaAdmin.user.create({
+      data: { email: `admin-${Date.now()}@test.com` },
+    });
+    await prismaAdmin.membership.create({
+      data: { userId: adminUser.id, tenantId, role: "ADMIN" },
+    });
+
+    const quote = await prismaAdmin.quote.create({
+      data: {
+        tenantId,
+        dealId,
+        number: "COT-DEL-ADMIN-001",
+        date: new Date("2026-03-15"),
+      },
+    });
+
+    mockAuth.mockResolvedValueOnce({ user: { id: adminUser.id } } as Session);
+
+    const result = await deleteQuote(tenantId, quote.id);
+
+    expect(result.ok).toBe(true);
+
+    const gone = await prismaAdmin.quote.findUnique({ where: { id: quote.id } });
+    expect(gone).toBeNull();
+  });
+});
+
+// ── hasQuoteAlert via deal query ──────────────────────────────────────────────
+
+describe("hasQuoteAlert via deal query", () => {
+  // TODO (Task 10): These tests will be added when the deal query includes
+  // hasQuoteAlert computed field. The PipelineStage already has requiresQuote=true
+  // for stage "contactado" and requiresQuote=false for stage "nuevo".
+  // The deal is in the "contactado" stage, so hasQuoteAlert should reflect
+  // whether the deal has at least one non-void quote.
+  it.todo("deal in requiresQuote stage with no quotes has hasQuoteAlert=true");
+  it.todo("deal in requiresQuote stage with at least one non-void quote has hasQuoteAlert=false");
+  it.todo("deal in non-requiresQuote stage has hasQuoteAlert=false regardless of quotes");
+});
