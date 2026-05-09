@@ -12,15 +12,17 @@ import { Separator } from "@/components/ui/separator"
 import { HistoryPanel } from "@/features/deals/components/HistoryPanel"
 import { NotesSection } from "@/features/notes/components/NotesSection"
 import { QuoteSection } from "@/features/quotes/components/QuoteSection"
+import { PaymentSection } from "@/features/payments/components/PaymentSection"
 import { updateDealFieldAction, moveDealAction, archiveDealAction } from "@/features/deals/actions"
 import { addFollowUpAction, completeFollowUpAction } from "@/features/follow-ups/actions"
 import { getDealActivity } from "@/features/activity/queries"
 import { getDealFollowUps } from "@/features/follow-ups/queries"
 import { getQuotesForDeal } from "@/features/quotes/queries"
+import { getPaymentsForDeal } from "@/features/payments/queries"
 import { avatarColor, avatarInitials } from "@/lib/utils/avatar-color"
 import { formatCurrency, formatDate } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
-import type { PipelineStage, CatalogItem, FollowUp, Quote } from "@prisma/client"
+import type { PipelineStage, CatalogItem, FollowUp, Quote, Payment } from "@prisma/client"
 import type { ActivityEntry } from "@/features/activity/queries"
 
 interface DealDetailData {
@@ -75,6 +77,7 @@ export function DealDetailModal({
   const [activities, setActivities] = useState<ActivityEntry[]>([])
   const [followUps, setFollowUps] = useState<FollowUp[]>([])
   const [quotes, setQuotes] = useState<Quote[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
   const [loadingAct, setLoadingAct] = useState(true)
 
   // Inline edit state
@@ -91,10 +94,12 @@ export function DealDetailModal({
       getDealActivity(tenantId, deal.id),
       getDealFollowUps(tenantId, deal.id),
       getQuotesForDeal(tenantId, deal.id),
-    ]).then(([acts, fus, qs]) => {
+      getPaymentsForDeal(tenantId, deal.id),
+    ]).then(([acts, fus, qs, ps]) => {
       setActivities(acts)
       setFollowUps(fus)
       setQuotes(qs)
+      setPayments(ps)
       setLoadingAct(false)
     })
   }, [tenantId, deal.id])
@@ -284,12 +289,15 @@ export function DealDetailModal({
               />
             </div>
 
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium">Pagos</p>
-                <Badge variant="outline" className="text-xs">{deal.paymentCount} activo(s)</Badge>
-              </div>
-              <p className="text-xs text-muted-foreground italic">Gestión de pagos — disponible en M6</p>
+            {/* Payments */}
+            <div className="border-t pt-4 mt-3">
+              <PaymentSection
+                dealId={deal.id}
+                tenantId={tenantId}
+                payments={payments}
+                canEdit={canEdit}
+                canDelete={canDelete}
+              />
             </div>
           </ScrollArea>
 
