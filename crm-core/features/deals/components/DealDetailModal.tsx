@@ -11,14 +11,16 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { HistoryPanel } from "@/features/deals/components/HistoryPanel"
 import { NotesSection } from "@/features/notes/components/NotesSection"
+import { QuoteSection } from "@/features/quotes/components/QuoteSection"
 import { updateDealFieldAction, moveDealAction, archiveDealAction } from "@/features/deals/actions"
 import { addFollowUpAction, completeFollowUpAction } from "@/features/follow-ups/actions"
 import { getDealActivity } from "@/features/activity/queries"
 import { getDealFollowUps } from "@/features/follow-ups/queries"
+import { getQuotesForDeal } from "@/features/quotes/queries"
 import { avatarColor, avatarInitials } from "@/lib/utils/avatar-color"
 import { formatCurrency, formatDate } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
-import type { PipelineStage, CatalogItem, FollowUp } from "@prisma/client"
+import type { PipelineStage, CatalogItem, FollowUp, Quote } from "@prisma/client"
 import type { ActivityEntry } from "@/features/activity/queries"
 
 interface DealDetailData {
@@ -48,6 +50,8 @@ interface DealDetailModalProps {
   tenantId: string
   tenantSlug: string
   settings: IntlSettings
+  canEdit?: boolean
+  canDelete?: boolean
   onClose: () => void
   onAction?: () => void
 }
@@ -63,11 +67,14 @@ export function DealDetailModal({
   tenantId,
   tenantSlug,
   settings,
+  canEdit = true,
+  canDelete = false,
   onClose,
   onAction,
 }: DealDetailModalProps) {
   const [activities, setActivities] = useState<ActivityEntry[]>([])
   const [followUps, setFollowUps] = useState<FollowUp[]>([])
+  const [quotes, setQuotes] = useState<Quote[]>([])
   const [loadingAct, setLoadingAct] = useState(true)
 
   // Inline edit state
@@ -80,13 +87,16 @@ export function DealDetailModal({
   const [fuLoading, setFuLoading] = useState(false)
 
   useEffect(() => {
-    Promise.all([getDealActivity(tenantId, deal.id), getDealFollowUps(tenantId, deal.id)]).then(
-      ([acts, fus]) => {
-        setActivities(acts)
-        setFollowUps(fus)
-        setLoadingAct(false)
-      }
-    )
+    Promise.all([
+      getDealActivity(tenantId, deal.id),
+      getDealFollowUps(tenantId, deal.id),
+      getQuotesForDeal(tenantId, deal.id),
+    ]).then(([acts, fus, qs]) => {
+      setActivities(acts)
+      setFollowUps(fus)
+      setQuotes(qs)
+      setLoadingAct(false)
+    })
   }, [tenantId, deal.id])
 
   async function saveField(field: string, value: string | number) {
@@ -263,13 +273,15 @@ export function DealDetailModal({
 
             <Separator />
 
-            {/* Stubs for M6 */}
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium">Cotizaciones</p>
-                <Badge variant="outline" className="text-xs">{deal.quoteCount} activa(s)</Badge>
-              </div>
-              <p className="text-xs text-muted-foreground italic">Gestión de cotizaciones — disponible en M6</p>
+            {/* Quotes */}
+            <div className="border-t pt-4 mt-3">
+              <QuoteSection
+                dealId={deal.id}
+                tenantId={tenantId}
+                quotes={quotes}
+                canEdit={canEdit}
+                canDelete={canDelete}
+              />
             </div>
 
             <div className="mt-3 space-y-2">

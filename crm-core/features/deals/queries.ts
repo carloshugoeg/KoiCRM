@@ -74,6 +74,8 @@ export async function getPipelineDeals(tenantId: string, filters: PipelineFilter
     hasOverdueFollowUp: d._count.followUps > 0,
     quoteCount: d._count.quotes,
     paymentCount: d._count.payments,
+    hasQuoteAlert: d.stage.requiresQuote && d._count.quotes === 0,
+    hasPaymentAlert: d.stage.requiresPayment && d._count.payments === 0,
   }))
 
   // Apply alert filter after fetch (simpler than SQL subquery)

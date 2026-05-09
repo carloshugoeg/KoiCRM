@@ -24,6 +24,8 @@ export interface DealCardData {
   hasActiveQuote: boolean
   hasActivePayment: boolean
   hasOverdueFollowUp: boolean
+  hasQuoteAlert: boolean
+  hasPaymentAlert: boolean
   stageKey: string
   quoteCount: number
   paymentCount: number
@@ -58,9 +60,8 @@ export function DealCard({ deal, settings, onClick }: DealCardProps) {
   const customEq = deal.equipment.find((e) => e.equipmentKey === "__custom__")
   const overflow = deal.equipment.filter((e) => e.equipmentKey !== "__custom__").length - 2
 
-  const missingQuoteAlert =
-    !deal.hasActiveQuote && deal.stageKey !== "prospecto" && deal.stageKey !== "perdido"
-  const missingPaymentAlert = !deal.hasActivePayment && deal.stageKey === "ganado"
+  const hasQuoteAlert = deal.hasQuoteAlert ?? false
+  const hasPaymentAlert = deal.hasPaymentAlert ?? false
 
   return (
     <div
@@ -68,7 +69,7 @@ export function DealCard({ deal, settings, onClick }: DealCardProps) {
       style={style}
       {...listeners}
       {...attributes}
-      className="bg-card border rounded-lg p-3 shadow-sm cursor-grab active:cursor-grabbing select-none"
+      className="relative bg-card border rounded-lg p-3 shadow-sm cursor-grab active:cursor-grabbing select-none"
       onClick={onClick}
     >
       {/* Header */}
@@ -119,12 +120,6 @@ export function DealCard({ deal, settings, onClick }: DealCardProps) {
           {deal.hasOverdueFollowUp && (
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Seguimiento vencido" />
           )}
-          {missingQuoteAlert && (
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" title="Falta cotización" />
-          )}
-          {missingPaymentAlert && (
-            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" title="Falta pago" />
-          )}
           {deal.statusKey !== "activo" && (
             <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded text-xs">
               {deal.statusKey}
@@ -132,6 +127,24 @@ export function DealCard({ deal, settings, onClick }: DealCardProps) {
           )}
         </div>
       </div>
+
+      {/* Alert dot — data-driven via stage.requiresQuote / requiresPayment */}
+      {(hasQuoteAlert || hasPaymentAlert) && (
+        <div
+          className="absolute top-1.5 right-1.5"
+          title={[
+            hasQuoteAlert ? "Falta Cotización" : null,
+            hasPaymentAlert ? "Falta Pago" : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        >
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+          </span>
+        </div>
+      )}
     </div>
   )
 }

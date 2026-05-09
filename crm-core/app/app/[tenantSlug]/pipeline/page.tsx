@@ -90,6 +90,8 @@ export default async function PipelinePage({ params, searchParams }: Props) {
     hasActiveQuote: d.hasActiveQuote,
     hasActivePayment: d.hasActivePayment,
     hasOverdueFollowUp: d.hasOverdueFollowUp,
+    hasQuoteAlert: d.hasQuoteAlert,
+    hasPaymentAlert: d.hasPaymentAlert,
     quoteCount: d.quoteCount ?? 0,
     paymentCount: d.paymentCount ?? 0,
   }))
@@ -118,6 +120,7 @@ export default async function PipelinePage({ params, searchParams }: Props) {
         logoUrl={tenant.branding?.logoUrl ?? null}
         productName={productName}
         canEdit={membership.role !== "VIEWER"}
+        canDelete={["OWNER", "ADMIN"].includes(membership.role)}
         followUpReasons={followUpReasons}
       />
       <PrintReport

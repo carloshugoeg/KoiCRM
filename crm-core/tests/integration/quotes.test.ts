@@ -24,6 +24,7 @@ import {
   voidQuote,
   deleteQuote,
 } from "@/features/quotes/actions";
+import { getPipelineDeals } from "@/features/deals/queries";
 import { auth } from "@/lib/auth/auth";
 
 const mockAuth = auth as unknown as Mock<() => Promise<Session | null>>;
@@ -33,6 +34,8 @@ const mockAuth = auth as unknown as Mock<() => Promise<Session | null>>;
 let tenantId: string;
 let userId: string;
 let dealId: string;
+let stage1Id: string;
+let stage2Id: string;
 
 // ── Setup ────────────────────────────────────────────────────────────────────
 
@@ -79,8 +82,9 @@ beforeAll(async () => {
       requiresPayment: false,
     },
   });
+  stage1Id = stage1.id;
 
-  await prismaAdmin.pipelineStage.create({
+  const stage2 = await prismaAdmin.pipelineStage.create({
     data: {
       tenantId,
       pipelineId: pipeline.id,
@@ -93,6 +97,7 @@ beforeAll(async () => {
       requiresPayment: false,
     },
   });
+  stage2Id = stage2.id;
 
   // Create a Deal in Stage 1 — use a cuid-compatible ID (Deal.id has no @default)
   const deal = await prismaAdmin.deal.create({
@@ -264,12 +269,45 @@ describe("deleteQuote", () => {
 // ── hasQuoteAlert via deal query ──────────────────────────────────────────────
 
 describe("hasQuoteAlert via deal query", () => {
-  // TODO (Task 10): These tests will be added when the deal query includes
-  // hasQuoteAlert computed field. The PipelineStage already has requiresQuote=true
-  // for stage "contactado" and requiresQuote=false for stage "nuevo".
-  // The deal is in the "contactado" stage, so hasQuoteAlert should reflect
-  // whether the deal has at least one non-void quote.
-  it.todo("deal in requiresQuote stage with no quotes has hasQuoteAlert=true");
-  it.todo("deal in requiresQuote stage with at least one non-void quote has hasQuoteAlert=false");
-  it.todo("deal in non-requiresQuote stage has hasQuoteAlert=false regardless of quotes");
+  it("deal in requiresQuote stage with no quotes has hasQuoteAlert=true", async () => {
+    // Ensure the deal is in stage1 (requiresQuote=true) with no active quotes
+    await prismaAdmin.quote.deleteMany({ where: { dealId, isVoid: false } });
+    await prismaAdmin.deal.update({ where: { id: dealId }, data: { stageId: stage1Id } });
+
+    const deals = await getPipelineDeals(tenantId);
+    const deal = deals.find((d) => d.id === dealId);
+    expect(deal).toBeDefined();
+    expect(deal!.hasQuoteAlert).toBe(true);
+  });
+
+  it("deal in requiresQuote stage with at least one non-void quote has hasQuoteAlert=false", async () => {
+    // Ensure the deal is in stage1 (requiresQuote=true)
+    await prismaAdmin.deal.update({ where: { id: dealId }, data: { stageId: stage1Id } });
+
+    // Create a non-void quote
+    await prismaAdmin.quote.create({
+      data: { tenantId, dealId, number: "COT-ALERT-001", date: new Date("2026-04-01") },
+    });
+
+    const deals = await getPipelineDeals(tenantId);
+    const deal = deals.find((d) => d.id === dealId);
+    expect(deal).toBeDefined();
+    expect(deal!.hasQuoteAlert).toBe(false);
+
+    // Cleanup
+    await prismaAdmin.quote.deleteMany({ where: { dealId, number: "COT-ALERT-001" } });
+  });
+
+  it("deal in non-requiresQuote stage has hasQuoteAlert=false regardless of quotes", async () => {
+    // Move the deal to stage2 (requiresQuote=false)
+    await prismaAdmin.deal.update({ where: { id: dealId }, data: { stageId: stage2Id } });
+
+    const deals = await getPipelineDeals(tenantId);
+    const deal = deals.find((d) => d.id === dealId);
+    expect(deal).toBeDefined();
+    expect(deal!.hasQuoteAlert).toBe(false);
+
+    // Restore to stage1 for any subsequent tests
+    await prismaAdmin.deal.update({ where: { id: dealId }, data: { stageId: stage1Id } });
+  });
 });

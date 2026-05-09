@@ -28,6 +28,7 @@ interface PipelineClientProps {
   logoUrl: string | null
   productName: string
   canEdit: boolean
+  canDelete: boolean
 }
 
 export function PipelineClient({
@@ -45,6 +46,7 @@ export function PipelineClient({
   logoUrl,
   productName,
   canEdit,
+  canDelete,
 }: PipelineClientProps) {
   const [newDealOpen, setNewDealOpen] = useState(false)
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
@@ -156,6 +158,8 @@ export function PipelineClient({
             tenantId={tenantId}
             tenantSlug={tenantSlug}
             settings={intlSettings}
+            canEdit={canEdit}
+            canDelete={canDelete}
             onClose={() => setSelectedDealId(null)}
             onAction={() => setSelectedDealId(null)}
           />
