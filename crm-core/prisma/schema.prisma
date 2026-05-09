@@ -139,6 +139,8 @@ model TenantSettings {
   dealIdPrefix        String  @default("DEAL")
   dealIdYearDigits    Int     @default(2)
   defaultPipelineId   String?
+  storageMaxBytes     BigInt  @default(8589934592)
+  storageUsedBytes    BigInt  @default(0)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
@@ -168,16 +170,18 @@ model Pipeline {
 }
 
 model PipelineStage {
-  id         String  @id @default(cuid())
-  tenantId   String
-  pipelineId String
-  order      Int
-  key        String
-  label      String
-  sublabel   String?
-  color      String
-  iconKey    String
-  locked     Boolean @default(false)
+  id              String  @id @default(cuid())
+  tenantId        String
+  pipelineId      String
+  order           Int
+  key             String
+  label           String
+  sublabel        String?
+  color           String
+  iconKey         String
+  locked          Boolean @default(false)
+  requiresQuote   Boolean @default(false)
+  requiresPayment Boolean @default(false)
 
   pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   deals    Deal[]
@@ -311,6 +315,7 @@ model Attachment {
   url       String
   mimeType  String
   size      Int
+  key       String
   createdAt DateTime @default(now())
 
   deal   Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
