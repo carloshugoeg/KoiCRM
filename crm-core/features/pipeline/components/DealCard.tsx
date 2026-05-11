@@ -118,7 +118,9 @@ export function DealCard({ deal, settings, onClick }: DealCardProps) {
         </span>
         <div className="flex items-center gap-1">
           {deal.hasOverdueFollowUp && (
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Seguimiento vencido" />
+            <span className="px-1.5 py-0.5 bg-red-500 text-white rounded text-[10px] font-medium leading-none">
+              Vencido
+            </span>
           )}
           {deal.statusKey !== "activo" && (
             <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded text-xs">

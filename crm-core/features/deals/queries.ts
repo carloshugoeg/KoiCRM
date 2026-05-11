@@ -6,7 +6,7 @@ export interface PipelineFilters {
   ownerId?: string
   channelKey?: string
   equipmentKey?: string
-  alerts?: "missingQuote" | "missingPayment"
+  alerts?: "missingQuote" | "missingPayment" | "overdueFollowUp"
   from?: Date
   to?: Date
 }
@@ -86,6 +86,9 @@ export async function getPipelineDeals(tenantId: string, filters: PipelineFilter
   }
   if (filters.alerts === "missingPayment") {
     return mapped.filter((d) => !d.hasActivePayment && d.stage.key === "ganado")
+  }
+  if (filters.alerts === "overdueFollowUp") {
+    return mapped.filter((d) => d.hasOverdueFollowUp)
   }
 
   return mapped

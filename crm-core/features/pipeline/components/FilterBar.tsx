@@ -94,6 +94,7 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
           <SelectItem value={ALL}>Sin filtro de alerta</SelectItem>
           <SelectItem value="missingQuote">Falta Cotización</SelectItem>
           <SelectItem value="missingPayment">Falta Pago</SelectItem>
+          <SelectItem value="overdueFollowUp">Seguim. Vencido</SelectItem>
         </SelectContent>
       </Select>
 

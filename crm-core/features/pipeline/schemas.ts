@@ -4,7 +4,7 @@ export const pipelineFiltersSchema = z.object({
   owner: z.string().optional(),
   channel: z.string().optional(),
   equipment: z.string().optional(),
-  alerts: z.enum(["missingQuote", "missingPayment"]).optional(),
+  alerts: z.enum(["missingQuote", "missingPayment", "overdueFollowUp"]).optional(),
   from: z.string().optional(),
   to: z.string().optional(),
 })
