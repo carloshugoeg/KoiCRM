@@ -68,11 +68,11 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 - [x] [T6.2 Quote CRUD + isVoid + alerta "Falta Cotización"](#t62-quote-crud--isvoid--alerta-falta-cotizaci%C3%B3n)
 - [x] [T6.3 Payment CRUD + alerta "Falta Pago"](#t63-payment-crud--alerta-falta-pago)
 
-### M7 — Follow-ups y Calendario
+### M7 — Follow-ups y Calendario ✅
 
-- [ ] [T7.1 FollowUp CRUD + completar con result](#t71-followup-crud--completar-con-result)
-- [ ] [T7.2 CalendarView mensual con color-coding](#t72-calendarview-mensual-con-color-coding)
-- [ ] [T7.3 Alertas de overdue en card y panel](#t73-alertas-de-overdue-en-card-y-panel)
+- [x] [T7.1 FollowUp CRUD + completar con result](#t71-followup-crud--completar-con-result)
+- [x] [T7.2 CalendarView mensual con color-coding](#t72-calendarview-mensual-con-color-coding)
+- [x] [T7.3 Alertas de overdue en card y panel](#t73-alertas-de-overdue-en-card-y-panel)
 
 ### M8 — Estadísticas, KPIs, charts
 
@@ -714,7 +714,7 @@ Cada task usa este formato:
 
 ## Milestone M7 — Follow-ups y Calendario
 
-### T7.1 FollowUp CRUD + completar con result
+### T7.1 FollowUp CRUD + completar con result ✅
 
 - **Objetivo**: gestionar seguimientos por deal.
 - **Archivos esperados**: `features/follow-ups/*`.
@@ -726,10 +726,10 @@ Cada task usa este formato:
 - **Tests requeridos**: integration.
 - **Notas**: §7.6 de DEMO_INVENTORY.
 - **Subtasks**:
-  - [ ] Server actions.
-  - [ ] UI en DealDetail.
+  - [x] Server actions.
+  - [x] UI en DealDetail.
 
-### T7.2 CalendarView mensual con color-coding
+### T7.2 CalendarView mensual con color-coding ✅
 
 - **Objetivo**: vista Calendario.
 - **Archivos esperados**: `app/app/[tenantSlug]/calendar/page.tsx`, `features/calendar/components/MonthGrid.tsx`.
@@ -742,11 +742,11 @@ Cada task usa este formato:
 - **Tests requeridos**: integration de queries; E2E de navegación.
 - **Notas**: §3.3 de DEMO_INVENTORY.
 - **Subtasks**:
-  - [ ] Helper de matriz mensual.
-  - [ ] Server query del rango.
-  - [ ] UI con día seleccionado.
+  - [x] Helper de matriz mensual.
+  - [x] Server query del rango.
+  - [x] UI con día seleccionado.
 
-### T7.3 Alertas de overdue en card y panel
+### T7.3 Alertas de overdue en card y panel ✅
 
 - **Objetivo**: indicadores visuales y panel de Alertas en Stats.
 - **Archivos esperados**: actualizaciones a card de pipeline + `app/app/[tenantSlug]/stats/alerts/page.tsx`.
@@ -757,8 +757,8 @@ Cada task usa este formato:
 - **Tests requeridos**: integration con dates específicas.
 - **Notas**: §7.6 de DEMO_INVENTORY.
 - **Subtasks**:
-  - [ ] Computo en query (sin client-side dates).
-  - [ ] UI consistente con DEMO_INVENTORY §6.5.
+  - [x] Computo en query (sin client-side dates).
+  - [x] UI consistente con DEMO_INVENTORY §6.5.
 
 ---
 
