@@ -367,20 +367,24 @@ export function DealDetailModal({
                           <p className="text-xs font-medium">{reasonLabel}</p>
                           <p className="text-xs text-muted-foreground">{fu.date.toISOString().slice(0, 10)}</p>
                         </div>
-                        <Button
-                          size="sm" variant="outline" className="h-6 text-xs shrink-0"
-                          onClick={() => { setCompletingId(fu.id); setCompletingResult("") }}
-                        >
-                          Completar
-                        </Button>
-                        <Button
-                          size="icon" variant="ghost" className="h-6 w-6 shrink-0"
-                          onClick={() => handleDeleteFollowUp(fu.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        {canEdit && (
+                          <Button
+                            size="sm" variant="outline" className="h-6 text-xs shrink-0"
+                            onClick={() => { setCompletingId(fu.id); setCompletingResult("") }}
+                          >
+                            Completar
+                          </Button>
+                        )}
+                        {canEdit && (
+                          <Button
+                            size="icon" variant="ghost" className="h-6 w-6 shrink-0"
+                            onClick={() => handleDeleteFollowUp(fu.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
-                      {isCompleting && (
+                      {canEdit && isCompleting && (
                         <div className="flex gap-2 items-center">
                           <Input
                             placeholder="Resultado (opcional)"
@@ -405,29 +409,31 @@ export function DealDetailModal({
               </div>
 
               {/* Add follow-up form */}
-              <div className="flex gap-2 items-end">
-                <div className="flex-1">
-                  <Input
-                    type="date"
-                    value={fuDate}
-                    onChange={(e) => setFuDate(e.target.value)}
-                    className="h-7 text-xs"
-                  />
+              {canEdit && (
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <Input
+                      type="date"
+                      value={fuDate}
+                      onChange={(e) => setFuDate(e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <Select value={fuReason} onValueChange={setFuReason}>
+                    <SelectTrigger className="w-36 h-7 text-xs">
+                      <SelectValue placeholder="Motivo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {followUpReasons.map((r) => (
+                        <SelectItem key={r.key} value={r.key}>{r.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" className="h-7 text-xs" onClick={handleAddFollowUp} disabled={fuLoading || !fuDate}>
+                    {fuLoading ? "..." : "Agregar"}
+                  </Button>
                 </div>
-                <Select value={fuReason} onValueChange={setFuReason}>
-                  <SelectTrigger className="w-36 h-7 text-xs">
-                    <SelectValue placeholder="Motivo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {followUpReasons.map((r) => (
-                      <SelectItem key={r.key} value={r.key}>{r.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button size="sm" className="h-7 text-xs" onClick={handleAddFollowUp} disabled={fuLoading || !fuDate}>
-                  {fuLoading ? "..." : "Agregar"}
-                </Button>
-              </div>
+              )}
 
               {completedFUs.length > 0 && (
                 <details className="mt-3">
