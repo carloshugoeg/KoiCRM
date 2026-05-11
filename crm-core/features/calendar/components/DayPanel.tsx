@@ -11,9 +11,10 @@ interface DayPanelProps {
   followUps: CalendarFollowUp[]
   followUpReasons: CatalogItem[]
   onOpenDeal: (dealId: string) => void
+  loadingDealId?: string | null
 }
 
-export function DayPanel({ day, month, year, followUps, followUpReasons, onOpenDeal }: DayPanelProps) {
+export function DayPanel({ day, month, year, followUps, followUpReasons, onOpenDeal, loadingDealId }: DayPanelProps) {
   const today = new Date()
   const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate())
 
@@ -63,7 +64,7 @@ export function DayPanel({ day, month, year, followUps, followUpReasons, onOpenD
                   <span
                     className="text-[10px] px-1.5 py-0.5 rounded font-medium"
                     style={{
-                      backgroundColor: stageColor + "22",
+                      backgroundColor: fu.deal.stage.color + "22", // schema enforces #RRGGBB — 22 = ~13% opacity
                       color: stageColor,
                     }}
                   >
@@ -78,10 +79,11 @@ export function DayPanel({ day, month, year, followUps, followUpReasons, onOpenD
             <Button
               size="sm"
               variant="outline"
-              className="self-end h-7 text-xs"
+              className="h-7 text-xs shrink-0"
               onClick={() => onOpenDeal(fu.deal.id)}
+              disabled={loadingDealId === fu.deal.id}
             >
-              Detalles
+              {loadingDealId === fu.deal.id ? "…" : "Detalles"}
             </Button>
           </div>
         )

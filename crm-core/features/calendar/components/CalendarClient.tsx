@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import { useRouter, usePathname } from "next/navigation"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -53,6 +54,7 @@ export function CalendarClient({
 
   const [selectedDay, setSelectedDay] = useState<number | null>(defaultDay)
   const [selectedDeal, setSelectedDeal] = useState<SelectedDeal | null>(null)
+  const [openingDealId, setOpeningDealId] = useState<string | null>(null)
 
   function navigate(targetYear: number, targetMonth: number, ownerId?: string) {
     const params = new URLSearchParams()
@@ -81,22 +83,26 @@ export function CalendarClient({
   }
 
   async function handleOpenDeal(dealId: string) {
-    const result = await getDealSummaryAction({ tenantId, dealId })
-    if (result.ok && result.deal) {
-      setSelectedDeal(result.deal)
+    setOpeningDealId(dealId)
+    try {
+      const res = await getDealSummaryAction({ tenantId, dealId })
+      if (res.ok && res.deal) setSelectedDeal(res.deal)
+      else toast.error(res.error ?? "No se pudo abrir la oportunidad.")
+    } finally {
+      setOpeningDealId(null)
     }
   }
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
-        <Button variant="ghost" size="icon" onClick={goPrev}>
+        <Button variant="ghost" size="icon" onClick={goPrev} aria-label="Mes anterior">
           <ChevronLeft className="w-4 h-4" />
         </Button>
         <Button variant="outline" size="sm" onClick={goToday}>
           Hoy
         </Button>
-        <Button variant="ghost" size="icon" onClick={goNext}>
+        <Button variant="ghost" size="icon" onClick={goNext} aria-label="Mes siguiente">
           <ChevronRight className="w-4 h-4" />
         </Button>
         <span className="font-semibold text-sm">
@@ -137,6 +143,7 @@ export function CalendarClient({
               followUps={followUps}
               followUpReasons={followUpReasons}
               onOpenDeal={handleOpenDeal}
+              loadingDealId={openingDealId}
             />
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground text-sm p-6 text-center">

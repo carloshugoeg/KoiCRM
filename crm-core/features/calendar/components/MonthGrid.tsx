@@ -28,7 +28,7 @@ export function MonthGrid({ year, month, followUps, selectedDay, onSelectDay }: 
   // Mon-first offset: Sun=0 → 6, Mon=1 → 0, …
   const startOffset = (firstDate.getDay() + 6) % 7
 
-  // Group follow-ups by day-of-month
+  // dates stored at noon — local .getDate() matches calendar day across timezones
   const byDay = new Map<number, CalendarFollowUp[]>()
   for (const fu of followUps) {
     const d = new Date(fu.date).getDate()
@@ -64,11 +64,13 @@ export function MonthGrid({ year, month, followUps, selectedDay, onSelectDay }: 
           const isToday = day === todayDay
 
           return (
-            <div
+            <button
               key={day}
+              type="button"
               onClick={() => onSelectDay(day)}
+              aria-pressed={isSelected}
               className={[
-                "min-h-[80px] border-b border-r p-1 cursor-pointer hover:bg-muted/50 transition-colors",
+                "min-h-[80px] border-b border-r p-1 hover:bg-muted/50 transition-colors w-full text-left",
                 isSelected ? "ring-2 ring-inset ring-primary" : "",
                 isToday ? "bg-primary/5" : "",
               ]
@@ -98,7 +100,7 @@ export function MonthGrid({ year, month, followUps, selectedDay, onSelectDay }: 
                   <span className="text-[10px] text-muted-foreground">+{overflow} más</span>
                 )}
               </div>
-            </div>
+            </button>
           )
         })}
       </div>
