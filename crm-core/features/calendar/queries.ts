@@ -14,7 +14,10 @@ export async function getCalendarFollowUps(
       where: {
         tenantId,
         date: { gte: startOfMonth, lt: startOfNext },
-        ...(ownerId ? { deal: { ownerId } } : {}),
+        deal: {
+          isArchived: false,
+          ...(ownerId ? { ownerId } : {}),
+        },
       },
       include: {
         deal: {
