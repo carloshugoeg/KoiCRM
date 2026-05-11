@@ -18,6 +18,8 @@ import {
   updateDealFieldSchema,
 } from "@/features/deals/schemas"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
+import { z } from "zod"
+import { getDeal } from "@/features/deals/queries"
 
 export async function createDealAction(
   raw: unknown
@@ -295,4 +297,57 @@ export async function updateDealFieldAction(raw: unknown): Promise<{ ok: boolean
 
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
   return { ok: true }
+}
+
+export async function getDealSummaryAction(raw: unknown): Promise<{
+  ok: boolean
+  error?: string
+  deal?: {
+    id: string; name: string; company: string | null; phone: string | null
+    whatsapp: string | null; email: string | null; value: number; statusKey: string
+    stageId: string; stageKey: string; createdAt: string; stageEnteredAt: string
+    ownerId: string; ownerName: string | null
+    equipment: { equipmentKey: string; customLabel: string | null }[]
+    quoteCount: number; paymentCount: number
+  }
+}> {
+  const session = await auth()
+  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
+
+  const parsed = z.object({ tenantId: z.string().min(1), dealId: z.string().min(1) }).safeParse(raw)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
+
+  const { tenantId, dealId } = parsed.data
+
+  try {
+    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER", "VIEWER"])
+  } catch {
+    return { ok: false, error: "Acceso denegado." }
+  }
+
+  const d = await getDeal(tenantId, dealId)
+  if (!d) return { ok: false, error: "Oportunidad no encontrada." }
+
+  return {
+    ok: true,
+    deal: {
+      id: d.id,
+      name: d.name,
+      company: d.company,
+      phone: d.client?.phone ?? d.phone ?? null,
+      whatsapp: d.client?.whatsapp ?? d.whatsapp ?? null,
+      email: d.client?.email ?? d.email ?? null,
+      value: Number(d.value),
+      statusKey: d.statusKey,
+      stageId: d.stageId,
+      stageKey: d.stage.key,
+      createdAt: d.createdAt.toISOString(),
+      stageEnteredAt: d.stageEnteredAt.toISOString(),
+      ownerId: d.ownerId,
+      ownerName: d.owner.name,
+      equipment: d.equipment,
+      quoteCount: d._count.quotes,
+      paymentCount: d._count.payments,
+    },
+  }
 }
