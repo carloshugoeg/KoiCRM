@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
-import { X, Phone, MessageCircle, Mail, ChevronDown } from "lucide-react"
+import { X, Phone, MessageCircle, Mail, ChevronDown, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -14,7 +14,7 @@ import { NotesSection } from "@/features/notes/components/NotesSection"
 import { QuoteSection } from "@/features/quotes/components/QuoteSection"
 import { PaymentSection } from "@/features/payments/components/PaymentSection"
 import { updateDealFieldAction, moveDealAction, archiveDealAction } from "@/features/deals/actions"
-import { addFollowUpAction, completeFollowUpAction } from "@/features/follow-ups/actions"
+import { addFollowUpAction, completeFollowUpAction, deleteFollowUpAction } from "@/features/follow-ups/actions"
 import { getDealActivity } from "@/features/activity/queries"
 import { getDealFollowUps } from "@/features/follow-ups/queries"
 import { getQuotesForDeal } from "@/features/quotes/queries"
@@ -88,6 +88,8 @@ export function DealDetailModal({
   const [fuDate, setFuDate] = useState("")
   const [fuReason, setFuReason] = useState(followUpReasons[0]?.key ?? "")
   const [fuLoading, setFuLoading] = useState(false)
+  const [completingId, setCompletingId] = useState<string | null>(null)
+  const [completingResult, setCompletingResult] = useState("")
 
   useEffect(() => {
     Promise.all([
@@ -149,9 +151,21 @@ export function DealDetailModal({
     }
   }
 
-  async function handleCompleteFollowUp(followUpId: string) {
-    const result = await completeFollowUpAction({ tenantId, tenantSlug, followUpId })
-    if (!result.ok) toast.error(result.error ?? "Error.")
+  async function handleCompleteFollowUp(followUpId: string, result: string) {
+    const res = await completeFollowUpAction({ tenantId, tenantSlug, followUpId, result: result || undefined })
+    if (!res.ok) toast.error(res.error ?? "Error.")
+    else {
+      setCompletingId(null)
+      setCompletingResult("")
+      const updated = await getDealFollowUps(tenantId, deal.id)
+      setFollowUps(updated)
+    }
+  }
+
+  async function handleDeleteFollowUp(followUpId: string) {
+    if (!confirm("¿Eliminar este seguimiento?")) return
+    const res = await deleteFollowUpAction({ tenantId, tenantSlug, followUpId })
+    if (!res.ok) toast.error(res.error ?? "Error.")
     else {
       const updated = await getDealFollowUps(tenantId, deal.id)
       setFollowUps(updated)
@@ -343,22 +357,51 @@ export function DealDetailModal({
               )}
 
               <div className="space-y-2 mb-3">
-                {pendingFUs.map((fu) => (
-                  <div key={fu.id} className="flex items-start gap-2 p-2 bg-muted/40 rounded">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium">{fu.reasonKey}</p>
-                      <p className="text-xs text-muted-foreground">{fu.date.toISOString().slice(0, 10)}</p>
+                {pendingFUs.map((fu) => {
+                  const isCompleting = completingId === fu.id
+                  const reasonLabel = followUpReasons.find((r) => r.key === fu.reasonKey)?.label ?? fu.reasonKey
+                  return (
+                    <div key={fu.id} className="p-2 bg-muted/40 rounded space-y-2">
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium">{reasonLabel}</p>
+                          <p className="text-xs text-muted-foreground">{fu.date.toISOString().slice(0, 10)}</p>
+                        </div>
+                        <Button
+                          size="sm" variant="outline" className="h-6 text-xs shrink-0"
+                          onClick={() => { setCompletingId(fu.id); setCompletingResult("") }}
+                        >
+                          Completar
+                        </Button>
+                        <Button
+                          size="icon" variant="ghost" className="h-6 w-6 shrink-0"
+                          onClick={() => handleDeleteFollowUp(fu.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      {isCompleting && (
+                        <div className="flex gap-2 items-center">
+                          <Input
+                            placeholder="Resultado (opcional)"
+                            value={completingResult}
+                            onChange={(e) => setCompletingResult(e.target.value)}
+                            className="h-6 text-xs flex-1"
+                          />
+                          <Button
+                            size="sm" className="h-6 text-xs"
+                            onClick={() => handleCompleteFollowUp(fu.id, completingResult)}
+                          >
+                            Confirmar
+                          </Button>
+                          <button className="text-xs text-muted-foreground" onClick={() => setCompletingId(null)}>
+                            Cancelar
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 text-xs shrink-0"
-                      onClick={() => handleCompleteFollowUp(fu.id)}
-                    >
-                      Completar
-                    </Button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               {/* Add follow-up form */}
@@ -394,7 +437,7 @@ export function DealDetailModal({
                   <div className="space-y-1 mt-2">
                     {completedFUs.map((fu) => (
                       <div key={fu.id} className="p-2 bg-muted/20 rounded opacity-60">
-                        <p className="text-xs line-through">{fu.reasonKey}</p>
+                        <p className="text-xs line-through">{followUpReasons.find((r) => r.key === fu.reasonKey)?.label ?? fu.reasonKey}</p>
                         {fu.result && <p className="text-xs text-muted-foreground">{fu.result}</p>}
                       </div>
                     ))}
