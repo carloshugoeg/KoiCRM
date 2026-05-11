@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
 import { Search } from "lucide-react"
 import { useTenant } from "@/lib/tenant/context"
@@ -16,6 +17,12 @@ interface Props {
 
 export function TenantHeader({ memberships }: Props) {
   const { tenant } = useTenant()
+  const pathname = usePathname()
+  function navClass(href: string) {
+    return pathname.startsWith(href)
+      ? "text-sm font-semibold"
+      : "text-sm text-muted-foreground hover:text-foreground transition-colors"
+  }
 
   return (
     <header className="h-14 border-b flex items-center px-4 gap-4 shrink-0">
@@ -37,6 +44,17 @@ export function TenantHeader({ memberships }: Props) {
           ))}
         </nav>
       )}
+      <nav className="flex gap-4">
+        <Link href={`/app/${tenant.slug}/pipeline`} className={navClass(`/app/${tenant.slug}/pipeline`)}>
+          Embudo
+        </Link>
+        <Link href={`/app/${tenant.slug}/calendar`} className={navClass(`/app/${tenant.slug}/calendar`)}>
+          Calendario
+        </Link>
+        <Link href={`/app/${tenant.slug}/stats`} className={navClass(`/app/${tenant.slug}/stats`)}>
+          Alertas
+        </Link>
+      </nav>
       <div className="ml-auto flex items-center gap-2">
         <Button
           variant="outline"
