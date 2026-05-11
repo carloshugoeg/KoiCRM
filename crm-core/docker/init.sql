@@ -2,12 +2,17 @@
 CREATE USER app_user WITH PASSWORD 'app_pass';
 
 -- Create admin user (BYPASSRLS - used for migrations/seeds only)
-CREATE USER admin_user WITH PASSWORD 'admin_pass';
+CREATE USER admin_user WITH PASSWORD 'admin_pass' CREATEDB;
 ALTER ROLE admin_user BYPASSRLS;
 
 -- Grant database access
 GRANT ALL PRIVILEGES ON DATABASE koicrm TO admin_user;
 GRANT CONNECT ON DATABASE koicrm TO app_user;
+
+-- Grant schema access for admin_user (migrations)
+GRANT ALL PRIVILEGES ON SCHEMA public TO admin_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO admin_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO admin_user;
 
 -- Grant schema access for app_user
 GRANT USAGE ON SCHEMA public TO app_user;
