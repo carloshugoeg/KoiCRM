@@ -52,7 +52,7 @@ export function TenantHeader({ memberships }: Props) {
           Calendario
         </Link>
         <Link href={`/app/${tenant.slug}/stats`} className={navClass(`/app/${tenant.slug}/stats`)}>
-          Alertas
+          Estadísticas
         </Link>
       </nav>
       <div className="ml-auto flex items-center gap-2">
