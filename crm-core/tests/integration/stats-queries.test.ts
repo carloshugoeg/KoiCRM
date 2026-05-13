@@ -149,4 +149,20 @@ describe("T8.1 — Stats aggregation queries", () => {
     expect(stats.totalEmbudo).toBe(0)
     expect(stats.ganado).toBe(0)
   })
+
+  it("filters by ownerId correctly across functions", async () => {
+    // userId2 owns only deal3 (ganado) — filter to their data only
+    const resumen = await getResumenStats(tenantId, { ownerId: userId2 })
+    expect(resumen.ganado).toBe(3000)
+    expect(resumen.totalEmbudo).toBe(0) // userId2 has no open deals
+
+    const team = await getEquipoStats(tenantId, { ownerId: userId2 })
+    expect(team).toHaveLength(1)
+    expect(team[0].ownerId).toBe(userId2)
+    expect(team[0].wonCount).toBe(1)
+
+    const channels = await getCanalStats(tenantId, { ownerId: userId2 })
+    // userId2's deal is channelKey "whatsapp"
+    expect(channels.every((c) => c.channelKey === "whatsapp")).toBe(true)
+  })
 })

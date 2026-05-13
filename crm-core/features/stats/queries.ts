@@ -106,6 +106,7 @@ export async function getResumenStats(tenantId: string, filters: StatsFilters) {
   )
 
   const ownerIds = topPerformersRaw.map((r) => r.ownerId)
+  // User is a global identity table with no tenant RLS policy — safe to query outside withTenant
   const owners = ownerIds.length
     ? await prisma.user.findMany({
         where: { id: { in: ownerIds } },
@@ -132,6 +133,7 @@ export async function getResumenStats(tenantId: string, filters: StatsFilters) {
     totalEmbudo,
     ganado: Number(wonAgg._sum.value ?? 0),
     perdido: Number(lostAgg._sum.value ?? 0),
+    // Spec §8.1: "definición conservadora" — denominator is total non-archived, not just won+lost
     tasaCierre: Math.round((wonCount / Math.max(activeCount, 1)) * 100 * 10) / 10,
     ticketPromedio: activeCountOpen > 0 ? Math.round(totalEmbudo / activeCountOpen) : 0,
     topPerformers,
@@ -199,6 +201,7 @@ export async function getEquipoStats(tenantId: string, filters: StatsFilters) {
   )
 
   const ownerIds = [...new Set(allByOwner.map((r) => r.ownerId))]
+  // User is a global identity table with no tenant RLS policy — safe to query outside withTenant
   const owners = ownerIds.length
     ? await prisma.user.findMany({
         where: { id: { in: ownerIds } },
@@ -234,22 +237,22 @@ export async function getCanalStats(tenantId: string, filters: StatsFilters) {
   const ownerFilter = filters.ownerId ? { ownerId: filters.ownerId } : {}
   const base: Prisma.DealWhereInput = { tenantId, isArchived: false, ...df, ...ownerFilter }
 
-  const [allByChannel, wonByChannel, channelCatalog] = await Promise.all([
+  const [[allByChannel, wonByChannel], channelCatalog] = await Promise.all([
     withTenant(tenantId, (tx) =>
-      tx.deal.groupBy({
-        by: ["channelKey"],
-        where: base,
-        _sum: { value: true },
-        _count: { id: true },
-      })
-    ),
-    withTenant(tenantId, (tx) =>
-      tx.deal.groupBy({
-        by: ["channelKey"],
-        where: { ...base, stageId: { in: wonIds.length ? wonIds : ["__none__"] } },
-        _sum: { value: true },
-        _count: { id: true },
-      })
+      Promise.all([
+        tx.deal.groupBy({
+          by: ["channelKey"],
+          where: base,
+          _sum: { value: true },
+          _count: { id: true },
+        }),
+        tx.deal.groupBy({
+          by: ["channelKey"],
+          where: { ...base, stageId: { in: wonIds.length ? wonIds : ["__none__"] } },
+          _sum: { value: true },
+          _count: { id: true },
+        }),
+      ])
     ),
     prisma.catalogItem.findMany({
       where: { tenantId, catalogKey: "salesChannel" },
@@ -279,18 +282,18 @@ export async function getProductosStats(tenantId: string, filters: StatsFilters)
   const ownerFilter = filters.ownerId ? { ownerId: filters.ownerId } : {}
   const base: Prisma.DealWhereInput = { tenantId, isArchived: false, ...df, ...ownerFilter }
 
-  const [demandDeals, wonDeals, equipmentCatalog] = await Promise.all([
+  const [[demandDeals, wonDeals], equipmentCatalog] = await Promise.all([
     withTenant(tenantId, (tx) =>
-      tx.deal.findMany({
-        where: { ...base, stageId: { notIn: closedIds.length ? closedIds : ["__none__"] } },
-        select: { value: true, equipment: { select: { equipmentKey: true } } },
-      })
-    ),
-    withTenant(tenantId, (tx) =>
-      tx.deal.findMany({
-        where: { ...base, stageId: { in: wonIds.length ? wonIds : ["__none__"] } },
-        select: { value: true, equipment: { select: { equipmentKey: true } } },
-      })
+      Promise.all([
+        tx.deal.findMany({
+          where: { ...base, stageId: { notIn: closedIds.length ? closedIds : ["__none__"] } },
+          select: { value: true, equipment: { select: { equipmentKey: true } } },
+        }),
+        tx.deal.findMany({
+          where: { ...base, stageId: { in: wonIds.length ? wonIds : ["__none__"] } },
+          select: { value: true, equipment: { select: { equipmentKey: true } } },
+        }),
+      ])
     ),
     prisma.catalogItem.findMany({
       where: { tenantId, catalogKey: "equipment" },
