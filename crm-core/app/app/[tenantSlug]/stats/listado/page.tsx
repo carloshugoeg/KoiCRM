@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
 import { getPipelineDeals } from "@/features/deals/queries"
 import { prisma } from "@/lib/db/client"
-import { formatCurrency } from "@/lib/intl/format"
+import { formatCurrency, parseDate } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
 
 interface Props {
@@ -21,8 +21,8 @@ export default async function ListadoPage({ params, searchParams }: Props) {
   const { tenant } = resolved
   const tenantId = tenant.id
 
-  const from = searchParams.from ? new Date(searchParams.from as string) : undefined
-  const to = searchParams.to ? new Date(searchParams.to as string) : undefined
+  const from = parseDate(searchParams.from)
+  const to = parseDate(searchParams.to)
 
   const [deals, settings] = await Promise.all([
     getPipelineDeals(tenantId, { from, to }),

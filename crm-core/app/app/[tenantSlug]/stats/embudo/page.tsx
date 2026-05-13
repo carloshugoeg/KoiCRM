@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
 import { getEmbudoStats } from "@/features/stats/queries"
 import { prisma } from "@/lib/db/client"
-import { formatCurrency } from "@/lib/intl/format"
+import { formatCurrency, parseDate } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
 import { BarChart } from "@/components/charts/BarChart"
 
@@ -20,8 +20,8 @@ export default async function EmbudoStatsPage({ params, searchParams }: Props) {
   if (!resolved) notFound()
 
   const { tenant } = resolved
-  const from = searchParams.from ? new Date(searchParams.from as string) : undefined
-  const to = searchParams.to ? new Date(searchParams.to as string) : undefined
+  const from = parseDate(searchParams.from)
+  const to = parseDate(searchParams.to)
 
   const [stages, settings] = await Promise.all([
     getEmbudoStats(tenant.id, { from, to }),

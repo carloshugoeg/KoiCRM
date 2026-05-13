@@ -30,6 +30,8 @@ export async function getFollowUpAlerts(
   const tomorrowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0)
   const in8DaysMidnight  = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 8, 0, 0, 0, 0)
 
+  // opts.from/to filter the parent deals by createdAt (which deals to include),
+  // not the follow-up dates (overdue/today/next7 logic remains date-relative to now)
   const dateRange = opts.from || opts.to
     ? {
         createdAt: {

@@ -32,3 +32,9 @@ export function formatDateTime(date: Date | string, settings: IntlSettings): str
     minute: "2-digit",
   }).format(new Date(date))
 }
+
+export function parseDate(s: unknown): Date | undefined {
+  if (typeof s !== "string" || !s) return undefined
+  const d = new Date(s)
+  return isNaN(d.getTime()) ? undefined : d
+}

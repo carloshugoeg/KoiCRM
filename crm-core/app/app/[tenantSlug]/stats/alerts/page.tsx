@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
 import { getFollowUpAlerts, type FollowUpAlert } from "@/features/follow-ups/queries"
+import { parseDate } from "@/lib/intl/format"
 import { getTenantMembers } from "@/features/tenants/queries"
 import { getCatalogItems } from "@/features/catalogs/queries"
 import { Badge } from "@/components/ui/badge"
@@ -62,8 +63,8 @@ export default async function AlertsPage({ params, searchParams }: Props) {
   const { tenant } = resolved
   const tenantId = tenant.id
   const ownerId = searchParams.owner as string | undefined
-  const from = searchParams.from ? new Date(searchParams.from as string) : undefined
-  const to = searchParams.to ? new Date(searchParams.to as string) : undefined
+  const from = parseDate(searchParams.from)
+  const to = parseDate(searchParams.to)
 
   const [alerts, members, followUpReasons] = await Promise.all([
     getFollowUpAlerts(tenantId, ownerId, { from, to }),

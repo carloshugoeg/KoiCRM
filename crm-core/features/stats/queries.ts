@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/client"
 import { withTenant } from "@/lib/db/rls"
+import type { PrismaTx } from "@/lib/db/rls"
 import type { Prisma } from "@prisma/client"
 import type { PipelineFilters } from "@/features/deals/queries"
 
@@ -11,8 +12,8 @@ export interface StatsFilters {
 
 // ── Shared helper ────────────────────────────────────────────────────────────
 
-async function getStageKeys(tenantId: string) {
-  const stages = await prisma.pipelineStage.findMany({
+async function getStageKeysTx(tenantId: string, tx: PrismaTx) {
+  const stages = await tx.pipelineStage.findMany({
     where: { tenantId },
     select: { id: true, key: true, label: true, color: true, order: true },
     orderBy: { order: "asc" },
@@ -78,18 +79,19 @@ export async function getPipelineKpis(tenantId: string, filters: PipelineFilters
 // ── T8.1 — Stats aggregations ─────────────────────────────────────────────────
 
 export async function getResumenStats(tenantId: string, filters: StatsFilters) {
-  const { wonIds, lostIds, closedIds } = await getStageKeys(tenantId)
   const df = dateFilter(filters)
   const ownerFilter = filters.ownerId ? { ownerId: filters.ownerId } : {}
-  const base: Prisma.DealWhereInput = { tenantId, isArchived: false, ...df, ...ownerFilter }
-  const openWhere = { ...base, stageId: { notIn: closedIds.length ? closedIds : ["__none__"] } }
-  const wonWhere = { ...base, stageId: { in: wonIds.length ? wonIds : ["__none__"] } }
-  const lostWhere = { ...base, stageId: { in: lostIds.length ? lostIds : ["__none__"] } }
 
-  const [allCount, openSum, wonAgg, lostAgg, topPerformersRaw] = await withTenant(
-    tenantId,
-    (tx) =>
-      Promise.all([
+  const { wonIds, lostIds, closedIds, allCount, openSum, wonAgg, lostAgg, topPerformersRaw } =
+    await withTenant(tenantId, async (tx) => {
+      const { wonIds, lostIds, closedIds } = await getStageKeysTx(tenantId, tx)
+
+      const base: Prisma.DealWhereInput = { tenantId, isArchived: false, ...df, ...ownerFilter }
+      const openWhere = { ...base, stageId: { notIn: closedIds.length ? closedIds : ["__none__"] } }
+      const wonWhere = { ...base, stageId: { in: wonIds.length ? wonIds : ["__none__"] } }
+      const lostWhere = { ...base, stageId: { in: lostIds.length ? lostIds : ["__none__"] } }
+
+      const [allCount, openSum, wonAgg, lostAgg, topPerformersRaw] = await Promise.all([
         tx.deal.count({ where: base }),
         tx.deal.aggregate({ where: openWhere, _sum: { value: true }, _count: { id: true } }),
         tx.deal.aggregate({ where: wonWhere, _sum: { value: true }, _count: { id: true } }),
@@ -103,7 +105,9 @@ export async function getResumenStats(tenantId: string, filters: StatsFilters) {
           take: 5,
         }),
       ])
-  )
+
+      return { wonIds, lostIds, closedIds, allCount, openSum, wonAgg, lostAgg, topPerformersRaw }
+    })
 
   const ownerIds = topPerformersRaw.map((r) => r.ownerId)
   // User is a global identity table with no tenant RLS policy — safe to query outside withTenant
@@ -143,18 +147,21 @@ export async function getResumenStats(tenantId: string, filters: StatsFilters) {
 export type ResumenStats = Awaited<ReturnType<typeof getResumenStats>>
 
 export async function getEmbudoStats(tenantId: string, filters: StatsFilters) {
-  const { stages } = await getStageKeys(tenantId)
   const df = dateFilter(filters)
   const ownerFilter = filters.ownerId ? { ownerId: filters.ownerId } : {}
 
-  const byStage = await withTenant(tenantId, (tx) =>
-    tx.deal.groupBy({
+  const { stages, byStage } = await withTenant(tenantId, async (tx) => {
+    const { stages } = await getStageKeysTx(tenantId, tx)
+
+    const byStage = await tx.deal.groupBy({
       by: ["stageId"],
       where: { tenantId, isArchived: false, ...df, ...ownerFilter },
       _sum: { value: true },
       _count: { id: true },
     })
-  )
+
+    return { stages, byStage }
+  })
 
   return stages.map((stage) => {
     const row = byStage.find((r) => r.stageId === stage.id)
@@ -173,13 +180,14 @@ export async function getEmbudoStats(tenantId: string, filters: StatsFilters) {
 export type EmbudoStats = Awaited<ReturnType<typeof getEmbudoStats>>
 
 export async function getEquipoStats(tenantId: string, filters: StatsFilters) {
-  const { wonIds, lostIds } = await getStageKeys(tenantId)
   const df = dateFilter(filters)
   const ownerFilter = filters.ownerId ? { ownerId: filters.ownerId } : {}
-  const base: Prisma.DealWhereInput = { tenantId, isArchived: false, ...df, ...ownerFilter }
 
-  const [allByOwner, wonByOwner, lostByOwner] = await withTenant(tenantId, (tx) =>
-    Promise.all([
+  const { allByOwner, wonByOwner, lostByOwner } = await withTenant(tenantId, async (tx) => {
+    const { wonIds, lostIds } = await getStageKeysTx(tenantId, tx)
+    const base: Prisma.DealWhereInput = { tenantId, isArchived: false, ...df, ...ownerFilter }
+
+    const [allByOwner, wonByOwner, lostByOwner] = await Promise.all([
       tx.deal.groupBy({
         by: ["ownerId"],
         where: base,
@@ -198,7 +206,9 @@ export async function getEquipoStats(tenantId: string, filters: StatsFilters) {
         _count: { id: true },
       }),
     ])
-  )
+
+    return { allByOwner, wonByOwner, lostByOwner }
+  })
 
   const ownerIds = [...new Set(allByOwner.map((r) => r.ownerId))]
   // User is a global identity table with no tenant RLS policy — safe to query outside withTenant
@@ -232,33 +242,34 @@ export async function getEquipoStats(tenantId: string, filters: StatsFilters) {
 export type EquipoStats = Awaited<ReturnType<typeof getEquipoStats>>
 
 export async function getCanalStats(tenantId: string, filters: StatsFilters) {
-  const { wonIds } = await getStageKeys(tenantId)
   const df = dateFilter(filters)
   const ownerFilter = filters.ownerId ? { ownerId: filters.ownerId } : {}
-  const base: Prisma.DealWhereInput = { tenantId, isArchived: false, ...df, ...ownerFilter }
 
-  const [[allByChannel, wonByChannel], channelCatalog] = await Promise.all([
-    withTenant(tenantId, (tx) =>
-      Promise.all([
-        tx.deal.groupBy({
-          by: ["channelKey"],
-          where: base,
-          _sum: { value: true },
-          _count: { id: true },
-        }),
-        tx.deal.groupBy({
-          by: ["channelKey"],
-          where: { ...base, stageId: { in: wonIds.length ? wonIds : ["__none__"] } },
-          _sum: { value: true },
-          _count: { id: true },
-        }),
-      ])
-    ),
-    prisma.catalogItem.findMany({
-      where: { tenantId, catalogKey: "salesChannel" },
-      select: { key: true, label: true },
-    }),
-  ])
+  const { allByChannel, wonByChannel, channelCatalog } = await withTenant(tenantId, async (tx) => {
+    const { wonIds } = await getStageKeysTx(tenantId, tx)
+    const base: Prisma.DealWhereInput = { tenantId, isArchived: false, ...df, ...ownerFilter }
+
+    const [allByChannel, wonByChannel, channelCatalog] = await Promise.all([
+      tx.deal.groupBy({
+        by: ["channelKey"],
+        where: base,
+        _sum: { value: true },
+        _count: { id: true },
+      }),
+      tx.deal.groupBy({
+        by: ["channelKey"],
+        where: { ...base, stageId: { in: wonIds.length ? wonIds : ["__none__"] } },
+        _sum: { value: true },
+        _count: { id: true },
+      }),
+      tx.catalogItem.findMany({
+        where: { tenantId, catalogKey: "salesChannel" },
+        select: { key: true, label: true },
+      }),
+    ])
+
+    return { allByChannel, wonByChannel, channelCatalog }
+  })
 
   return allByChannel.map((row) => {
     const won = wonByChannel.find((r) => r.channelKey === row.channelKey)
@@ -277,29 +288,30 @@ export async function getCanalStats(tenantId: string, filters: StatsFilters) {
 export type CanalStats = Awaited<ReturnType<typeof getCanalStats>>
 
 export async function getProductosStats(tenantId: string, filters: StatsFilters) {
-  const { wonIds, closedIds } = await getStageKeys(tenantId)
   const df = dateFilter(filters)
   const ownerFilter = filters.ownerId ? { ownerId: filters.ownerId } : {}
-  const base: Prisma.DealWhereInput = { tenantId, isArchived: false, ...df, ...ownerFilter }
 
-  const [[demandDeals, wonDeals], equipmentCatalog] = await Promise.all([
-    withTenant(tenantId, (tx) =>
-      Promise.all([
-        tx.deal.findMany({
-          where: { ...base, stageId: { notIn: closedIds.length ? closedIds : ["__none__"] } },
-          select: { value: true, equipment: { select: { equipmentKey: true } } },
-        }),
-        tx.deal.findMany({
-          where: { ...base, stageId: { in: wonIds.length ? wonIds : ["__none__"] } },
-          select: { value: true, equipment: { select: { equipmentKey: true } } },
-        }),
-      ])
-    ),
-    prisma.catalogItem.findMany({
-      where: { tenantId, catalogKey: "equipment" },
-      select: { key: true, label: true },
-    }),
-  ])
+  const { demandDeals, wonDeals, equipmentCatalog } = await withTenant(tenantId, async (tx) => {
+    const { wonIds, closedIds } = await getStageKeysTx(tenantId, tx)
+    const base: Prisma.DealWhereInput = { tenantId, isArchived: false, ...df, ...ownerFilter }
+
+    const [demandDeals, wonDeals, equipmentCatalog] = await Promise.all([
+      tx.deal.findMany({
+        where: { ...base, stageId: { notIn: closedIds.length ? closedIds : ["__none__"] } },
+        select: { value: true, equipment: { select: { equipmentKey: true } } },
+      }),
+      tx.deal.findMany({
+        where: { ...base, stageId: { in: wonIds.length ? wonIds : ["__none__"] } },
+        select: { value: true, equipment: { select: { equipmentKey: true } } },
+      }),
+      tx.catalogItem.findMany({
+        where: { tenantId, catalogKey: "equipment" },
+        select: { key: true, label: true },
+      }),
+    ])
+
+    return { demandDeals, wonDeals, equipmentCatalog }
+  })
 
   const map = new Map<string, { demandCount: number; soldCount: number; pendingValue: number; soldValue: number }>()
 
