@@ -173,7 +173,8 @@ export type EmbudoStats = Awaited<ReturnType<typeof getEmbudoStats>>
 export async function getEquipoStats(tenantId: string, filters: StatsFilters) {
   const { wonIds, lostIds } = await getStageKeys(tenantId)
   const df = dateFilter(filters)
-  const base: Prisma.DealWhereInput = { tenantId, isArchived: false, ...df }
+  const ownerFilter = filters.ownerId ? { ownerId: filters.ownerId } : {}
+  const base: Prisma.DealWhereInput = { tenantId, isArchived: false, ...df, ...ownerFilter }
 
   const [allByOwner, wonByOwner, lostByOwner] = await withTenant(tenantId, (tx) =>
     Promise.all([
