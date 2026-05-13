@@ -62,9 +62,11 @@ export default async function AlertsPage({ params, searchParams }: Props) {
   const { tenant } = resolved
   const tenantId = tenant.id
   const ownerId = searchParams.owner as string | undefined
+  const from = searchParams.from ? new Date(searchParams.from as string) : undefined
+  const to = searchParams.to ? new Date(searchParams.to as string) : undefined
 
   const [alerts, members, followUpReasons] = await Promise.all([
-    getFollowUpAlerts(tenantId, ownerId),
+    getFollowUpAlerts(tenantId, ownerId, { from, to }),
     getTenantMembers(tenantId),
     getCatalogItems(tenantId, "followupReason"),
   ])

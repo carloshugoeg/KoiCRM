@@ -20,13 +20,30 @@ const alertDealSelect = {
   },
 } as const
 
-export async function getFollowUpAlerts(tenantId: string, ownerId?: string) {
+export async function getFollowUpAlerts(
+  tenantId: string,
+  ownerId?: string,
+  opts: { from?: Date; to?: Date } = {}
+) {
   const now = new Date()
   const todayMidnight    = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
   const tomorrowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0)
   const in8DaysMidnight  = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 8, 0, 0, 0, 0)
 
-  const dealFilter = ownerId ? { ownerId, isArchived: false } : { isArchived: false }
+  const dateRange = opts.from || opts.to
+    ? {
+        createdAt: {
+          ...(opts.from ? { gte: opts.from } : {}),
+          ...(opts.to ? { lte: opts.to } : {}),
+        },
+      }
+    : {}
+
+  const dealFilter = {
+    ...(ownerId ? { ownerId } : {}),
+    isArchived: false,
+    ...dateRange,
+  }
   const ownerFilter = { deal: dealFilter }
 
   const [overdue, today, next7] = await Promise.all([
