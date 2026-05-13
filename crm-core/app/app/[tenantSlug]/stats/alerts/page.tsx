@@ -83,6 +83,8 @@ export default async function AlertsPage({ params, searchParams }: Props) {
           <p className="text-sm text-muted-foreground">Seguimientos vencidos, para hoy y próximos 7 días</p>
         </div>
         <form action={`/app/${params.tenantSlug}/stats/alerts`} method="GET" className="flex gap-2 items-center">
+          {searchParams.from && <input type="hidden" name="from" value={searchParams.from as string} />}
+          {searchParams.to && <input type="hidden" name="to" value={searchParams.to as string} />}
           <select name="owner" defaultValue={ownerId ?? ""} className="h-8 rounded border text-xs px-2 bg-background">
             <option value="">Todos los asesores</option>
             {memberList.map((m) => (

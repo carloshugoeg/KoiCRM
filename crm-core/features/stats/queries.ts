@@ -52,28 +52,30 @@ export async function getPipelineKpis(tenantId: string, filters: PipelineFilters
     baseWhere.equipment = { some: { equipmentKey: filters.equipmentKey } }
   }
 
-  const stages = await prisma.pipelineStage.findMany({
-    where: { tenantId },
-    select: { id: true, key: true },
+  return withTenant(tenantId, async (tx) => {
+    const stages = await tx.pipelineStage.findMany({
+      where: { tenantId },
+      select: { id: true, key: true },
+    })
+    const wonStageIds = stages.filter((s) => s.key === "ganado").map((s) => s.id)
+    const closedStageIds = stages.filter((s) => s.key === "ganado" || s.key === "perdido").map((s) => s.id)
+
+    const [pipelineAgg, wonAgg] = await Promise.all([
+      tx.deal.aggregate({
+        where: { ...baseWhere, stageId: { notIn: closedStageIds.length ? closedStageIds : ["__none__"] } },
+        _sum: { value: true },
+      }),
+      tx.deal.aggregate({
+        where: { ...baseWhere, stageId: { in: wonStageIds.length ? wonStageIds : ["__none__"] } },
+        _sum: { value: true },
+      }),
+    ])
+
+    return {
+      totalPipeline: Number(pipelineAgg._sum.value ?? 0),
+      totalWon: Number(wonAgg._sum.value ?? 0),
+    }
   })
-  const wonStageIds = stages.filter((s) => s.key === "ganado").map((s) => s.id)
-  const closedStageIds = stages.filter((s) => s.key === "ganado" || s.key === "perdido").map((s) => s.id)
-
-  const [pipelineAgg, wonAgg] = await Promise.all([
-    prisma.deal.aggregate({
-      where: { ...baseWhere, stageId: { notIn: closedStageIds.length ? closedStageIds : ["__none__"] } },
-      _sum: { value: true },
-    }),
-    prisma.deal.aggregate({
-      where: { ...baseWhere, stageId: { in: wonStageIds.length ? wonStageIds : ["__none__"] } },
-      _sum: { value: true },
-    }),
-  ])
-
-  return {
-    totalPipeline: Number(pipelineAgg._sum.value ?? 0),
-    totalWon: Number(wonAgg._sum.value ?? 0),
-  }
 }
 
 // ── T8.1 — Stats aggregations ─────────────────────────────────────────────────
