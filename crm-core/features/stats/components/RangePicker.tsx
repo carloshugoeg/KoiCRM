@@ -15,7 +15,10 @@ const PRESETS: { key: Preset; label: string }[] = [
 ]
 
 function toISODate(d: Date) {
-  return d.toISOString().split("T")[0]
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
 }
 
 function getPresetRange(preset: Preset): { from: string; to: string } | null {
@@ -106,6 +109,7 @@ export function RangePicker() {
     <div className="flex flex-wrap items-center gap-1.5">
       {PRESETS.map((p) => (
         <button
+          type="button"
           key={p.key}
           onClick={() => applyPreset(p.key)}
           className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
@@ -121,6 +125,7 @@ export function RangePicker() {
         <input
           type="date"
           value={from}
+          max={to || undefined}
           onChange={(e) => applyCustom("from", e.target.value)}
           className="h-7 rounded border text-xs px-2 bg-background w-32"
         />
@@ -128,6 +133,7 @@ export function RangePicker() {
         <input
           type="date"
           value={to}
+          min={from || undefined}
           onChange={(e) => applyCustom("to", e.target.value)}
           className="h-7 rounded border text-xs px-2 bg-background w-32"
         />

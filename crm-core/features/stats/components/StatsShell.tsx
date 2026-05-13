@@ -25,7 +25,7 @@ export function StatsShell({ tenantSlug }: { tenantSlug: string }) {
   }
 
   function isActive(key: string) {
-    return pathname.includes(`/stats/${key}`)
+    return pathname.startsWith(`/app/${tenantSlug}/stats/${key}`)
   }
 
   return (
