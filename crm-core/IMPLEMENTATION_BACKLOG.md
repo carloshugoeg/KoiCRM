@@ -76,9 +76,9 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 
 ### M8 — Estadísticas, KPIs, charts
 
-- [ ] [T8.1 Aggregations server-side por sub-tab](#t81-aggregations-server-side-por-sub-tab)
-- [ ] [T8.2 Charts (Recharts) por sub-tab](#t82-charts-recharts-por-sub-tab)
-- [ ] [T8.3 Filtro de rango de fecha global del panel](#t83-filtro-de-rango-de-fecha-global-del-panel)
+- [x] [T8.1 Aggregations server-side por sub-tab](#t81-aggregations-server-side-por-sub-tab)
+- [x] [T8.2 Charts (Recharts) por sub-tab](#t82-charts-recharts-por-sub-tab)
+- [x] [T8.3 Filtro de rango de fecha global del panel](#t83-filtro-de-rango-de-fecha-global-del-panel)
 
 ### M9 — Plantilla industria aquasistemas
 
