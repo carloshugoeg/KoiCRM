@@ -82,8 +82,8 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 
 ### M9 — Plantilla industria aquasistemas
 
-- [ ] [T9.1 IndustryTemplate aquasistemas (seed)](#t91-industrytemplate-aquasistemas-seed)
-- [ ] [T9.2 Aplicar plantilla en onboarding](#t92-aplicar-plantilla-en-onboarding)
+- [x] [T9.1 IndustryTemplate aquasistemas (seed)](#t91-industrytemplate-aquasistemas-seed)
+- [x] [T9.2 Aplicar plantilla en onboarding](#t92-aplicar-plantilla-en-onboarding)
 
 ### M10 — Hardening, tests, demo data
 
@@ -831,9 +831,9 @@ Cada task usa este formato:
 - **Tests requeridos**: integration "aplicar plantilla a tenant nuevo y verificar todo el contenido".
 - **Notas**: §9, §24, §6.1–6.3 de DEMO_INVENTORY.
 - **Subtasks**:
-  - [ ] Construcción del payload.
-  - [ ] Función `applyAquasistemasTemplate(tenantId, tx)`.
-  - [ ] Test de aplicación.
+  - [x] Construcción del payload.
+  - [x] Función `applyAquasistemasTemplate(tenantId, tx)`.
+  - [x] Test de aplicación.
 
 ### T9.2 Aplicar plantilla en onboarding
 
@@ -846,9 +846,9 @@ Cada task usa este formato:
 - **Tests requeridos**: E2E "signup → onboarding → ver pipeline con 6 columnas".
 - **Notas**: §9.
 - **Subtasks**:
-  - [ ] Registry indexado por slug.
-  - [ ] Wire-up en createTenant.
-  - [ ] UI de selección de industria.
+  - [x] Registry indexado por slug.
+  - [x] Wire-up en createTenant.
+  - [x] UI de selección de industria.
 
 ---
 
