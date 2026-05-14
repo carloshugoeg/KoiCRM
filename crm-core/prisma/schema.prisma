@@ -264,6 +264,8 @@ model Deal {
   @@index([tenantId, stageId])
   @@index([tenantId, ownerId])
   @@index([tenantId, clientId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, channelKey])
 }
 
 model DealEquipment {
