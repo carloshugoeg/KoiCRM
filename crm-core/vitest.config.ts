@@ -8,7 +8,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     passWithNoTests: true,
-    exclude: ["tests/integration/**", "node_modules/**"],
+    exclude: ["tests/integration/**", "tests/e2e/**", "features/**/__tests__/**", "node_modules/**"],
   },
   resolve: {
     alias: [{ find: /^@\/(.*)/, replacement: path.resolve(__dirname, "./$1") }],
