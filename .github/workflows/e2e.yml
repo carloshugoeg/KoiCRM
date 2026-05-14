@@ -33,6 +33,7 @@ jobs:
       NEXTAUTH_URL: http://localhost:3000
       PLAYWRIGHT_BASE_URL: http://localhost:3000
       RESEND_API_KEY: re_placeholder_not_used_in_e2e
+      NODE_ENV: production
 
     steps:
       - uses: actions/checkout@v4

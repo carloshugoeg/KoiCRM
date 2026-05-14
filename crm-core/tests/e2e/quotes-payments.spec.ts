@@ -1,7 +1,6 @@
 import { test, expect } from "@playwright/test"
-import path from "path"
+import { AUTH_FILE } from "./auth.setup"
 
-const AUTH_FILE = path.join(__dirname, ".auth/demo-user.json")
 test.use({ storageState: AUTH_FILE })
 
 test.describe("Quotes and Payments", () => {
