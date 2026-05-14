@@ -1,0 +1,78 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: ["main", "master"]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crm-core
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: koi_crm
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/koi_crm
+      DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/koi_crm
+      NEXTAUTH_SECRET: e2e-test-secret-32-chars-minimum-ok
+      NEXTAUTH_URL: http://localhost:3000
+      PLAYWRIGHT_BASE_URL: http://localhost:3000
+      RESEND_API_KEY: re_placeholder_not_used_in_e2e
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: crm-core/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run migrations
+        run: pnpm exec prisma migrate deploy
+
+      - name: Seed demo tenant
+        run: pnpm seed:demo
+
+      - name: Build Next.js
+        run: pnpm build
+
+      - name: Start Next.js server
+        run: pnpm start &
+
+      - name: Wait for server to be ready
+        run: npx wait-on http://localhost:3000 --timeout 30000
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        run: pnpm test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: crm-core/playwright-report/
+          retention-days: 7
