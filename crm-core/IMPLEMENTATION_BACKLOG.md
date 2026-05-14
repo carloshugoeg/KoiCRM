@@ -74,23 +74,23 @@ Backlog ejecutable de la V1 de `crm-core/`. Cada item es una task concreta para 
 - [x] [T7.2 CalendarView mensual con color-coding](#t72-calendarview-mensual-con-color-coding)
 - [x] [T7.3 Alertas de overdue en card y panel](#t73-alertas-de-overdue-en-card-y-panel)
 
-### M8 — Estadísticas, KPIs, charts
+### M8 — Estadísticas, KPIs, charts ✅
 
 - [x] [T8.1 Aggregations server-side por sub-tab](#t81-aggregations-server-side-por-sub-tab)
 - [x] [T8.2 Charts (Recharts) por sub-tab](#t82-charts-recharts-por-sub-tab)
 - [x] [T8.3 Filtro de rango de fecha global del panel](#t83-filtro-de-rango-de-fecha-global-del-panel)
 
-### M9 — Plantilla industria aquasistemas
+### M9 — Plantilla industria aquasistemas ✅
 
 - [x] [T9.1 IndustryTemplate aquasistemas (seed)](#t91-industrytemplate-aquasistemas-seed)
 - [x] [T9.2 Aplicar plantilla en onboarding](#t92-aplicar-plantilla-en-onboarding)
 
 ### M10 — Hardening, tests, demo data
 
-- [ ] [T10.1 Test suite E2E (Playwright) cubriendo flujos clave](#t101-test-suite-e2e-playwright-cubriendo-flujos-clave)
-- [ ] [T10.2 Accesibilidad mínima (kanban teclado, aria-labels)](#t102-accesibilidad-m%C3%ADnima-kanban-teclado-aria-labels)
-- [ ] [T10.3 Performance pass (índices, paginación, queries)](#t103-performance-pass-%C3%ADndices-paginaci%C3%B3n-queries)
-- [ ] [T10.4 Demo tenant aquasistemas seed `pnpm seed:demo`](#t104-demo-tenant-aquasistemas-seed-pnpm-seeddemo)
+- [x] [T10.1 Test suite E2E (Playwright) cubriendo flujos clave](#t101-test-suite-e2e-playwright-cubriendo-flujos-clave)
+- [x] [T10.2 Accesibilidad mínima (kanban teclado, aria-labels)](#t102-accesibilidad-m%C3%ADnima-kanban-teclado-aria-labels)
+- [x] [T10.3 Performance pass (índices, paginación, queries)](#t103-performance-pass-%C3%ADndices-paginaci%C3%B3n-queries)
+- [x] [T10.4 Demo tenant aquasistemas seed `pnpm seed:demo`](#t104-demo-tenant-aquasistemas-seed-pnpm-seeddemo)
 
 ---
 
@@ -865,9 +865,9 @@ Cada task usa este formato:
 - **Tests requeridos**: los propios E2E.
 - **Notas**: §17.
 - **Subtasks**:
-  - [ ] Setup Playwright + fixtures.
-  - [ ] Specs (uno por flujo).
-  - [ ] CI workflow.
+  - [x] Setup Playwright + fixtures.
+  - [x] Specs (uno por flujo).
+  - [x] CI workflow.
 
 ### T10.2 Accesibilidad mínima (kanban teclado, aria-labels)
 
@@ -882,8 +882,8 @@ Cada task usa este formato:
 - **Tests requeridos**: axe-core en E2E.
 - **Notas**: §11, §15 de DEMO_INVENTORY.
 - **Subtasks**:
-  - [ ] Auditoría axe.
-  - [ ] Fixes.
+  - [x] Auditoría axe.
+  - [x] Fixes.
 
 ### T10.3 Performance pass (índices, paginación, queries)
 
@@ -897,9 +897,9 @@ Cada task usa este formato:
 - **Tests requeridos**: bench script (no en CI obligatorio).
 - **Notas**: §20.
 - **Subtasks**:
-  - [ ] Bench dataset.
-  - [ ] Análisis EXPLAIN.
-  - [ ] Índices adicionales si hace falta.
+  - [x] Bench dataset.
+  - [x] Análisis EXPLAIN.
+  - [x] Índices adicionales si hace falta.
 
 ### T10.4 Demo tenant aquasistemas seed `pnpm seed:demo`
 
@@ -913,9 +913,9 @@ Cada task usa este formato:
 - **Tests requeridos**: integration "ejecutar seed y verificar conteos".
 - **Notas**: §9 de ARCHITECTURE_PLAN, §1 de DEMO_INVENTORY.
 - **Subtasks**:
-  - [ ] Definir dataset.
-  - [ ] Script idempotente.
-  - [ ] Documentar en README.
+  - [x] Definir dataset.
+  - [x] Script idempotente.
+  - [x] Documentar en README.
 
 ---
 
