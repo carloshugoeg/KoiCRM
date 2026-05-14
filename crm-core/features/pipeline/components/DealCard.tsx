@@ -69,7 +69,7 @@ export function DealCard({ deal, settings, onClick }: DealCardProps) {
       style={style}
       {...listeners}
       {...attributes}
-      className="relative bg-card border rounded-lg p-3 shadow-sm cursor-grab active:cursor-grabbing select-none"
+      className="relative bg-card border rounded-lg p-3 shadow-sm cursor-grab active:cursor-grabbing select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
       onClick={onClick}
     >
       {/* Header */}
@@ -134,6 +134,13 @@ export function DealCard({ deal, settings, onClick }: DealCardProps) {
       {(hasQuoteAlert || hasPaymentAlert) && (
         <div
           className="absolute top-1.5 right-1.5"
+          role="img"
+          aria-label={[
+            hasQuoteAlert ? "Falta Cotización" : null,
+            hasPaymentAlert ? "Falta Pago" : null,
+          ]
+            .filter(Boolean)
+            .join(", ")}
           title={[
             hasQuoteAlert ? "Falta Cotización" : null,
             hasPaymentAlert ? "Falta Pago" : null,
@@ -141,7 +148,7 @@ export function DealCard({ deal, settings, onClick }: DealCardProps) {
             .filter(Boolean)
             .join(" · ")}
         >
-          <span className="relative flex h-2.5 w-2.5">
+          <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
           </span>

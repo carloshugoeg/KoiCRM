@@ -45,7 +45,7 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Select value={currentFilters.owner ?? ALL} onValueChange={(v) => update("owner", v)}>
-        <SelectTrigger className="w-36 h-8 text-xs">
+        <SelectTrigger className="w-36 h-8 text-xs" aria-label="Filtrar por asesor">
           <SelectValue placeholder="Asesor" />
         </SelectTrigger>
         <SelectContent>
@@ -59,7 +59,7 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
       </Select>
 
       <Select value={currentFilters.channel ?? ALL} onValueChange={(v) => update("channel", v)}>
-        <SelectTrigger className="w-36 h-8 text-xs">
+        <SelectTrigger className="w-36 h-8 text-xs" aria-label="Filtrar por canal">
           <SelectValue placeholder="Canal" />
         </SelectTrigger>
         <SelectContent>
@@ -73,7 +73,7 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
       </Select>
 
       <Select value={currentFilters.equipment ?? ALL} onValueChange={(v) => update("equipment", v)}>
-        <SelectTrigger className="w-36 h-8 text-xs">
+        <SelectTrigger className="w-36 h-8 text-xs" aria-label="Filtrar por equipo">
           <SelectValue placeholder="Equipo" />
         </SelectTrigger>
         <SelectContent>
@@ -87,7 +87,7 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
       </Select>
 
       <Select value={currentFilters.alerts ?? ALL} onValueChange={(v) => update("alerts", v)}>
-        <SelectTrigger className="w-40 h-8 text-xs">
+        <SelectTrigger className="w-40 h-8 text-xs" aria-label="Filtrar por alerta">
           <SelectValue placeholder="Alertas" />
         </SelectTrigger>
         <SelectContent>
@@ -104,13 +104,15 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
           className="h-8 text-xs w-36"
           value={currentFilters.from ?? ""}
           onChange={(e) => update("from", e.target.value || undefined)}
+          aria-label="Fecha desde"
         />
-        <span className="text-xs text-muted-foreground">→</span>
+        <span className="text-xs text-muted-foreground" aria-hidden="true">→</span>
         <Input
           type="date"
           className="h-8 text-xs w-36"
           value={currentFilters.to ?? ""}
           onChange={(e) => update("to", e.target.value || undefined)}
+          aria-label="Fecha hasta"
         />
       </div>
 

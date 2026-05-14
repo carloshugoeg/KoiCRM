@@ -30,7 +30,13 @@ export function KanbanColumn({ stage, deals, settings, onDealClick }: KanbanColu
         />
         <span className="text-sm font-semibold truncate">{stage.label}</span>
         {stage.locked && (
-          <span className="ml-auto text-xs text-muted-foreground">🔒</span>
+          <span
+            className="ml-auto text-xs text-muted-foreground"
+            aria-label="Etapa bloqueada"
+            title="Etapa bloqueada"
+          >
+            🔒
+          </span>
         )}
         <span className="ml-auto text-xs font-medium text-muted-foreground">{deals.length}</span>
       </div>
