@@ -1,3 +1,4 @@
+import path from "path"
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
 import { prismaAdmin, disconnectAll } from "./helpers"
 
@@ -13,7 +14,7 @@ describe("demo-aquasistemas seed", () => {
     // Run the seed by executing it directly (avoids ESM/CJS import issues with the auto-run code)
     const { execSync } = await import("child_process")
     execSync("pnpm seed:demo", {
-      cwd: "/Users/carloshugo/Documents/Projects/KoiCRM/crm-core",
+      cwd: path.resolve(__dirname, "../.."),
       stdio: "inherit",
     })
     const tenant = await prismaAdmin.tenant.findUnique({ where: { slug: "demo-aqua" } })
@@ -21,7 +22,14 @@ describe("demo-aquasistemas seed", () => {
   }, 60_000)
 
   afterAll(async () => {
+    const demoEmails = [
+      "admin@aquasistemas.demo",
+      "ventas@aquasistemas.demo",
+      "ops@aquasistemas.demo",
+      "soporte@aquasistemas.demo",
+    ]
     await prismaAdmin.tenant.deleteMany({ where: { slug: "demo-aqua" } })
+    await prismaAdmin.user.deleteMany({ where: { email: { in: demoEmails } } })
     await disconnectAll()
   })
 
@@ -62,9 +70,9 @@ describe("demo-aquasistemas seed", () => {
     const overdue = await prismaAdmin.followUp.count({
       where: { tenantId, completed: false, date: { lt: new Date() } },
     })
-    expect(total).toBeGreaterThanOrEqual(10)
-    expect(completed).toBeGreaterThanOrEqual(3)
-    expect(overdue).toBeGreaterThanOrEqual(3)
+    expect(total).toBe(10)
+    expect(completed).toBe(3)
+    expect(overdue).toBe(3)
   })
 
   it("applies branding (primaryColor) and settings (dealIdPrefix)", async () => {
@@ -78,7 +86,7 @@ describe("demo-aquasistemas seed", () => {
   it("is idempotent — re-running produces exactly 30 deals", async () => {
     const { execSync } = await import("child_process")
     execSync("pnpm seed:demo", {
-      cwd: "/Users/carloshugo/Documents/Projects/KoiCRM/crm-core",
+      cwd: path.resolve(__dirname, "../.."),
       stdio: "inherit",
     })
     const newTenant = await prismaAdmin.tenant.findUnique({ where: { slug: "demo-aqua" } })
