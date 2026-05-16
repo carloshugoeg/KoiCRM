@@ -55,13 +55,42 @@ export const archiveDealSchema = z.object({
   dealId: z.string().min(1),
 })
 
-export const updateDealFieldSchema = z.object({
-  tenantId: z.string().min(1),
-  tenantSlug: z.string().min(1),
-  dealId: z.string().min(1),
-  field: z.enum(["value", "statusKey", "phone", "whatsapp", "email", "name", "company"]),
-  value: z.union([z.string(), z.coerce.number()]),
-})
+export const updateDealFieldSchema = z
+  .object({
+    tenantId: z.string().min(1),
+    tenantSlug: z.string().min(1),
+    dealId: z.string().min(1),
+    field: z.enum(["value", "statusKey", "phone", "whatsapp", "email", "name", "company"]),
+    value: z.union([z.string(), z.coerce.number()]),
+  })
+  .superRefine((data, ctx) => {
+    const { field, value } = data
+    const addErr = (message: string) => ctx.addIssue({ code: "custom", message, path: ["value"] })
+
+    if (field === "email" && typeof value === "string" && value !== "") {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) addErr("Email inválido.")
+    }
+    if (field === "phone" && typeof value === "string" && value.length > 30) {
+      addErr("Teléfono demasiado largo (máx. 30 caracteres).")
+    }
+    if (field === "whatsapp" && typeof value === "string" && value.length > 40) {
+      addErr("WhatsApp demasiado largo (máx. 40 caracteres).")
+    }
+    if (field === "name") {
+      if (typeof value !== "string" || value.trim().length === 0) addErr("El nombre es requerido.")
+      else if (value.length > 200) addErr("Nombre demasiado largo (máx. 200 caracteres).")
+    }
+    if (field === "company" && typeof value === "string" && value.length > 200) {
+      addErr("Empresa demasiado larga (máx. 200 caracteres).")
+    }
+    if (field === "value") {
+      const num = typeof value === "number" ? value : Number(value)
+      if (isNaN(num) || num < 0) addErr("El valor debe ser un número positivo.")
+    }
+    if (field === "statusKey" && (typeof value !== "string" || value.trim().length === 0)) {
+      addErr("El estado es requerido.")
+    }
+  })
 
 export type CreateDealInput = z.infer<typeof createDealSchema>
 export type UpdateDealInput = z.infer<typeof updateDealSchema>

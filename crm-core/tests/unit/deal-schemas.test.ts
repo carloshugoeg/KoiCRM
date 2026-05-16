@@ -1,0 +1,43 @@
+import { describe, it, expect } from "vitest"
+import { updateDealFieldSchema } from "@/features/deals/schemas"
+
+const base = { tenantId: "t1", tenantSlug: "s1", dealId: "d1" }
+
+describe("updateDealFieldSchema field-level validation", () => {
+  it("rejects non-email value for field=email", () => {
+    const r = updateDealFieldSchema.safeParse({ ...base, field: "email", value: "not-an-email" })
+    expect(r.success).toBe(false)
+  })
+  it("accepts empty string for field=email (nullable)", () => {
+    const r = updateDealFieldSchema.safeParse({ ...base, field: "email", value: "" })
+    expect(r.success).toBe(true)
+  })
+  it("rejects phone longer than 30 chars", () => {
+    const r = updateDealFieldSchema.safeParse({ ...base, field: "phone", value: "x".repeat(31) })
+    expect(r.success).toBe(false)
+  })
+  it("rejects whatsapp longer than 40 chars", () => {
+    const r = updateDealFieldSchema.safeParse({ ...base, field: "whatsapp", value: "x".repeat(41) })
+    expect(r.success).toBe(false)
+  })
+  it("rejects empty name for field=name", () => {
+    const r = updateDealFieldSchema.safeParse({ ...base, field: "name", value: "" })
+    expect(r.success).toBe(false)
+  })
+  it("rejects name longer than 200 chars", () => {
+    const r = updateDealFieldSchema.safeParse({ ...base, field: "name", value: "x".repeat(201) })
+    expect(r.success).toBe(false)
+  })
+  it("rejects negative value for field=value", () => {
+    const r = updateDealFieldSchema.safeParse({ ...base, field: "value", value: -1 })
+    expect(r.success).toBe(false)
+  })
+  it("accepts zero for field=value", () => {
+    const r = updateDealFieldSchema.safeParse({ ...base, field: "value", value: 0 })
+    expect(r.success).toBe(true)
+  })
+  it("rejects empty statusKey", () => {
+    const r = updateDealFieldSchema.safeParse({ ...base, field: "statusKey", value: "" })
+    expect(r.success).toBe(false)
+  })
+})
