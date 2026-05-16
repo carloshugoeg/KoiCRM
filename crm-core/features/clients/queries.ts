@@ -1,4 +1,3 @@
-import { prisma } from "@/lib/db/client"
 import { withTenant, type PrismaTx } from "@/lib/db/rls"
 import type { Prisma } from "@prisma/client"
 
@@ -67,17 +66,19 @@ export async function listClients(
     ]
   }
 
-  return prisma.client.findMany({
-    where,
-    orderBy: sort === "name" ? { name: "asc" } : { updatedAt: "desc" },
-    include: {
-      _count: {
-        select: {
-          deals: { where: { isArchived: false } },
+  return withTenant(tenantId, (tx) =>
+    tx.client.findMany({
+      where,
+      orderBy: sort === "name" ? { name: "asc" } : { updatedAt: "desc" },
+      include: {
+        _count: {
+          select: {
+            deals: { where: { isArchived: false } },
+          },
         },
       },
-    },
-  })
+    })
+  )
 }
 
 export async function getClientWithDeals(tenantId: string, clientId: string) {
@@ -111,16 +112,18 @@ export async function getClientKpis(
     ? { createdAt: { gte: dateRange.from, lte: dateRange.to } }
     : {}
 
-  const [allDeals, wonDeals] = await Promise.all([
-    prisma.deal.findMany({
-      where: { tenantId, clientId, ...dateFilter },
-      select: { id: true, isArchived: true, stage: { select: { key: true } }, value: true },
-    }),
-    prisma.deal.findMany({
-      where: { tenantId, clientId, stage: { key: "ganado" }, ...dateFilter },
-      select: { value: true },
-    }),
-  ])
+  const [allDeals, wonDeals] = await withTenant(tenantId, (tx) =>
+    Promise.all([
+      tx.deal.findMany({
+        where: { tenantId, clientId, ...dateFilter },
+        select: { id: true, isArchived: true, stage: { select: { key: true } }, value: true },
+      }),
+      tx.deal.findMany({
+        where: { tenantId, clientId, stage: { key: "ganado" }, ...dateFilter },
+        select: { value: true },
+      }),
+    ])
+  )
 
   const totalOpps = allDeals.length
   const activeOpps = allDeals.filter((d) => !d.isArchived && d.stage.key !== "ganado" && d.stage.key !== "perdido").length

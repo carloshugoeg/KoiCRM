@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
+import { withTenant } from "@/lib/db/rls"
 import { getPipelineDeals } from "@/features/deals/queries"
 import { getCatalogItems } from "@/features/catalogs/queries"
 import { getTenantMembers } from "@/features/tenants/queries"
@@ -38,7 +39,7 @@ export default async function PipelinePage({ params, searchParams }: Props) {
   const filters = pipelineFiltersSchema.parse(rawParams)
 
   const [pipeline, members, channels, equipment, statuses, followUpReasons, settings] = await Promise.all([
-    getDefaultPipeline(tenantId),
+    withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
     getTenantMembers(tenantId),
     getCatalogItems(tenantId, "salesChannel"),
     getCatalogItems(tenantId, "equipment"),

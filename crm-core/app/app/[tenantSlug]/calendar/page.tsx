@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
 import { getCalendarFollowUps } from "@/features/calendar/queries"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
+import { withTenant } from "@/lib/db/rls"
 import { getTenantMembers } from "@/features/tenants/queries"
 import { getCatalogItems } from "@/features/catalogs/queries"
 import { CalendarClient } from "@/features/calendar/components/CalendarClient"
@@ -33,7 +34,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
   const [followUps, members, pipeline, followUpReasons, settings] = await Promise.all([
     getCalendarFollowUps(tenantId, year, month, ownerId),
     getTenantMembers(tenantId),
-    getDefaultPipeline(tenantId),
+    withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
     getCatalogItems(tenantId, "followupReason"),
     prisma.tenantSettings.findUnique({ where: { tenantId } }),
   ])

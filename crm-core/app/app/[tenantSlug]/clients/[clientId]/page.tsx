@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
 import { getClientWithDeals, getClientKpis } from "@/features/clients/queries"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
+import { withTenant } from "@/lib/db/rls"
 import { getCatalogItems } from "@/features/catalogs/queries"
 import { getTenantMembers } from "@/features/tenants/queries"
 import { ClientProfile } from "@/features/clients/components/ClientProfile"
@@ -28,7 +29,7 @@ export default async function ClientDetailPage({ params }: Props) {
   const [clientData, kpis, pipeline, members, channels, equipment, statuses, settings] = await Promise.all([
     getClientWithDeals(tenantId, params.clientId),
     getClientKpis(tenantId, params.clientId),
-    getDefaultPipeline(tenantId),
+    withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
     getTenantMembers(tenantId),
     getCatalogItems(tenantId, "salesChannel"),
     getCatalogItems(tenantId, "equipment"),

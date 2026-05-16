@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
 import { getArchivedDeals } from "@/features/deals/queries"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
+import { withTenant } from "@/lib/db/rls"
 import { getCatalogItems } from "@/features/catalogs/queries"
 import { ArchiveTable } from "@/features/deals/components/ArchiveTable"
 import { prisma } from "@/lib/db/client"
@@ -28,7 +29,7 @@ export default async function ArchivePage({ params, searchParams }: Props) {
 
   const [{ deals, nextCursor }, pipeline, followUpReasons, settings] = await Promise.all([
     getArchivedDeals(tenantId, cursor, 10),
-    getDefaultPipeline(tenantId),
+    withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
     getCatalogItems(tenantId, "followupReason"),
     prisma.tenantSettings.findUnique({ where: { tenantId } }),
   ])

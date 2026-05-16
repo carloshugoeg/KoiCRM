@@ -1,7 +1,7 @@
-import { prisma } from "@/lib/db/client"
+import type { PrismaTx } from "@/lib/db/rls"
 
-export async function getDefaultPipeline(tenantId: string) {
-  return prisma.pipeline.findFirst({
+export async function getDefaultPipeline(tx: PrismaTx, tenantId: string) {
+  return tx.pipeline.findFirst({
     where: { tenantId, isDefault: true },
     include: {
       stages: { orderBy: { order: "asc" } },

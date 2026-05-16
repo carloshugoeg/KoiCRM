@@ -1,4 +1,3 @@
-import { prisma } from "@/lib/db/client"
 import { withTenant, type PrismaTx } from "@/lib/db/rls"
 import type { Prisma } from "@prisma/client"
 
@@ -81,5 +80,7 @@ export async function _countActivitiesForDeal(
   tenantId: string,
   dealId: string,
 ): Promise<number> {
-  return prisma.activity.count({ where: { tenantId, entity: "Deal", entityId: dealId } })
+  return withTenant(tenantId, (tx) =>
+    tx.activity.count({ where: { tenantId, entity: "Deal", entityId: dealId } })
+  )
 }
