@@ -24,7 +24,7 @@ export async function globalSearchAction(
     return { ok: false, error: "Acceso denegado." }
   }
 
-  const q = query.trim()
+  const q = query.trim().slice(0, 200)
   if (!q) return { ok: true, results: [] }
 
   const [deals, clients] = await Promise.all([
