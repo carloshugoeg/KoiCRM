@@ -5,7 +5,6 @@ import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
 import { requireRole } from "@/lib/auth/rbac"
-import { prisma } from "@/lib/db/client"
 import { generateDealId } from "@/lib/id/deal-id"
 import { ownerInitials } from "@/lib/utils/avatar-color"
 import { findOrCreateClient } from "@/features/clients/queries"
@@ -38,21 +37,24 @@ export async function createDealAction(
     return { ok: false, error: "Acceso denegado." }
   }
 
-  // Get pipeline and first unlocked stage
-  const pipeline = await getDefaultPipeline(tenantId)
-  if (!pipeline) return { ok: false, error: "No hay un pipeline configurado." }
-  const firstStage = pipeline.stages.find((s) => !s.locked)
-  if (!firstStage) return { ok: false, error: "No hay etapas disponibles en el pipeline." }
-
-  // Derive owner initials
-  const owner = await prisma.user.findUnique({
-    where: { id: fields.ownerId },
-    select: { name: true },
-  })
-
   let dealId: string | undefined
+  let createError: string | undefined
   try {
     await withTenant(tenantId, async (tx) => {
+      // Fetch pipeline with RLS (BUG-005 fix)
+      const pipeline = await getDefaultPipeline(tx, tenantId)
+      if (!pipeline) { createError = "No hay un pipeline configurado."; return }
+      const firstStage = pipeline.stages.find((s) => !s.locked)
+      if (!firstStage) { createError = "No hay etapas disponibles en el pipeline."; return }
+
+      // Validate ownerId is a member of this tenant (BUG-003 fix)
+      const ownerMembership = await tx.membership.findUnique({
+        where: { userId_tenantId: { userId: fields.ownerId, tenantId } },
+      })
+      if (!ownerMembership) { createError = "El asesor seleccionado no pertenece al equipo."; return }
+
+      // Get owner name for ID generation
+      const owner = await tx.user.findUnique({ where: { id: fields.ownerId }, select: { name: true } })
       const initials = ownerInitials(owner?.name)
       const id = await generateDealId(tx, tenantId, initials)
 
@@ -116,6 +118,8 @@ export async function createDealAction(
     throw e
   }
 
+  if (createError) return { ok: false, error: createError }
+
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
   return { ok: true, dealId }
 }
@@ -135,10 +139,11 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
     return { ok: false, error: "Acceso denegado." }
   }
 
-  const existing = await prisma.deal.findUnique({ where: { id: dealId, tenantId } })
-  if (!existing) return { ok: false, error: "Oportunidad no encontrada." }
-
+  let notFound = false
   await withTenant(tenantId, async (tx) => {
+    const existing = await tx.deal.findUnique({ where: { id: dealId, tenantId } })
+    if (!existing) { notFound = true; return }
+
     const updateData: Prisma.DealUpdateInput = {}
     if (fields.name !== undefined) updateData.name = fields.name.trim()
     if (fields.company !== undefined) updateData.company = fields.company?.trim() || null
@@ -149,7 +154,7 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
     if (fields.statusKey !== undefined) updateData.statusKey = fields.statusKey
     if (fields.channelKey !== undefined) updateData.channelKey = fields.channelKey
 
-    await tx.deal.update({ where: { id: dealId }, data: updateData })
+    await tx.deal.update({ where: { id: dealId, tenantId }, data: updateData })
 
     if (fields.equipment !== undefined || fields.equipmentCustom !== undefined) {
       await tx.dealEquipment.deleteMany({ where: { dealId } })
@@ -172,6 +177,7 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
       await recordActivity(tx, { tenantId, entity: "Deal", entityId: dealId, type: "valueChanged", payload: { old: Number(existing.value), new: fields.value }, userId: session.user!.id })
     }
   })
+  if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
 
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
   return { ok: true }
@@ -192,22 +198,23 @@ export async function moveDealAction(raw: unknown): Promise<{ ok: boolean; error
     return { ok: false, error: "Acceso denegado." }
   }
 
-  const [deal, targetStage] = await Promise.all([
-    prisma.deal.findUnique({ where: { id: dealId, tenantId }, select: { stageId: true } }),
-    prisma.pipelineStage.findUnique({ where: { id: toStageId, tenantId } }),
-  ])
-
-  if (!deal) return { ok: false, error: "Oportunidad no encontrada." }
-  if (!targetStage) return { ok: false, error: "Etapa no encontrada." }
-  if (targetStage.locked && !force) {
-    return { ok: false, error: `La etapa "${targetStage.label}" está bloqueada. Usa las acciones del panel de detalle.` }
-  }
-
-  const fromStageId = deal.stageId
+  let moveError: string | undefined
 
   await withTenant(tenantId, async (tx) => {
+    const [deal, targetStage] = await Promise.all([
+      tx.deal.findUnique({ where: { id: dealId, tenantId }, select: { stageId: true } }),
+      tx.pipelineStage.findUnique({ where: { id: toStageId, tenantId } }),
+    ])
+
+    if (!deal) { moveError = "Oportunidad no encontrada."; return }
+    if (!targetStage) { moveError = "Etapa no encontrada."; return }
+    if (targetStage.locked && !force) {
+      moveError = `La etapa "${targetStage.label}" está bloqueada. Usa las acciones del panel de detalle.`
+      return
+    }
+
     await tx.deal.update({
-      where: { id: dealId },
+      where: { id: dealId, tenantId },
       data: { stageId: toStageId, stageEnteredAt: new Date() },
     })
     await recordActivity(tx, {
@@ -215,10 +222,12 @@ export async function moveDealAction(raw: unknown): Promise<{ ok: boolean; error
       entity: "Deal",
       entityId: dealId,
       type: "stageChanged",
-      payload: { from: fromStageId, to: toStageId, toLabel: targetStage.label },
+      payload: { from: deal.stageId, to: toStageId, toLabel: targetStage.label },
       userId: session.user!.id,
     })
   })
+
+  if (moveError) return { ok: false, error: moveError }
 
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
   revalidatePath(`/app/${tenantSlug}/archive`, "page")
@@ -240,11 +249,11 @@ export async function archiveDealAction(raw: unknown): Promise<{ ok: boolean; er
     return { ok: false, error: "Acceso denegado." }
   }
 
-  const deal = await prisma.deal.findUnique({ where: { id: dealId, tenantId } })
-  if (!deal) return { ok: false, error: "Oportunidad no encontrada." }
-
+  let notFound = false
   await withTenant(tenantId, async (tx) => {
-    await tx.deal.update({ where: { id: dealId }, data: { isArchived: true } })
+    const deal = await tx.deal.findUnique({ where: { id: dealId, tenantId } })
+    if (!deal) { notFound = true; return }
+    await tx.deal.update({ where: { id: dealId, tenantId }, data: { isArchived: true } })
     await recordActivity(tx, {
       tenantId,
       entity: "Deal",
@@ -254,6 +263,7 @@ export async function archiveDealAction(raw: unknown): Promise<{ ok: boolean; er
       userId: session.user!.id,
     })
   })
+  if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
 
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
   revalidatePath(`/app/${tenantSlug}/archive`, "page")
@@ -275,14 +285,14 @@ export async function updateDealFieldAction(raw: unknown): Promise<{ ok: boolean
     return { ok: false, error: "Acceso denegado." }
   }
 
-  const deal = await prisma.deal.findUnique({
-    where: { id: dealId, tenantId },
-    select: { value: true, statusKey: true, phone: true, whatsapp: true, email: true, name: true, company: true },
-  })
-  if (!deal) return { ok: false, error: "Oportunidad no encontrada." }
-
+  let notFound = false
   await withTenant(tenantId, async (tx) => {
-    await tx.deal.update({ where: { id: dealId }, data: { [field]: value } })
+    const deal = await tx.deal.findUnique({
+      where: { id: dealId, tenantId },
+      select: { value: true, statusKey: true, phone: true, whatsapp: true, email: true, name: true, company: true },
+    })
+    if (!deal) { notFound = true; return }
+    await tx.deal.update({ where: { id: dealId, tenantId }, data: { [field]: value } })
     if (field === "value") {
       await recordActivity(tx, {
         tenantId,
@@ -294,6 +304,7 @@ export async function updateDealFieldAction(raw: unknown): Promise<{ ok: boolean
       })
     }
   })
+  if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
 
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
   return { ok: true }
