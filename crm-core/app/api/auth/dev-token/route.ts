@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db/client"
 // Dev-only: returns the latest verification token for a given email.
 // Gated behind NODE_ENV — never reaches production.
 export async function GET(req: NextRequest) {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
     return NextResponse.json({ error: "Not available" }, { status: 404 })
   }
 

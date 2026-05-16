@@ -77,6 +77,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const deal = await prisma.deal.findUnique({
+    where: { id: dealId, tenantId },
+    select: { id: true },
+  });
+  if (!deal) {
+    return NextResponse.json({ error: "Deal not found" }, { status: 404 });
+  }
+
   const ext = EXT_MAP[contentType] ?? "bin";
   const key = `${tenantId}/deals/${dealId}/${randomUUID()}.${ext}`;
   const { signedUrl, publicUrl } = await signUploadUrl(key, contentType, size);

@@ -123,7 +123,9 @@ export async function getDeal(tenantId: string, dealId: string) {
 export async function getArchivedDeals(tenantId: string, cursor?: string, limit = 10) {
   const where: Prisma.DealWhereInput = { tenantId, isArchived: true }
   if (cursor) {
-    where.createdAt = { lt: new Date(cursor) }
+    const cursorDate = new Date(cursor)
+    if (isNaN(cursorDate.getTime())) throw new Error("Invalid cursor: expected ISO 8601 date string")
+    where.createdAt = { lt: cursorDate }
   }
 
   const deals = await withTenant(tenantId, (tx) =>

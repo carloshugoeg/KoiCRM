@@ -57,3 +57,12 @@ describe("updateDealFieldSchema field-level validation", () => {
     expect(r.success).toBe(false)
   })
 })
+
+describe("BUG-007: cursor date validation", () => {
+  it("new Date('garbage').getTime() is NaN", () => {
+    expect(isNaN(new Date("garbage string").getTime())).toBe(true)
+  })
+  it("new Date(validIso).getTime() is not NaN", () => {
+    expect(isNaN(new Date(new Date().toISOString()).getTime())).toBe(false)
+  })
+})
