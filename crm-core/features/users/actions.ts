@@ -2,6 +2,7 @@
 
 import crypto from "crypto"
 import { z } from "zod"
+import { headers } from "next/headers"
 import { prisma } from "@/lib/db/client"
 import { hashPassword } from "@/lib/auth/password"
 import { sendEmail, buildVerificationEmail, buildPasswordResetEmail, buildInvitationEmail } from "@/lib/email/resend"
@@ -19,6 +20,11 @@ function randomToken(): string {
   return crypto.randomBytes(32).toString("hex")
 }
 
+function getClientIp(): string {
+  const h = headers()
+  return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip") ?? "unknown"
+}
+
 // ─── Signup ──────────────────────────────────────────────────────────────────
 
 const signupSchema = z.object({
@@ -28,7 +34,8 @@ const signupSchema = z.object({
 })
 
 export async function signupAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  if (!rateLimit("signup:global", 10, 60_000)) {
+  const ip = getClientIp()
+  if (!rateLimit(`signup:ip:${ip}`, 10, 60_000)) {
     return { ok: false, error: "Demasiados intentos. Intenta más tarde." }
   }
 
@@ -38,7 +45,7 @@ export async function signupAction(raw: unknown): Promise<{ ok: boolean; error?:
   const { name, email, password } = parsed.data
 
   const existing = await prisma.user.findUnique({ where: { email } })
-  if (existing) return { ok: false, error: "Este correo ya está registrado." }
+  if (existing) return { ok: true }
 
   const hashed = await hashPassword(password)
   await prisma.user.create({ data: { name, email, password: hashed } })
@@ -67,7 +74,8 @@ export async function signupAction(raw: unknown): Promise<{ ok: boolean; error?:
 const forgotSchema = z.object({ email: z.string().email() })
 
 export async function forgotPasswordAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  if (!rateLimit("forgot:global", 20, 60_000)) {
+  const ip = getClientIp()
+  if (!rateLimit(`forgot:ip:${ip}`, 5, 60_000)) {
     return { ok: false, error: "Demasiados intentos. Intenta más tarde." }
   }
 

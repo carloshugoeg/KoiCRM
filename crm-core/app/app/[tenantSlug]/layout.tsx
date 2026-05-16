@@ -9,6 +9,8 @@ interface Props {
   params: { tenantSlug: string }
 }
 
+const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/
+
 function buildCssVars(branding: {
   primaryColor?: string | null
   bgColorLight?: string | null
@@ -17,12 +19,13 @@ function buildCssVars(branding: {
   kpiBgColor?: string | null
 } | null): string {
   if (!branding) return ""
+  const valid = (v: string | null | undefined): v is string => v != null && HEX_COLOR_RE.test(v)
   const vars: string[] = []
-  if (branding.primaryColor) vars.push(`--color-primary: ${branding.primaryColor};`)
-  if (branding.bgColorLight) vars.push(`--color-bg-light: ${branding.bgColorLight};`)
-  if (branding.bgColorDark) vars.push(`--color-bg-dark: ${branding.bgColorDark};`)
-  if (branding.headerBgColor) vars.push(`--color-header-bg: ${branding.headerBgColor};`)
-  if (branding.kpiBgColor) vars.push(`--color-kpi-bg: ${branding.kpiBgColor};`)
+  if (valid(branding.primaryColor)) vars.push(`--color-primary: ${branding.primaryColor};`)
+  if (valid(branding.bgColorLight)) vars.push(`--color-bg-light: ${branding.bgColorLight};`)
+  if (valid(branding.bgColorDark)) vars.push(`--color-bg-dark: ${branding.bgColorDark};`)
+  if (valid(branding.headerBgColor)) vars.push(`--color-header-bg: ${branding.headerBgColor};`)
+  if (valid(branding.kpiBgColor)) vars.push(`--color-kpi-bg: ${branding.kpiBgColor};`)
   return vars.length ? `:root { ${vars.join(" ")} }` : ""
 }
 
