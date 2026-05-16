@@ -59,15 +59,15 @@ describe("BUG-010: changeMemberRole self-demotion guard", () => {
 
 describe("BUG-011: ADMIN cannot remove another ADMIN", () => {
   it("ADMIN-removes-ADMIN: caller=ADMIN, target=ADMIN → should be blocked", () => {
-    const callerRole = "ADMIN"
-    const targetRole = "ADMIN"
+    const callerRole: string = "ADMIN"
+    const targetRole: string = "ADMIN"
     const blocked = targetRole === "ADMIN" && callerRole !== "OWNER"
     expect(blocked).toBe(true)
   })
 
   it("OWNER-removes-ADMIN: caller=OWNER, target=ADMIN → should be allowed", () => {
-    const callerRole = "OWNER"
-    const targetRole = "ADMIN"
+    const callerRole: string = "OWNER"
+    const targetRole: string = "ADMIN"
     const blocked = targetRole === "ADMIN" && callerRole !== "OWNER"
     expect(blocked).toBe(false)
   })
