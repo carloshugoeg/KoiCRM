@@ -40,4 +40,20 @@ describe("updateDealFieldSchema field-level validation", () => {
     const r = updateDealFieldSchema.safeParse({ ...base, field: "statusKey", value: "" })
     expect(r.success).toBe(false)
   })
+  it("accepts valid email for field=email", () => {
+    const r = updateDealFieldSchema.safeParse({ ...base, field: "email", value: "user@example.com" })
+    expect(r.success).toBe(true)
+  })
+  it("accepts string number '10' for field=value", () => {
+    const r = updateDealFieldSchema.safeParse({ ...base, field: "value", value: "10" })
+    expect(r.success).toBe(true)
+  })
+  it("rejects non-numeric string 'abc' for field=value", () => {
+    const r = updateDealFieldSchema.safeParse({ ...base, field: "value", value: "abc" })
+    expect(r.success).toBe(false)
+  })
+  it("rejects non-string (number) for string field=phone", () => {
+    const r = updateDealFieldSchema.safeParse({ ...base, field: "phone", value: 12345 })
+    expect(r.success).toBe(false)
+  })
 })

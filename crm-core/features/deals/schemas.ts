@@ -67,8 +67,14 @@ export const updateDealFieldSchema = z
     const { field, value } = data
     const addErr = (message: string) => ctx.addIssue({ code: "custom", message, path: ["value"] })
 
+    const STRING_FIELDS = ["phone", "whatsapp", "name", "company", "email", "statusKey"] as const
+    if (STRING_FIELDS.includes(field as typeof STRING_FIELDS[number]) && typeof value !== "string") {
+      addErr("Se esperaba un texto.")
+      return
+    }
+
     if (field === "email" && typeof value === "string" && value !== "") {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) addErr("Email inválido.")
+      if (!z.string().email().safeParse(value).success) addErr("Email inválido.")
     }
     if (field === "phone" && typeof value === "string" && value.length > 30) {
       addErr("Teléfono demasiado largo (máx. 30 caracteres).")
