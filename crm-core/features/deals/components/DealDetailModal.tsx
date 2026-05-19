@@ -15,15 +15,12 @@ import { QuoteSection } from "@/features/quotes/components/QuoteSection"
 import { PaymentSection } from "@/features/payments/components/PaymentSection"
 import { updateDealFieldAction, moveDealAction, archiveDealAction } from "@/features/deals/actions"
 import { addFollowUpAction, completeFollowUpAction, deleteFollowUpAction } from "@/features/follow-ups/actions"
-import { getDealActivity } from "@/features/activity/queries"
-import { getDealFollowUps } from "@/features/follow-ups/queries"
-import { getQuotesForDeal } from "@/features/quotes/queries"
-import { getPaymentsForDeal } from "@/features/payments/queries"
+import { getDealActivityAction, getDealFollowUpsAction, getQuotesForDealAction, getPaymentsForDealAction } from "@/features/deals/actions"
+import type { ActivityEntry } from "@/features/activity/queries"
 import { avatarColor, avatarInitials } from "@/lib/utils/avatar-color"
 import { formatCurrency, formatDate } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
 import type { PipelineStage, CatalogItem, FollowUp, Quote, Payment } from "@prisma/client"
-import type { ActivityEntry } from "@/features/activity/queries"
 
 interface DealDetailData {
   id: string
@@ -93,10 +90,10 @@ export function DealDetailModal({
 
   useEffect(() => {
     Promise.all([
-      getDealActivity(tenantId, deal.id),
-      getDealFollowUps(tenantId, deal.id),
-      getQuotesForDeal(tenantId, deal.id),
-      getPaymentsForDeal(tenantId, deal.id),
+      getDealActivityAction(tenantId, deal.id),
+      getDealFollowUpsAction(tenantId, deal.id),
+      getQuotesForDealAction(tenantId, deal.id),
+      getPaymentsForDealAction(tenantId, deal.id),
     ]).then(([acts, fus, qs, ps]) => {
       setActivities(acts)
       setFollowUps(fus)
@@ -145,7 +142,7 @@ export function DealDetailModal({
     if (!result.ok) toast.error(result.error ?? "Error al agregar seguimiento.")
     else {
       toast.success("Seguimiento agregado.")
-      const updated = await getDealFollowUps(tenantId, deal.id)
+      const updated = await getDealFollowUpsAction(tenantId, deal.id)
       setFollowUps(updated)
       setFuDate("")
     }
@@ -157,7 +154,7 @@ export function DealDetailModal({
     else {
       setCompletingId(null)
       setCompletingResult("")
-      const updated = await getDealFollowUps(tenantId, deal.id)
+      const updated = await getDealFollowUpsAction(tenantId, deal.id)
       setFollowUps(updated)
     }
   }
@@ -167,7 +164,7 @@ export function DealDetailModal({
     const res = await deleteFollowUpAction({ tenantId, tenantSlug, followUpId })
     if (!res.ok) toast.error(res.error ?? "Error.")
     else {
-      const updated = await getDealFollowUps(tenantId, deal.id)
+      const updated = await getDealFollowUpsAction(tenantId, deal.id)
       setFollowUps(updated)
     }
   }

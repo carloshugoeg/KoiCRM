@@ -1,6 +1,7 @@
 "use client"
 
-import { createContext, useContext } from "react"
+import { createContext, useContext, createElement } from "react"
+import type { ReactNode } from "react"
 import type { Membership, Tenant, TenantBranding } from "@prisma/client"
 
 export type TenantContextValue = {
@@ -9,7 +10,10 @@ export type TenantContextValue = {
 }
 
 const TenantContext = createContext<TenantContextValue | null>(null)
-export const TenantProvider = TenantContext.Provider
+
+export function TenantProvider({ value, children }: { value: TenantContextValue; children: ReactNode }) {
+  return createElement(TenantContext.Provider, { value }, children)
+}
 
 export function useTenant(): TenantContextValue {
   const ctx = useContext(TenantContext)

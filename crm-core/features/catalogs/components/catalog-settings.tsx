@@ -11,7 +11,7 @@ import {
   deleteCatalogItemAction,
   reorderCatalogItemsAction,
 } from "@/features/catalogs/actions"
-import { CATALOG_LABELS } from "@/features/catalogs/queries"
+import { CATALOG_LABELS } from "@/features/catalogs/constants"
 import type { CatalogItem, Tenant } from "@prisma/client"
 import type { CatalogKey } from "@/features/catalogs/queries"
 

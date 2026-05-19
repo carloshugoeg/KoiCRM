@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/auth/rbac"
 import { prisma } from "@/lib/db/client"
 import { recordActivity } from "@/features/activity/queries"
 import { addNoteSchema, deleteNoteSchema } from "@/features/notes/schemas"
+import { getDealNotes, getClientNotes } from "@/features/notes/queries"
 
 export async function addNoteAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
   const session = await auth()
@@ -73,4 +74,18 @@ export async function deleteNoteAction(raw: unknown): Promise<{ ok: boolean; err
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
   revalidatePath(`/app/${tenantSlug}/clients`, "page")
   return { ok: true }
+}
+
+export async function getDealNotesAction(tenantId: string, dealId: string) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error("No autenticado.")
+  await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER", "VIEWER"])
+  return getDealNotes(tenantId, dealId)
+}
+
+export async function getClientNotesAction(tenantId: string, clientId: string) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error("No autenticado.")
+  await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER", "VIEWER"])
+  return getClientNotes(tenantId, clientId)
 }

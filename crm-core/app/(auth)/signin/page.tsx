@@ -40,7 +40,7 @@ function SignInForm() {
       setError("Correo o contraseña incorrectos.")
       return
     }
-    router.push(params.get("callbackUrl") ?? "/app")
+    window.location.assign(params.get("callbackUrl") ?? "/app")
   }
 
   return (

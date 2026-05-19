@@ -8,7 +8,10 @@ import { requireRole } from "@/lib/auth/rbac"
 import { generateDealId } from "@/lib/id/deal-id"
 import { ownerInitials } from "@/lib/utils/avatar-color"
 import { findOrCreateClient } from "@/features/clients/queries"
-import { recordActivity } from "@/features/activity/queries"
+import { recordActivity, getDealActivity } from "@/features/activity/queries"
+import { getDealFollowUps } from "@/features/follow-ups/queries"
+import { getQuotesForDeal } from "@/features/quotes/queries"
+import { getPaymentsForDeal } from "@/features/payments/queries"
 import {
   createDealSchema,
   updateDealSchema,
@@ -361,4 +364,29 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
       paymentCount: d._count.payments,
     },
   }
+}
+
+export async function getDealActivityAction(tenantId: string, dealId: string) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error("No autenticado.")
+  await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER", "VIEWER"])
+  return getDealActivity(tenantId, dealId)
+}
+
+export async function getDealFollowUpsAction(tenantId: string, dealId: string) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error("No autenticado.")
+  return getDealFollowUps(tenantId, dealId)
+}
+
+export async function getQuotesForDealAction(tenantId: string, dealId: string) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error("No autenticado.")
+  return getQuotesForDeal(tenantId, dealId)
+}
+
+export async function getPaymentsForDealAction(tenantId: string, dealId: string) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error("No autenticado.")
+  return getPaymentsForDeal(tenantId, dealId)
 }

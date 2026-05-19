@@ -5,11 +5,10 @@ import { toast } from "sonner"
 import { Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { addNoteAction, deleteNoteAction } from "@/features/notes/actions"
-import { getDealNotes, getClientNotes } from "@/features/notes/queries"
+import { addNoteAction, deleteNoteAction, getDealNotesAction, getClientNotesAction } from "@/features/notes/actions"
+import type { NoteEntry } from "@/features/notes/queries"
 import { formatDateTime } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
-import type { NoteEntry } from "@/features/notes/queries"
 
 interface NotesSectionProps {
   tenantId: string
@@ -26,9 +25,9 @@ export function NotesSection({ tenantId, tenantSlug, dealId, clientId, settings 
 
   useEffect(() => {
     const fetch = dealId
-      ? getDealNotes(tenantId, dealId)
+      ? getDealNotesAction(tenantId, dealId)
       : clientId
-        ? getClientNotes(tenantId, clientId)
+        ? getClientNotesAction(tenantId, clientId)
         : Promise.resolve([])
     fetch.then(setNotes)
   }, [tenantId, dealId, clientId])
@@ -45,9 +44,9 @@ export function NotesSection({ tenantId, tenantSlug, dealId, clientId, settings 
     toast.success("Nota guardada.")
     setBody("")
     const updated = dealId
-      ? await getDealNotes(tenantId, dealId)
+      ? await getDealNotesAction(tenantId, dealId)
       : clientId
-        ? await getClientNotes(tenantId, clientId)
+        ? await getClientNotesAction(tenantId, clientId)
         : []
     setNotes(updated)
   }

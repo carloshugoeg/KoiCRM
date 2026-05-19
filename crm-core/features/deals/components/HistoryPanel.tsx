@@ -2,7 +2,7 @@
 
 import { formatDateTime } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
-import { ACTIVITY_LABELS } from "@/features/activity/queries"
+import { ACTIVITY_LABELS } from "@/features/activity/constants"
 import type { ActivityType, ActivityEntry } from "@/features/activity/queries"
 
 interface HistoryPanelProps {
