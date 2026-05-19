@@ -33,8 +33,6 @@ export default async function EquipoStatsPage({ params, searchParams }: Props) {
     locale: settings?.locale ?? "es-GT",
     currency: settings?.currency ?? "GTQ",
   }
-  const fmt = (n: number) => formatCurrency(n, intl)
-
   const pieData = team.map((r) => ({ label: r.ownerName, value: r.dealsCount }))
   const barData = team.map((r) => ({ label: r.ownerName, value: r.wonValue }))
 
@@ -47,7 +45,7 @@ export default async function EquipoStatsPage({ params, searchParams }: Props) {
         </div>
         <div className="rounded-lg border p-4">
           <h2 className="text-sm font-semibold mb-4">Valor ganado por asesor</h2>
-          <BarChart data={barData} formatter={fmt} />
+          <BarChart data={barData} intl={intl} />
         </div>
       </div>
 
@@ -70,8 +68,8 @@ export default async function EquipoStatsPage({ params, searchParams }: Props) {
                   <td className="px-3 py-2">{r.wonCount}</td>
                   <td className="px-3 py-2">{r.lostCount}</td>
                   <td className="px-3 py-2">{r.closingRate}%</td>
-                  <td className="px-3 py-2">{fmt(r.totalValue)}</td>
-                  <td className="px-3 py-2 font-medium text-green-600">{fmt(r.wonValue)}</td>
+                  <td className="px-3 py-2">{formatCurrency(r.totalValue, intl)}</td>
+                  <td className="px-3 py-2 font-medium text-green-600">{formatCurrency(r.wonValue, intl)}</td>
                 </tr>
               ))}
             </tbody>

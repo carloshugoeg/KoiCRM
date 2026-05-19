@@ -32,8 +32,6 @@ export default async function EmbudoStatsPage({ params, searchParams }: Props) {
     locale: settings?.locale ?? "es-GT",
     currency: settings?.currency ?? "GTQ",
   }
-  const fmt = (n: number) => formatCurrency(n, intl)
-
   const chartData = stages.map((s) => ({ label: s.stageLabel, value: s.count, color: s.stageColor }))
   const valueData = stages.map((s) => ({ label: s.stageLabel, value: s.value, color: s.stageColor }))
 
@@ -46,7 +44,7 @@ export default async function EmbudoStatsPage({ params, searchParams }: Props) {
         </div>
         <div className="rounded-lg border p-4">
           <h2 className="text-sm font-semibold mb-4">Valor por etapa</h2>
-          <BarChart data={valueData} formatter={fmt} />
+          <BarChart data={valueData} intl={intl} />
         </div>
       </div>
 
@@ -71,7 +69,7 @@ export default async function EmbudoStatsPage({ params, searchParams }: Props) {
                     </span>
                   </td>
                   <td className="px-3 py-2">{s.count}</td>
-                  <td className="px-3 py-2">{fmt(s.value)}</td>
+                  <td className="px-3 py-2">{formatCurrency(s.value, intl)}</td>
                 </tr>
               ))}
             </tbody>

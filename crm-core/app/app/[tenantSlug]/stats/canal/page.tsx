@@ -33,8 +33,6 @@ export default async function CanalStatsPage({ params, searchParams }: Props) {
     locale: settings?.locale ?? "es-GT",
     currency: settings?.currency ?? "GTQ",
   }
-  const fmt = (n: number) => formatCurrency(n, intl)
-
   const pieData = channels.map((c) => ({ label: c.channelLabel, value: c.dealsCount }))
   const barData = channels.map((c) => ({ label: c.channelLabel, value: c.totalValue }))
 
@@ -47,7 +45,7 @@ export default async function CanalStatsPage({ params, searchParams }: Props) {
         </div>
         <div className="rounded-lg border p-4">
           <h2 className="text-sm font-semibold mb-4">Valor por canal</h2>
-          <BarChart data={barData} formatter={fmt} />
+          <BarChart data={barData} intl={intl} />
         </div>
       </div>
 
@@ -67,9 +65,9 @@ export default async function CanalStatsPage({ params, searchParams }: Props) {
                 <tr key={c.channelKey} className="border-b last:border-0">
                   <td className="px-3 py-2 font-medium">{c.channelLabel}</td>
                   <td className="px-3 py-2">{c.dealsCount}</td>
-                  <td className="px-3 py-2">{fmt(c.totalValue)}</td>
+                  <td className="px-3 py-2">{formatCurrency(c.totalValue, intl)}</td>
                   <td className="px-3 py-2">{c.wonCount}</td>
-                  <td className="px-3 py-2 font-medium text-green-600">{fmt(c.wonValue)}</td>
+                  <td className="px-3 py-2 font-medium text-green-600">{formatCurrency(c.wonValue, intl)}</td>
                 </tr>
               ))}
             </tbody>
