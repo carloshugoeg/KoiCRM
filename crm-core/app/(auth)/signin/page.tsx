@@ -2,14 +2,13 @@
 
 import { useState, Suspense } from "react"
 import { signIn } from "next-auth/react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 
 function SignInForm() {
-  const router = useRouter()
   const params = useSearchParams()
 
   const errorParam = params.get("error")

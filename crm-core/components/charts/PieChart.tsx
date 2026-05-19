@@ -27,7 +27,7 @@ export function PieChart({ data, formatter, height = 220 }: PieChartProps) {
           cx="50%"
           cy="50%"
           outerRadius={80}
-          label={({ name, percent }: any) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+          label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`}
           labelLine={false}
         >
           {data.map((entry, i) => (
@@ -35,7 +35,7 @@ export function PieChart({ data, formatter, height = 220 }: PieChartProps) {
           ))}
         </Pie>
         <Tooltip
-          formatter={(v: any) => [formatter ? formatter(v) : v, ""]}
+          formatter={(v) => [formatter ? formatter(v as number) : (v as number), ""]}
           contentStyle={{ fontSize: 12, borderRadius: 6 }}
         />
       </RePieChart>

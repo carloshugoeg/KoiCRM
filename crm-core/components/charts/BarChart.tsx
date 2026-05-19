@@ -23,7 +23,7 @@ export function BarChart({ data, formatter, height = 220 }: BarChartProps) {
         <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
         <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={formatter} />
         <Tooltip
-          formatter={(v: any) => [formatter ? formatter(v) : v, ""]}
+          formatter={(v) => [formatter ? formatter(v as number) : (v as number), ""]}
           contentStyle={{ fontSize: 12, borderRadius: 6 }}
         />
         <Bar dataKey="value" radius={[3, 3, 0, 0]}>
