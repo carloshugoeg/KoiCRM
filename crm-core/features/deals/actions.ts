@@ -216,6 +216,17 @@ export async function moveDealAction(raw: unknown): Promise<{ ok: boolean; error
       return
     }
 
+    if (targetStage.key === "ganado") {
+      const paymentWithDoc = await tx.payment.findFirst({
+        where: { dealId, tenantId, isVoid: false, fileUrl: { not: null } },
+        select: { id: true },
+      })
+      if (!paymentWithDoc) {
+        moveError = "Para marcar como ganado, debes adjuntar un documento de pago a la oportunidad."
+        return
+      }
+    }
+
     await tx.deal.update({
       where: { id: dealId, tenantId },
       data: { stageId: toStageId, stageEnteredAt: new Date() },

@@ -177,6 +177,7 @@ export function DealDetailModal({
   const unlockedStages = stages.filter((s) => !s.locked && s.id !== deal.stageId)
   const wonStage = stages.find((s) => s.key === "ganado")
   const lostStage = stages.find((s) => s.key === "perdido")
+  const hasPaymentDoc = payments.some((p) => !p.isVoid && !!p.fileUrl)
 
   const pendingFUs = followUps.filter((f) => !f.completed)
   const completedFUs = followUps.filter((f) => f.completed)
@@ -329,7 +330,14 @@ export function DealDetailModal({
                 </Select>
               )}
               {wonStage && deal.stageKey !== "ganado" && (
-                <Button size="sm" variant="outline" className="h-8 text-xs text-emerald-600 border-emerald-300" onClick={() => handleMove(wonStage.id, true)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs text-emerald-600 border-emerald-300"
+                  onClick={() => handleMove(wonStage.id, true)}
+                  disabled={loadingAct || !hasPaymentDoc}
+                  title={!hasPaymentDoc ? "Adjunta un documento de pago antes de marcar como ganado" : undefined}
+                >
                   Marcar como ganado
                 </Button>
               )}

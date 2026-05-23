@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, useEffect } from "react"
 import {
   DndContext,
   DragEndEvent,
@@ -39,6 +39,10 @@ export function KanbanBoard({
   const [deals, setDeals] = useState(initialDeals)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [, startTransition] = useTransition()
+
+  useEffect(() => {
+    setDeals(initialDeals)
+  }, [initialDeals])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),

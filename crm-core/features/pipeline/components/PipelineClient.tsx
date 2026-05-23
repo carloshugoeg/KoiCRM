@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { Plus, Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { KanbanBoard } from "@/features/pipeline/components/KanbanBoard"
@@ -48,15 +49,17 @@ export function PipelineClient({
   canEdit,
   canDelete,
 }: PipelineClientProps) {
+  const router = useRouter()
   const [newDealOpen, setNewDealOpen] = useState(false)
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
 
-  // Convert serialized dates back to Date objects
-  const dealCards: DealCardData[] = deals.map((d) => ({
+  // Convert serialized dates back to Date objects — memoized so the reference only
+  // changes when the server sends fresh data (after router.refresh()), not on every render.
+  const dealCards: DealCardData[] = useMemo(() => deals.map((d) => ({
     ...d,
     createdAt: new Date(d.createdAt),
     stageEnteredAt: new Date(d.stageEnteredAt),
-  }))
+  })), [deals])
 
   // Compute KPIs from local deal data
   const closedKeys = ["ganado", "perdido"]
@@ -161,7 +164,10 @@ export function PipelineClient({
             canEdit={canEdit}
             canDelete={canDelete}
             onClose={() => setSelectedDealId(null)}
-            onAction={() => setSelectedDealId(null)}
+            onAction={() => {
+              setSelectedDealId(null)
+              router.refresh()
+            }}
           />
         )
       })()}
