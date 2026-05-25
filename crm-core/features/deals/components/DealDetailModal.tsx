@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import { X, Phone, MessageCircle, Mail, ChevronDown, Trash2 } from "lucide-react"
+import * as DialogPrimitive from "@radix-ui/react-dialog"
+import { DialogPortal, DialogOverlay, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -195,8 +197,14 @@ export function DealDetailModal({
 
   return (
     <>
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-background rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+    <DialogPrimitive.Root open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogPrimitive.Content
+          className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-full max-w-5xl max-h-[90vh] bg-background rounded-xl shadow-2xl flex flex-col focus:outline-none"
+          aria-describedby={undefined}
+        >
+        <DialogTitle className="sr-only">{deal.name}</DialogTitle>
         {/* Modal header */}
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
           <div>
@@ -495,8 +503,9 @@ export function DealDetailModal({
             )}
           </ScrollArea>
         </div>
-      </div>
-    </div>
+        </DialogPrimitive.Content>
+      </DialogPortal>
+    </DialogPrimitive.Root>
 
     <AlertDialog
       open={archiveConfirmOpen}
