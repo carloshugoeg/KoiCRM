@@ -108,9 +108,8 @@ export function DealDetailModal({
     const result = await updateDealFieldAction({ tenantId, tenantSlug, dealId: deal.id, field, value })
     if (!result.ok) toast.error(result.error ?? "Error al guardar.")
     else {
-      toast.success("Guardado.")
+      toast.success("Guardado.", { onAutoClose: () => onAction?.() })
       setEditField(null)
-      onAction?.()
     }
   }
 
@@ -121,9 +120,8 @@ export function DealDetailModal({
       const result = await moveDealAction({ tenantId, tenantSlug, dealId: deal.id, toStageId, force })
       if (!result.ok) toast.error(result.error ?? "Error al mover.")
       else {
-        toast.success("Etapa actualizada.")
+        toast.success("Etapa actualizada.", { onAutoClose: () => onAction?.() })
         onClose()
-        onAction?.()
       }
     } finally {
       setMoving(false)
