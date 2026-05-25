@@ -370,7 +370,7 @@ export function DealDetailModal({
                       <div className="flex items-start gap-2">
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium">{reasonLabel}</p>
-                          <p className="text-xs text-muted-foreground">{fu.date.toISOString().slice(0, 10)}</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(fu.date.toISOString(), settings)}</p>
                         </div>
                         {canEdit && (
                           <Button
