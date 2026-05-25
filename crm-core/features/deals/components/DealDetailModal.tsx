@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import { X, Phone, MessageCircle, Mail, ChevronDown, Trash2 } from "lucide-react"
+import { AlertDialog } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -77,6 +78,8 @@ export function DealDetailModal({
   const [payments, setPayments] = useState<Payment[]>([])
   const [loadingAct, setLoadingAct] = useState(true)
   const [moving, setMoving] = useState(false)
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
+  const [deleteFollowUpId, setDeleteFollowUpId] = useState<string | null>(null)
 
   // Inline edit state
   const [editField, setEditField] = useState<string | null>(null)
@@ -129,13 +132,17 @@ export function DealDetailModal({
   }
 
   async function handleArchive() {
-    if (!confirm("¿Archivar esta oportunidad?")) return
-    const result = await archiveDealAction({ tenantId, tenantSlug, dealId: deal.id })
-    if (!result.ok) toast.error(result.error ?? "Error al archivar.")
-    else {
-      toast.success("Archivado.")
-      onClose()
-      onAction?.()
+    if (moving) return
+    setMoving(true)
+    try {
+      const result = await archiveDealAction({ tenantId, tenantSlug, dealId: deal.id })
+      if (!result.ok) toast.error(result.error ?? "Error al archivar.")
+      else {
+        toast.success("Archivado.", { onAutoClose: () => onAction?.() })
+        onClose()
+      }
+    } finally {
+      setMoving(false)
     }
   }
 
@@ -165,7 +172,6 @@ export function DealDetailModal({
   }
 
   async function handleDeleteFollowUp(followUpId: string) {
-    if (!confirm("¿Eliminar este seguimiento?")) return
     const res = await deleteFollowUpAction({ tenantId, tenantSlug, followUpId })
     if (!res.ok) toast.error(res.error ?? "Error.")
     else {
@@ -188,6 +194,7 @@ export function DealDetailModal({
   const completedFUs = followUps.filter((f) => f.completed)
 
   return (
+    <>
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
       <div className="bg-background rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
         {/* Modal header */}
@@ -354,7 +361,7 @@ export function DealDetailModal({
                   Marcar como perdido
                 </Button>
               )}
-              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleArchive} disabled={moving}>
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setArchiveConfirmOpen(true)} disabled={moving}>
                 Archivar
               </Button>
             </div>
@@ -391,7 +398,7 @@ export function DealDetailModal({
                         {canEdit && (
                           <Button
                             size="icon" variant="ghost" className="h-6 w-6 shrink-0"
-                            onClick={() => handleDeleteFollowUp(fu.id)}
+                            onClick={() => setDeleteFollowUpId(fu.id)}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -490,5 +497,28 @@ export function DealDetailModal({
         </div>
       </div>
     </div>
+
+    <AlertDialog
+      open={archiveConfirmOpen}
+      onOpenChange={setArchiveConfirmOpen}
+      title="¿Archivar oportunidad?"
+      description="La oportunidad se moverá al archivo y no aparecerá en el pipeline."
+      confirmLabel="Archivar"
+      cancelLabel="Cancelar"
+      destructive
+      onConfirm={handleArchive}
+    />
+
+    <AlertDialog
+      open={deleteFollowUpId !== null}
+      onOpenChange={(open) => { if (!open) setDeleteFollowUpId(null) }}
+      title="¿Eliminar seguimiento?"
+      description="Esta acción no se puede deshacer."
+      confirmLabel="Eliminar"
+      cancelLabel="Cancelar"
+      destructive
+      onConfirm={() => { if (deleteFollowUpId) handleDeleteFollowUp(deleteFollowUpId) }}
+    />
+    </>
   )
 }
