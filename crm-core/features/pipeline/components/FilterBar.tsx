@@ -21,7 +21,7 @@ const ALL = "__all__"
 export function FilterBar({ members, channels, equipment, currentFilters, tenantSlug }: FilterBarProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const [, startTransition] = useTransition()
+  const [isPending, startTransition] = useTransition()
 
   function update(key: string, value: string | undefined) {
     const params = new URLSearchParams()
@@ -45,7 +45,7 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Select value={currentFilters.owner ?? ALL} onValueChange={(v) => update("owner", v)}>
-        <SelectTrigger className="w-36 h-8 text-xs" aria-label="Filtrar por asesor">
+        <SelectTrigger className={`w-36 h-8 text-xs${isPending ? " opacity-50" : ""}`} disabled={isPending} aria-label="Filtrar por asesor">
           <SelectValue placeholder="Asesor" />
         </SelectTrigger>
         <SelectContent>
@@ -59,7 +59,7 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
       </Select>
 
       <Select value={currentFilters.channel ?? ALL} onValueChange={(v) => update("channel", v)}>
-        <SelectTrigger className="w-36 h-8 text-xs" aria-label="Filtrar por canal">
+        <SelectTrigger className={`w-36 h-8 text-xs${isPending ? " opacity-50" : ""}`} disabled={isPending} aria-label="Filtrar por canal">
           <SelectValue placeholder="Canal" />
         </SelectTrigger>
         <SelectContent>
@@ -73,7 +73,7 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
       </Select>
 
       <Select value={currentFilters.equipment ?? ALL} onValueChange={(v) => update("equipment", v)}>
-        <SelectTrigger className="w-36 h-8 text-xs" aria-label="Filtrar por equipo">
+        <SelectTrigger className={`w-36 h-8 text-xs${isPending ? " opacity-50" : ""}`} disabled={isPending} aria-label="Filtrar por equipo">
           <SelectValue placeholder="Equipo" />
         </SelectTrigger>
         <SelectContent>
@@ -87,7 +87,7 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
       </Select>
 
       <Select value={currentFilters.alerts ?? ALL} onValueChange={(v) => update("alerts", v)}>
-        <SelectTrigger className="w-40 h-8 text-xs" aria-label="Filtrar por alerta">
+        <SelectTrigger className={`w-40 h-8 text-xs${isPending ? " opacity-50" : ""}`} disabled={isPending} aria-label="Filtrar por alerta">
           <SelectValue placeholder="Alertas" />
         </SelectTrigger>
         <SelectContent>
@@ -101,7 +101,8 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
       <div className="flex items-center gap-1">
         <Input
           type="date"
-          className="h-8 text-xs w-36"
+          className={`h-8 text-xs w-36${isPending ? " opacity-50" : ""}`}
+          disabled={isPending}
           value={currentFilters.from ?? ""}
           onChange={(e) => update("from", e.target.value || undefined)}
           aria-label="Fecha desde"
@@ -109,7 +110,8 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
         <span className="text-xs text-muted-foreground" aria-hidden="true">→</span>
         <Input
           type="date"
-          className="h-8 text-xs w-36"
+          className={`h-8 text-xs w-36${isPending ? " opacity-50" : ""}`}
+          disabled={isPending}
           value={currentFilters.to ?? ""}
           onChange={(e) => update("to", e.target.value || undefined)}
           aria-label="Fecha hasta"
