@@ -76,6 +76,7 @@ export function DealDetailModal({
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [loadingAct, setLoadingAct] = useState(true)
+  const [moving, setMoving] = useState(false)
 
   // Inline edit state
   const [editField, setEditField] = useState<string | null>(null)
@@ -114,12 +115,18 @@ export function DealDetailModal({
   }
 
   async function handleMove(toStageId: string, force = false) {
-    const result = await moveDealAction({ tenantId, tenantSlug, dealId: deal.id, toStageId, force })
-    if (!result.ok) toast.error(result.error ?? "Error al mover.")
-    else {
-      toast.success("Etapa actualizada.")
-      onClose()
-      onAction?.()
+    if (moving) return
+    setMoving(true)
+    try {
+      const result = await moveDealAction({ tenantId, tenantSlug, dealId: deal.id, toStageId, force })
+      if (!result.ok) toast.error(result.error ?? "Error al mover.")
+      else {
+        toast.success("Etapa actualizada.")
+        onClose()
+        onAction?.()
+      }
+    } finally {
+      setMoving(false)
     }
   }
 
@@ -322,7 +329,7 @@ export function DealDetailModal({
             <div className="flex flex-wrap gap-2 mb-4">
               {unlockedStages.length > 0 && (
                 <Select onValueChange={(v) => handleMove(v)}>
-                  <SelectTrigger className="w-40 h-8 text-xs">
+                  <SelectTrigger className="w-40 h-8 text-xs" disabled={moving}>
                     <SelectValue placeholder="Mover a..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -338,18 +345,18 @@ export function DealDetailModal({
                   variant="outline"
                   className="h-8 text-xs text-emerald-600 border-emerald-300"
                   onClick={() => handleMove(wonStage.id, true)}
-                  disabled={loadingAct || !hasPaymentDoc}
+                  disabled={loadingAct || !hasPaymentDoc || moving}
                   title={!hasPaymentDoc ? "Adjunta un documento de pago antes de marcar como ganado" : undefined}
                 >
                   Marcar como ganado
                 </Button>
               )}
               {lostStage && deal.stageKey !== "perdido" && (
-                <Button size="sm" variant="outline" className="h-8 text-xs text-red-600 border-red-300" onClick={() => handleMove(lostStage.id, true)}>
+                <Button size="sm" variant="outline" className="h-8 text-xs text-red-600 border-red-300" onClick={() => handleMove(lostStage.id, true)} disabled={moving}>
                   Marcar como perdido
                 </Button>
               )}
-              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleArchive}>
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleArchive} disabled={moving}>
                 Archivar
               </Button>
             </div>
