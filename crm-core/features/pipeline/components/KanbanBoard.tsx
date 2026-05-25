@@ -38,7 +38,8 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [deals, setDeals] = useState(initialDeals)
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [, startTransition] = useTransition()
+  const [isPending, startTransition] = useTransition()
+  const [movingDealId, setMovingDealId] = useState<string | null>(null)
 
   useEffect(() => {
     setDeals(initialDeals)
@@ -82,12 +83,14 @@ export function KanbanBoard({
       )
     )
 
+    setMovingDealId(dealId)
     startTransition(async () => {
       const result = await moveDealAction({ tenantId, tenantSlug, dealId, toStageId, force: false })
       if (!result.ok) {
-        setDeals(previous) // rollback
+        setDeals(previous)
         toast.error(result.error ?? "Error al mover la oportunidad.")
       }
+      setMovingDealId(null)
     })
   }
 
@@ -103,6 +106,7 @@ export function KanbanBoard({
             deals={deals.filter((d) => d.stageId === stage.id)}
             settings={settings}
             onDealClick={onDealClick}
+            movingDealId={movingDealId}
           />
         ))}
       </div>

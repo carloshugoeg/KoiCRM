@@ -12,9 +12,10 @@ interface KanbanColumnProps {
   deals: DealCardData[]
   settings: IntlSettings
   onDealClick: (dealId: string) => void
+  movingDealId?: string | null
 }
 
-export function KanbanColumn({ stage, deals, settings, onDealClick }: KanbanColumnProps) {
+export function KanbanColumn({ stage, deals, settings, onDealClick, movingDealId }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
 
   return (
@@ -60,12 +61,16 @@ export function KanbanColumn({ stage, deals, settings, onDealClick }: KanbanColu
         <ScrollArea className="h-full">
           <div className="space-y-2 pb-2">
             {deals.map((deal) => (
-              <DealCard
+              <div
                 key={deal.id}
-                deal={deal}
-                settings={settings}
-                onClick={() => onDealClick(deal.id)}
-              />
+                className={deal.id === movingDealId ? "opacity-40 pointer-events-none" : undefined}
+              >
+                <DealCard
+                  deal={deal}
+                  settings={settings}
+                  onClick={() => onDealClick(deal.id)}
+                />
+              </div>
             ))}
           </div>
         </ScrollArea>
