@@ -226,7 +226,10 @@ export function DealDetailModal({
                     onChange={(e) => setEditValue(e.target.value)}
                     className="h-7 text-sm"
                     onBlur={() => saveField("value", parseFloat(editValue) || 0)}
-                    onKeyDown={(e) => { if (e.key === "Enter") saveField("value", parseFloat(editValue) || 0) }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur()
+                      if (e.key === "Escape") setEditField(null)
+                    }}
                   />
                 </div>
               ) : (
