@@ -147,6 +147,13 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
     const existing = await tx.deal.findUnique({ where: { id: dealId, tenantId } })
     if (!existing) { notFound = true; return }
 
+    if (fields.ownerId && fields.ownerId !== existing.ownerId) {
+      const ownerMembership = await tx.membership.findUnique({
+        where: { userId_tenantId: { userId: fields.ownerId, tenantId } },
+      })
+      if (!ownerMembership) { notFound = true; return }
+    }
+
     const updateData: Prisma.DealUpdateInput = {}
     if (fields.name !== undefined) updateData.name = fields.name.trim()
     if (fields.company !== undefined) updateData.company = fields.company?.trim() || null
@@ -156,6 +163,7 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
     if (fields.value !== undefined) updateData.value = fields.value
     if (fields.statusKey !== undefined) updateData.statusKey = fields.statusKey
     if (fields.channelKey !== undefined) updateData.channelKey = fields.channelKey
+    if (fields.ownerId !== undefined) updateData.owner = { connect: { id: fields.ownerId } }
 
     await tx.deal.update({ where: { id: dealId, tenantId }, data: updateData })
 
