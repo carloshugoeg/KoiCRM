@@ -412,3 +412,11 @@ model CustomFieldDefinition {
   @@unique([tenantId, entity, key])
   @@index([tenantId, entity])
 }
+
+model RateLimitEntry {
+  key     String   @id
+  count   Int      @default(1)
+  resetAt DateTime
+
+  @@map("rate_limit_entries")
+}

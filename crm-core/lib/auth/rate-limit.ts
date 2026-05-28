@@ -1,13 +1,28 @@
-const store = new Map<string, { count: number; resetAt: number }>()
+import { prisma } from "@/lib/db/client"
 
-export function rateLimit(key: string, max: number, windowMs: number): boolean {
-  const now = Date.now()
-  const entry = store.get(key)
-  if (!entry || entry.resetAt < now) {
-    store.set(key, { count: 1, resetAt: now + windowMs })
+export async function rateLimit(key: string, max: number, windowMs: number): Promise<boolean> {
+  const now = new Date()
+  const resetAt = new Date(now.getTime() + windowMs)
+
+  try {
+    type Row = { count: number }
+    const rows = await prisma.$queryRaw<Row[]>`
+      INSERT INTO rate_limit_entries (key, count, "resetAt")
+      VALUES (${key}, 1, ${resetAt})
+      ON CONFLICT (key) DO UPDATE SET
+        count = CASE
+          WHEN rate_limit_entries."resetAt" < ${now} THEN 1
+          ELSE rate_limit_entries.count + 1
+        END,
+        "resetAt" = CASE
+          WHEN rate_limit_entries."resetAt" < ${now} THEN ${resetAt}
+          ELSE rate_limit_entries."resetAt"
+        END
+      RETURNING count
+    `
+    return (rows[0]?.count ?? 1) <= max
+  } catch {
+    // Fail open: if DB is unavailable, don't block legitimate users
     return true
   }
-  if (entry.count >= max) return false
-  entry.count++
-  return true
 }

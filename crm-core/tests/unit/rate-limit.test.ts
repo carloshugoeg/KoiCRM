@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-let now = 1_000_000
+vi.mock("@/lib/db/client", () => ({
+  prisma: { $queryRaw: vi.fn() },
+}))
 
-beforeEach(() => {
-  vi.spyOn(Date, "now").mockImplementation(() => now)
-})
+import { prisma } from "@/lib/db/client"
 
 const loadModule = async () => {
   vi.resetModules()
@@ -12,25 +12,29 @@ const loadModule = async () => {
 }
 
 describe("rateLimit", () => {
-  it("allows requests under the limit", async () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it("allows request when count is within limit", async () => {
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ count: 2 }])
     const { rateLimit } = await loadModule()
-    expect(rateLimit("key1", 3, 60_000)).toBe(true)
-    expect(rateLimit("key1", 3, 60_000)).toBe(true)
-    expect(rateLimit("key1", 3, 60_000)).toBe(true)
+    expect(await rateLimit("key1", 3, 60_000)).toBe(true)
   })
 
-  it("blocks when limit is exceeded", async () => {
+  it("blocks request when count exceeds limit", async () => {
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ count: 4 }])
     const { rateLimit } = await loadModule()
-    rateLimit("key2", 2, 60_000)
-    rateLimit("key2", 2, 60_000)
-    expect(rateLimit("key2", 2, 60_000)).toBe(false)
+    expect(await rateLimit("key1", 3, 60_000)).toBe(false)
   })
 
-  it("resets after window expires", async () => {
+  it("allows request when count equals limit (last allowed request)", async () => {
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ count: 3 }])
     const { rateLimit } = await loadModule()
-    rateLimit("key3", 1, 60_000)
-    expect(rateLimit("key3", 1, 60_000)).toBe(false)
-    now += 61_000
-    expect(rateLimit("key3", 1, 60_000)).toBe(true)
+    expect(await rateLimit("key1", 3, 60_000)).toBe(true)
+  })
+
+  it("fails open when DB throws", async () => {
+    vi.mocked(prisma.$queryRaw).mockRejectedValue(new Error("DB down"))
+    const { rateLimit } = await loadModule()
+    expect(await rateLimit("key1", 3, 60_000)).toBe(true)
   })
 })

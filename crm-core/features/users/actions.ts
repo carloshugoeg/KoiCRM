@@ -35,7 +35,7 @@ const signupSchema = z.object({
 
 export async function signupAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
   const ip = getClientIp()
-  if (!rateLimit(`signup:ip:${ip}`, 10, 60_000)) {
+  if (!await rateLimit(`signup:ip:${ip}`, 10, 60_000)) {
     return { ok: false, error: "Demasiados intentos. Intenta más tarde." }
   }
 
@@ -75,7 +75,7 @@ const forgotSchema = z.object({ email: z.string().email() })
 
 export async function forgotPasswordAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
   const ip = getClientIp()
-  if (!rateLimit(`forgot:ip:${ip}`, 5, 60_000)) {
+  if (!await rateLimit(`forgot:ip:${ip}`, 5, 60_000)) {
     return { ok: false, error: "Demasiados intentos. Intenta más tarde." }
   }
 
