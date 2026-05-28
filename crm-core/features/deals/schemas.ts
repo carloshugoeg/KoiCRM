@@ -1,5 +1,8 @@
 import { z } from "zod"
 
+const PHONE_RE = /^\d{4}-\d{4}$/
+const WA_RE = /^\+502 \d{4}-\d{4}$/
+
 export const createDealSchema = z
   .object({
     tenantId: z.string().min(1),
@@ -8,8 +11,13 @@ export const createDealSchema = z
     channelKey: z.string().min(1, "El canal es requerido."),
     name: z.string().min(1, "El nombre es requerido.").max(200),
     company: z.string().max(200).optional().nullable(),
-    phone: z.string().max(30).optional().nullable(),
-    whatsapp: z.string().max(40).optional().nullable(),
+    phone: z.string({ error: "El teléfono es requerido." }).min(1, "El teléfono es requerido.").regex(PHONE_RE, "El teléfono debe tener el formato XXXX-XXXX."),
+    whatsapp: z
+      .string()
+      .regex(WA_RE, "El WhatsApp debe tener el formato +502 XXXX-XXXX.")
+      .optional()
+      .nullable()
+      .or(z.literal("")),
     email: z.string().email("Email inválido.").optional().nullable().or(z.literal("")),
     equipment: z.array(z.string()).default([]),
     equipmentCustom: z.string().max(300).optional().nullable(),
@@ -31,8 +39,18 @@ export const updateDealSchema = z.object({
   channelKey: z.string().min(1).optional(),
   name: z.string().min(1).max(200).optional(),
   company: z.string().max(200).optional().nullable(),
-  phone: z.string().max(30).optional().nullable(),
-  whatsapp: z.string().max(40).optional().nullable(),
+  phone: z
+    .string()
+    .regex(PHONE_RE, "El teléfono debe tener el formato XXXX-XXXX.")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  whatsapp: z
+    .string()
+    .regex(WA_RE, "El WhatsApp debe tener el formato +502 XXXX-XXXX.")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
   email: z.string().email().optional().nullable().or(z.literal("")),
   equipment: z.array(z.string()).optional(),
   equipmentCustom: z.string().max(300).optional().nullable(),
@@ -46,7 +64,7 @@ export const moveDealSchema = z.object({
   tenantSlug: z.string().min(1),
   dealId: z.string().min(1),
   toStageId: z.string().min(1),
-  force: z.boolean().default(false), // bypass locked check for explicit win/lose buttons
+  force: z.boolean().default(false),
 })
 
 export const archiveDealSchema = z.object({
@@ -76,11 +94,12 @@ export const updateDealFieldSchema = z
     if (field === "email" && typeof value === "string" && value !== "") {
       if (!z.string().email().safeParse(value).success) addErr("Email inválido.")
     }
-    if (field === "phone" && typeof value === "string" && value.length > 30) {
-      addErr("Teléfono demasiado largo (máx. 30 caracteres).")
+    if (field === "phone" && typeof value === "string") {
+      if (value.length === 0) addErr("El teléfono es requerido.")
+      else if (!PHONE_RE.test(value)) addErr("El teléfono debe tener el formato XXXX-XXXX.")
     }
-    if (field === "whatsapp" && typeof value === "string" && value.length > 40) {
-      addErr("WhatsApp demasiado largo (máx. 40 caracteres).")
+    if (field === "whatsapp" && typeof value === "string" && value !== "") {
+      if (!WA_RE.test(value)) addErr("El WhatsApp debe tener el formato +502 XXXX-XXXX.")
     }
     if (field === "name") {
       if (typeof value !== "string" || value.trim().length === 0) addErr("El nombre es requerido.")
