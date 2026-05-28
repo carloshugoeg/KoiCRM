@@ -66,3 +66,4 @@ Una task solo puede marcarse como done cuando:
 - Lo especifico de aquasistemas debe modelarse como plantilla de industria, configuracion de tenant, catalogos, campos custom o reglas configurables.
 - Toda decision importante debe quedar documentada como nota en `crm-core/DECISIONS_AND_OPEN_QUESTIONS.md` o como ADR si el plan lo define.
 - No cierres una task con "pendiente de probar" como si estuviera terminada.
+
