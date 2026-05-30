@@ -3,6 +3,7 @@
 import { useDroppable } from "@dnd-kit/core"
 import { cn } from "@/lib/utils"
 import { DealCard, type DealCardData } from "@/features/pipeline/components/DealCard"
+import { formatCurrency } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
 import type { PipelineStage } from "@prisma/client"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -18,28 +19,57 @@ interface KanbanColumnProps {
 export function KanbanColumn({ stage, deals, settings, onDealClick, movingDealId }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
 
+  const totalValue = deals.reduce((sum, d) => sum + d.value, 0)
+
   return (
-    <div className="flex flex-col w-64 shrink-0">
+    <div
+      className="flex flex-col w-64 shrink-0 rounded-2xl overflow-hidden"
+      style={{
+        background: "var(--col-bg)",
+        border: `1px solid ${stage.color}30`,
+      }}
+    >
       {/* Column header */}
       <div
-        className="flex items-center gap-2 px-3 py-2 rounded-t-lg mb-1"
-        style={{ backgroundColor: stage.color + "20", borderBottom: `2px solid ${stage.color}` }}
+        className="px-3 py-3 cursor-default"
+        style={{
+          background: `${stage.color}1a`,
+          borderBottom: `2px solid ${stage.color}`,
+        }}
       >
-        <span
-          className="w-2 h-2 rounded-full shrink-0"
-          style={{ backgroundColor: stage.color }}
-        />
-        <span className="text-sm font-semibold truncate">{stage.label}</span>
-        {stage.locked && (
+        {/* Row 1: label pill + deal count */}
+        <div className="flex items-center gap-2">
           <span
-            className="ml-auto text-xs text-muted-foreground"
-            aria-label="Etapa bloqueada"
-            title="Etapa bloqueada"
+            className="flex-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white truncate shadow-sm"
+            style={{ background: stage.color }}
           >
-            🔒
+            {stage.label}
           </span>
-        )}
-        <span className="ml-auto text-xs font-medium text-muted-foreground">{deals.length}</span>
+          <span
+            className="text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shrink-0"
+            style={{
+              background: `${stage.color}1a`,
+              color: stage.color,
+              border: `1px solid ${stage.color}4d`,
+            }}
+          >
+            {deals.length}
+          </span>
+          {stage.locked && (
+            <span aria-label="Etapa bloqueada" title="Etapa bloqueada" className="text-sm shrink-0">
+              🔒
+            </span>
+          )}
+        </div>
+        {/* Row 2: total value + sublabel */}
+        <div className="flex items-center justify-between mt-1.5">
+          <span className="text-xs font-black" style={{ color: stage.color }}>
+            {formatCurrency(totalValue, settings)}
+          </span>
+          {stage.sublabel && (
+            <span className="text-[10px] truncate ml-2 text-muted-foreground">{stage.sublabel}</span>
+          )}
+        </div>
       </div>
 
       {/* Drop zone */}
@@ -48,10 +78,12 @@ export function KanbanColumn({ stage, deals, settings, onDealClick, movingDealId
         role="region"
         aria-label={stage.label}
         className={cn(
-          "flex-1 rounded-b-lg p-2 min-h-[200px] transition-colors",
-          isOver && !stage.locked ? "bg-accent/50 ring-2 ring-primary/30" : "bg-muted/30",
-          isOver && stage.locked ? "bg-destructive/10 ring-2 ring-destructive/30" : ""
+          "flex-1 p-2 min-h-[200px] transition-colors",
+          isOver && stage.locked && "ring-2 ring-inset ring-destructive/30"
         )}
+        style={{
+          background: isOver && !stage.locked ? `${stage.color}1a` : "transparent",
+        }}
       >
         {isOver && stage.locked && (
           <div className="text-xs text-destructive text-center py-2 font-medium">
@@ -68,6 +100,7 @@ export function KanbanColumn({ stage, deals, settings, onDealClick, movingDealId
                 <DealCard
                   deal={deal}
                   settings={settings}
+                  stageColor={stage.color}
                   onClick={() => onDealClick(deal.id)}
                 />
               </div>

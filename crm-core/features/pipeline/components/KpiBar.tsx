@@ -9,14 +9,34 @@ interface KpiBarProps {
 
 export function KpiBar({ totalPipeline, totalWon, settings }: KpiBarProps) {
   return (
-    <div className="flex gap-4">
-      <div className="bg-card border rounded-lg px-4 py-2 min-w-[140px]">
-        <p className="text-xs text-muted-foreground">Total Embudo</p>
-        <p className="text-lg font-bold">{formatCurrency(totalPipeline, settings)}</p>
+    <div className="flex gap-3">
+      <div
+        className="rounded-xl px-4 py-2.5 min-w-[140px]"
+        style={{
+          background: "var(--kpi-card-bg)",
+          border: "1px solid var(--kpi-card-border)",
+        }}
+      >
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
+          Total Embudo
+        </p>
+        <p className="text-lg font-black" style={{ color: "#38bdf8" }}>
+          {formatCurrency(totalPipeline, settings)}
+        </p>
       </div>
-      <div className="bg-card border rounded-lg px-4 py-2 min-w-[140px]">
-        <p className="text-xs text-muted-foreground">Ganado</p>
-        <p className="text-lg font-bold text-emerald-600">{formatCurrency(totalWon, settings)}</p>
+      <div
+        className="rounded-xl px-4 py-2.5 min-w-[140px]"
+        style={{
+          background: "var(--kpi-card-bg)",
+          border: "1px solid var(--kpi-card-border)",
+        }}
+      >
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
+          Ganado
+        </p>
+        <p className="text-lg font-black" style={{ color: "#34d399" }}>
+          {formatCurrency(totalWon, settings)}
+        </p>
       </div>
     </div>
   )

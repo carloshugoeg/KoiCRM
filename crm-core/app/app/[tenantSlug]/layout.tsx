@@ -47,7 +47,7 @@ export default async function TenantLayout({ children, params }: Props) {
       {cssVars && (
         <style dangerouslySetInnerHTML={{ __html: cssVars }} />
       )}
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col" style={{ background: "var(--app-bg)" }}>
         <TenantHeader memberships={memberships} />
         <main className="flex-1">{children}</main>
       </div>

@@ -41,7 +41,18 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 220 90% 56%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
+
+    /* Visual design system — light mode */
+    --app-bg: linear-gradient(160deg, #f0f4ff 0%, #e8eeff 60%, #f0f4ff 100%);
+    --card-bg: linear-gradient(150deg, rgba(255,255,255,0.99), rgba(248,250,255,0.97));
+    --col-bg: rgba(255, 255, 255, 0.88);
+    --header-bg: rgba(255, 255, 255, 0.97);
+    --header-border: rgba(99, 102, 241, 0.18);
+    --tag-bg: rgba(241, 245, 249, 0.9);
+    --tag-border: rgba(99, 102, 241, 0.15);
+    --kpi-card-bg: rgba(255, 255, 255, 0.92);
+    --kpi-card-border: rgba(99, 102, 241, 0.15);
   }
 
   .dark {
@@ -79,6 +90,17 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 220 90% 56%;
+
+    /* Visual design system — dark mode */
+    --app-bg: linear-gradient(160deg, #05090f 0%, #070d1a 60%, #050910 100%);
+    --card-bg: linear-gradient(150deg, rgba(12,18,36,0.98), rgba(9,14,28,0.95));
+    --col-bg: rgba(10, 15, 30, 0.72);
+    --header-bg: rgba(5, 9, 20, 0.97);
+    --header-border: rgba(255, 255, 255, 0.07);
+    --tag-bg: rgba(30, 41, 59, 0.6);
+    --tag-border: rgba(255, 255, 255, 0.07);
+    --kpi-card-bg: rgba(255, 255, 255, 0.03);
+    --kpi-card-border: rgba(255, 255, 255, 0.06);
   }
 }
 
@@ -89,4 +111,27 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@keyframes sfPing {
+  75%, 100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(156, 163, 175, 0.05);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.35);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.6);
 }

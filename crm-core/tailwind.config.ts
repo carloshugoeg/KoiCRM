@@ -5,6 +5,17 @@ const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./features/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-dm-sans)", "Segoe UI", "sans-serif"],
+      },
+      keyframes: {
+        sfPing: {
+          "75%, 100%": { transform: "scale(2.2)", opacity: "0" },
+        },
+      },
+      animation: {
+        sfPing: "sfPing 1.2s cubic-bezier(0,0,0.2,1) infinite",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

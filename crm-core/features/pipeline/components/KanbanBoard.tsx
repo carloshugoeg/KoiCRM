@@ -95,6 +95,9 @@ export function KanbanBoard({
   }
 
   const activeDeal = activeId ? deals.find((d) => d.id === activeId) : null
+  const activeDealStageColor = activeDeal
+    ? stages.find((s) => s.id === activeDeal.stageId)?.color ?? "#6366f1"
+    : "#6366f1"
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -116,6 +119,7 @@ export function KanbanBoard({
           <DealCard
             deal={activeDeal}
             settings={settings}
+            stageColor={activeDealStageColor}
             onClick={() => {}}
           />
         )}

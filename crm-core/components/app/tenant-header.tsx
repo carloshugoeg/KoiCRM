@@ -25,7 +25,10 @@ export function TenantHeader({ memberships }: Props) {
   }
 
   return (
-    <header className="h-14 border-b flex items-center px-4 gap-4 shrink-0">
+    <header
+      className="h-14 flex items-center px-4 gap-4 shrink-0 backdrop-blur-sm sticky top-0 z-40"
+      style={{ background: "var(--header-bg)", borderBottom: "1px solid var(--header-border)" }}
+    >
       <span className="font-semibold">{tenant.branding?.productName ?? tenant.name}</span>
       {memberships.length > 1 && (
         <nav className="flex gap-2 text-sm">
