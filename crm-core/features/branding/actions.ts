@@ -15,6 +15,8 @@ const updateBrandingSchema = z.object({
   headerBgColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
   kpiBgColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
   productName: z.string().max(50).optional().nullable(),
+  logoUrl: z.string().url("URL inválida").max(500).optional().nullable(),
+  bgImageUrl: z.string().url("URL inválida").max(500).optional().nullable(),
 })
 
 export async function updateBrandingAction(

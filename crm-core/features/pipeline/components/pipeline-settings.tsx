@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   DndContext,
@@ -21,8 +21,16 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { updateStageAction, reorderStagesAction, deleteStageAction } from "@/features/pipeline/actions"
+import { updateStageAction, reorderStagesAction, deleteStageAction, createStageAction } from "@/features/pipeline/actions"
 import type { Pipeline, PipelineStage, Tenant } from "@prisma/client"
+
+const PRESET_COLORS = [
+  "#818cf8","#38bdf8","#fbbf24","#f472b6",
+  "#34d399","#fb923c","#f87171","#a78bfa",
+  "#4ade80","#e879f9","#facc15","#60a5fa",
+]
+
+const STAGE_ICONS = ["Star","User","Phone","DollarSign","Flame","CheckCircle2","Clock","Zap","Package","Waves"]
 
 type PipelineWithStages = Pipeline & { stages: PipelineStage[] }
 
@@ -46,7 +54,9 @@ function SortableStageRow({
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [label, setLabel] = useState(stage.label)
+  const [sublabel, setSublabel] = useState(stage.sublabel ?? "")
   const [color, setColor] = useState(stage.color)
+  const [iconKey, setIconKey] = useState(stage.iconKey)
   const [saving, setSaving] = useState(false)
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: stage.id })
@@ -64,8 +74,9 @@ function SortableStageRow({
       tenantSlug: tenant.slug,
       id: stage.id,
       label,
+      sublabel: sublabel || null,
       color,
-      iconKey: stage.iconKey,
+      iconKey,
     })
     setSaving(false)
     setEditing(false)
@@ -89,27 +100,50 @@ function SortableStageRow({
         style={{ backgroundColor: color }}
       />
       {editing ? (
-        <div className="flex-1 flex gap-2 items-center">
+        <div className="flex-1 flex flex-col gap-2">
           <Input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            className="flex-1"
+            placeholder="Nombre de etapa"
             autoFocus
           />
-          <input
-            type="color"
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            className="h-9 w-10 cursor-pointer rounded border"
+          <Input
+            value={sublabel}
+            onChange={(e) => setSublabel(e.target.value)}
+            placeholder="Descripción corta (opcional)"
           />
-          <Button size="sm" onClick={handleSave} disabled={saving}>
-            {saving ? "…" : "Guardar"}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancelar</Button>
+          <div className="flex flex-wrap gap-1">
+            {PRESET_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setColor(c)}
+                className={`w-3 h-3 cursor-pointer rounded-full border-2 ${color === c ? "border-foreground" : "border-transparent"}`}
+                style={{ backgroundColor: c }}
+                aria-label={c}
+              />
+            ))}
+          </div>
+          <select
+            value={iconKey}
+            onChange={(e) => setIconKey(e.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            {STAGE_ICONS.map((icon) => (
+              <option key={icon} value={icon}>{icon}</option>
+            ))}
+          </select>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleSave} disabled={saving}>
+              {saving ? "…" : "Guardar"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancelar</Button>
+          </div>
         </div>
       ) : (
         <div className="flex-1 min-w-0">
           <p className="font-medium truncate">{stage.label}</p>
+          {stage.sublabel && <p className="text-xs text-muted-foreground truncate">{stage.sublabel}</p>}
           {stage.locked && <span className="text-xs text-muted-foreground">Bloqueada</span>}
         </div>
       )}
@@ -132,6 +166,15 @@ export function PipelineSettings({ tenant, pipeline, canManage }: Props) {
   const [stages, setStages] = useState(pipeline?.stages ?? [])
   const [error, setError] = useState<string | null>(null)
 
+  // Sync stages list when server component re-renders after router.refresh()
+  useEffect(() => { setStages(pipeline?.stages ?? []) }, [pipeline])
+  const [newLabel, setNewLabel] = useState("")
+  const [newSublabel, setNewSublabel] = useState("")
+  const [newColor, setNewColor] = useState("#818cf8")
+  const [newIconKey, setNewIconKey] = useState("Star")
+  const [adding, setAdding] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -152,6 +195,26 @@ export function PipelineSettings({ tenant, pipeline, canManage }: Props) {
       pipelineId: pipeline!.id,
       orderedIds: newStages.map((s) => s.id),
     })
+    router.refresh()
+  }
+
+  async function handleAddStage(e: React.FormEvent) {
+    e.preventDefault()
+    setAdding(true)
+    setAddError(null)
+    const result = await createStageAction({
+      tenantId: tenant.id,
+      tenantSlug: tenant.slug,
+      pipelineId: pipeline!.id,
+      label: newLabel,
+      sublabel: newSublabel || null,
+      color: newColor,
+      iconKey: newIconKey,
+    })
+    setAdding(false)
+    if (!result.ok) { setAddError(result.error ?? "Error."); return }
+    setNewLabel("")
+    setNewSublabel("")
     router.refresh()
   }
 
@@ -200,6 +263,48 @@ export function PipelineSettings({ tenant, pipeline, canManage }: Props) {
           </ul>
         </SortableContext>
       </DndContext>
+
+      {canManage && (
+        <form onSubmit={handleAddStage} className="border rounded-lg p-4 space-y-3">
+          <h2 className="text-base font-semibold">Nueva etapa</h2>
+          <Input
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+            placeholder="Nombre de etapa"
+            required
+          />
+          <Input
+            value={newSublabel}
+            onChange={(e) => setNewSublabel(e.target.value)}
+            placeholder="Descripción corta (opcional)"
+          />
+          <div className="flex flex-wrap gap-1">
+            {PRESET_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setNewColor(c)}
+                className={`w-3 h-3 cursor-pointer rounded-full border-2 ${newColor === c ? "border-foreground" : "border-transparent"}`}
+                style={{ backgroundColor: c }}
+                aria-label={c}
+              />
+            ))}
+          </div>
+          <select
+            value={newIconKey}
+            onChange={(e) => setNewIconKey(e.target.value)}
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          >
+            {STAGE_ICONS.map((icon) => (
+              <option key={icon} value={icon}>{icon}</option>
+            ))}
+          </select>
+          {addError && <p className="text-sm text-destructive">{addError}</p>}
+          <Button type="submit" disabled={adding}>
+            {adding ? "Agregando…" : "Agregar"}
+          </Button>
+        </form>
+      )}
     </div>
   )
 }

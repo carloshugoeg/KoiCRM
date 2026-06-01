@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test"
-import { AUTH_FILE } from "./auth.setup"
+import { AUTH_FILE } from "./auth-helpers"
 
 test.use({ storageState: AUTH_FILE })
 

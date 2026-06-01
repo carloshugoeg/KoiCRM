@@ -1,18 +1,32 @@
 import { test as setup } from "@playwright/test"
-import path from "path"
+import { AUTH_FILE } from "./auth-helpers"
 
-export const AUTH_FILE = path.join(__dirname, ".auth/demo-user.json")
+export { AUTH_FILE }
+
+const BASE_URL = "http://localhost:3000"
 
 setup("authenticate as demo user", async ({ page }) => {
-  await page.goto("/signin")
+  // Step 1: get CSRF token from NextAuth
+  const csrfRes = await page.request.get(`${BASE_URL}/api/auth/csrf`)
+  const { csrfToken } = await csrfRes.json()
 
-  // Signin form uses Label "Correo" for email, "Contraseña" for password, button "Entrar"
-  // Fill by input id to avoid label encoding issues
-  await page.locator('input[name="email"], input[id="email"], input[type="email"]').first().fill("roberto@demo-aqua.local")
-  await page.locator('input[name="password"], input[id="password"], input[type="password"]').first().fill("Demo1234!")
-  await page.getByRole("button", { name: /entrar|iniciar sesión|sign in/i }).click()
+  // Step 2: POST credentials to NextAuth — this sets the session-token cookie
+  await page.request.post(`${BASE_URL}/api/auth/callback/credentials`, {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    data: new URLSearchParams({
+      csrfToken,
+      email: "roberto@demo-aqua.local",
+      password: "Demo1234!",
+      redirect: "false",
+      json: "true",
+      callbackUrl: `${BASE_URL}/app`,
+    }).toString(),
+  })
 
-  // Wait for redirect to the app (any tenant URL)
-  await page.waitForURL(/\/app\//, { timeout: 15_000 })
+  // Step 3: Navigate to the app to verify the session is valid and get final cookies
+  await page.goto(`${BASE_URL}/app`)
+  await page.waitForURL(/\/app\/[^/]+\//, { timeout: 30_000 })
+
+  // Save full browser state (cookies + localStorage)
   await page.context().storageState({ path: AUTH_FILE })
 })

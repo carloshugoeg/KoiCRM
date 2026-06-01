@@ -22,6 +22,8 @@ export function BrandingSettings({ tenant, branding, canManage }: Props) {
   const [headerBgColor, setHeaderBgColor] = useState(branding?.headerBgColor ?? "#1e293b")
   const [kpiBgColor, setKpiBgColor] = useState(branding?.kpiBgColor ?? "#f8fafc")
   const [productName, setProductName] = useState(branding?.productName ?? "")
+  const [logoUrl, setLogoUrl] = useState(branding?.logoUrl ?? "")
+  const [bgImageUrl, setBgImageUrl] = useState(branding?.bgImageUrl ?? "")
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -39,6 +41,8 @@ export function BrandingSettings({ tenant, branding, canManage }: Props) {
       headerBgColor,
       kpiBgColor,
       productName: productName || null,
+      logoUrl: logoUrl || null,
+      bgImageUrl: bgImageUrl || null,
     })
     setSaving(false)
     if (!result.ok) { setError(result.error ?? "Error al guardar."); return }
@@ -93,9 +97,41 @@ export function BrandingSettings({ tenant, branding, canManage }: Props) {
             </div>
           ))}
         </div>
-        <p className="text-sm text-muted-foreground">
-          Logo: disponible en M6 cuando esté listo el módulo de archivos.
-        </p>
+        <div className="space-y-2">
+          <Label htmlFor="logoUrl">Logo (URL de imagen)</Label>
+          <Input
+            id="logoUrl"
+            type="url"
+            value={logoUrl}
+            onChange={(e) => setLogoUrl(e.target.value)}
+            placeholder="https://ejemplo.com/logo.png"
+            disabled={!canManage}
+            maxLength={500}
+          />
+          {logoUrl && (
+            <div className="mt-2 p-3 border rounded-lg bg-muted/30 flex items-center justify-center" style={{ minHeight: "4rem" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logoUrl}
+                alt="Logo preview"
+                className="max-h-16 max-w-xs object-contain"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
+              />
+            </div>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="bgImageUrl">Imagen de fondo (URL)</Label>
+          <Input
+            id="bgImageUrl"
+            type="url"
+            value={bgImageUrl}
+            onChange={(e) => setBgImageUrl(e.target.value)}
+            placeholder="https://ejemplo.com/fondo.jpg"
+            disabled={!canManage}
+            maxLength={500}
+          />
+        </div>
         {canManage && (
           <Button type="submit" disabled={saving}>
             {saving ? "Guardando…" : "Guardar apariencia"}

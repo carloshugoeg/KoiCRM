@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
-import { Search } from "lucide-react"
+import { Search, Settings } from "lucide-react"
 import { useTenant } from "@/lib/tenant/context"
 import { Button } from "@/components/ui/button"
 import { CommandMenu } from "@/components/CommandMenu"
@@ -59,6 +59,13 @@ export function TenantHeader({ memberships }: Props) {
         </Link>
       </nav>
       <div className="ml-auto flex items-center gap-2">
+        <Link
+          href={`/app/${tenant.slug}/settings/appearance`}
+          className={navClass(`/app/${tenant.slug}/settings`)}
+          title="Configuración"
+        >
+          <Settings className="h-4 w-4" />
+        </Link>
         <Button
           variant="outline"
           size="sm"
