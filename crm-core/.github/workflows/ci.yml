@@ -24,3 +24,65 @@ jobs:
       - run: pnpm type-check
       - run: pnpm lint:check
       - run: pnpm test
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: ci
+    defaults:
+      run:
+        working-directory: crm-core
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: koicrm
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d koicrm"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://app_user:app_pass@localhost:5434/koicrm
+      DATABASE_ADMIN_URL: postgresql://admin_user:admin_pass@localhost:5434/koicrm
+      AUTH_SECRET: ci-test-secret-not-for-production
+      AUTH_URL: http://localhost:3000
+      RESEND_API_KEY: re_ci_placeholder
+      S3_ENDPOINT: http://localhost:9000
+      S3_BUCKET: ci-bucket
+      S3_ACCESS_KEY_ID: ci-key
+      S3_SECRET_ACCESS_KEY: ci-secret
+      S3_REGION: auto
+      S3_PUBLIC_URL: http://localhost:9000/ci-bucket
+      SENTRY_DSN: ""
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: crm-core/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Apply DB init script
+        run: |
+          PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -d koicrm \
+            -f docker/init.sql
+      - name: Run migrations
+        run: pnpm exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ env.DATABASE_ADMIN_URL }}
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build app
+        run: pnpm build
+      - name: Run E2E tests
+        run: pnpm test:e2e
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000

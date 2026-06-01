@@ -1,3 +1,6 @@
+// @ts-check
+import { withSentryConfig } from "@sentry/nextjs";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async headers() {
@@ -30,8 +33,18 @@ const nextConfig = {
           },
         ],
       },
-    ]
+    ];
   },
-}
+};
 
-export default nextConfig
+export default withSentryConfig(nextConfig, {
+  // Suppress Sentry CLI output during builds
+  silent: !process.env.CI,
+  // Don't expose source maps to the client bundle
+  hideSourceMaps: true,
+  // Remove debug logging from the Sentry bundle (reduces bundle size)
+  webpack: { treeshake: { removeDebugLogging: true } },
+  // Upload source maps to Sentry on build (requires SENTRY_AUTH_TOKEN + org/project in env)
+  // Set SENTRY_ORG and SENTRY_PROJECT in your Vercel env vars alongside SENTRY_AUTH_TOKEN.
+  widenClientFileUpload: true,
+});
