@@ -54,6 +54,8 @@ export async function getPipelineDeals(tenantId: string, filters: PipelineFilter
         owner: { select: { id: true, name: true, email: true } },
         client: true,
         equipment: true,
+        quotes: { where: { isVoid: false }, take: 1, orderBy: { createdAt: "desc" }, select: { number: true } },
+        payments: { where: { isVoid: false }, take: 1, orderBy: { createdAt: "desc" }, select: { number: true } },
         _count: {
           select: {
             quotes: { where: { isVoid: false } },

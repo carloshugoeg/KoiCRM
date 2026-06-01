@@ -1,5 +1,7 @@
 "use client"
 
+import { useState } from "react"
+
 import { useDraggable } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
 import { avatarColor } from "@/lib/utils/avatar-color"
@@ -29,6 +31,8 @@ export interface DealCardData {
   stageKey: string
   quoteCount: number
   paymentCount: number
+  latestQuoteNumber?: string | null
+  latestPaymentNumber?: string | null
 }
 
 interface DealCardProps {
@@ -36,6 +40,9 @@ interface DealCardProps {
   settings: IntlSettings
   onClick: () => void
   stageColor?: string
+  isCompact?: boolean       // column-driven compact mode; undefined = legacy internal-toggle
+  isHighlighted?: boolean   // column-driven highlight glow
+  onOpenDetail?: () => void // separate callback for opening the modal
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -50,11 +57,31 @@ function diffDays(from: Date, to: Date): number {
   return Math.floor((to.getTime() - from.getTime()) / 86_400_000)
 }
 
-export function DealCard({ deal, settings, onClick, stageColor }: DealCardProps) {
+function getInitials(name: string) {
+  if (!name) return "U"
+  const parts = name.trim().split(" ")
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return name.substring(0, 2).toUpperCase()
+}
+
+// Convert hex to rgba for subdued backgrounds
+function hex2rgba(hex: string, alpha = 0.15) {
+  let h = hex.replace("#", "")
+  if (h.length === 3) h = h.split("").map(c => c + c).join("")
+  const r = parseInt(h.substring(0, 2), 16)
+  const g = parseInt(h.substring(2, 4), 16)
+  const b = parseInt(h.substring(4, 6), 16)
+  return `rgba(${isNaN(r) ? 0 : r},${isNaN(g) ? 0 : g},${isNaN(b) ? 0 : b},${alpha})`
+}
+
+export function DealCard({ deal, settings, onClick, stageColor, isCompact, isHighlighted, onOpenDetail }: DealCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id })
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const sc = stageColor ?? "#6366f1"
-  const ownerColor = avatarColor(deal.ownerId)
+
+  const avatarInitials = getInitials(deal.name)
+  const avatarCol = avatarColor(deal.id)
 
   const now = new Date()
   const daysTotal = diffDays(deal.createdAt, now)
@@ -68,8 +95,21 @@ export function DealCard({ deal, settings, onClick, stageColor }: DealCardProps)
 
   const hasQuoteAlert = deal.hasQuoteAlert ?? false
   const hasPaymentAlert = deal.hasPaymentAlert ?? false
+  const missingDoc = hasQuoteAlert || hasPaymentAlert
 
   const statusColor = STATUS_COLORS[deal.statusKey] ?? "#64748b"
+
+  // Expanded view is shown when: parent explicitly says not-compact (column-controlled),
+  // or when internally toggled (legacy uncontrolled mode).
+  const showExpanded = isCompact === false || (isCompact === undefined && isExpanded)
+
+  const boxShadow = isDragging
+    ? `0 8px 30px ${hex2rgba(sc, 0.4)}, 0 0 0 2px ${sc}`
+    : isHighlighted
+      ? `0 0 0 2px ${sc}, 0 8px 30px ${hex2rgba(sc, 0.4)}`
+      : missingDoc
+        ? `0 0 0 2px #ef444450, 0 4px 15px rgba(239,68,68,0.15)`
+        : "none"
 
   return (
     <div
@@ -77,151 +117,175 @@ export function DealCard({ deal, settings, onClick, stageColor }: DealCardProps)
       style={{
         transform: CSS.Translate.toString(transform),
         opacity: isDragging ? 0.5 : 1,
-        background: "var(--card-bg)",
-        border: `1px solid ${sc}4d`,
+        background: "#ffffff",
+        borderColor: sc,
+        boxShadow,
       }}
       {...listeners}
       {...attributes}
-      className="relative rounded-xl cursor-grab active:cursor-grabbing select-none overflow-hidden
-                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary
-                 focus-visible:ring-offset-1 transition-all duration-300 hover:-translate-y-0.5"
+      className={`relative rounded-xl border cursor-grab active:cursor-grabbing select-none overflow-hidden
+                 focus-visible:outline-none transition-transform duration-300 hover:-translate-y-0.5
+                 ${isHighlighted ? "scale-[1.02]" : ""}`}
       onMouseEnter={(e) => {
-        if (!isDragging) {
+        if (!isDragging && !isHighlighted) {
           (e.currentTarget as HTMLDivElement).style.boxShadow =
-            `0 6px 22px rgba(0,0,0,0.18), 0 0 0 1px ${sc}55`
+            `0 4px 12px rgba(0,0,0,0.08), 0 0 0 1px ${sc}55`
         }
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = "none"
+        if (!isDragging && !isHighlighted) {
+          (e.currentTarget as HTMLDivElement).style.boxShadow = missingDoc
+            ? `0 0 0 2px #ef444450, 0 4px 15px rgba(239,68,68,0.15)`
+            : "none"
+        }
       }}
-      onClick={onClick}
+      onClick={() => {
+        if (isDragging) return
+        if (isCompact !== undefined) {
+          // Column-controlled mode: delegate click to parent
+          onClick()
+        } else {
+          // Uncontrolled mode: toggle inline expand
+          setIsExpanded(p => !p)
+        }
+      }}
     >
-      {/* Stage-color top gradient bar */}
-      <div
-        className="h-0.5 w-full shrink-0"
-        style={{ background: `linear-gradient(90deg, ${sc}cc, transparent)` }}
-      />
-
-      {/* Card body */}
-      <div className="p-3 space-y-2">
-        {/* Header */}
-        <div className="flex items-start gap-2">
-          <div
-            className="w-2.5 h-2.5 rounded-full mt-1 shrink-0"
-            style={{ backgroundColor: ownerColor }}
-            title={deal.ownerName ?? ""}
-          />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold leading-tight truncate">{deal.name}</p>
-            {deal.company && (
-              <p className="text-xs text-muted-foreground truncate">{deal.company}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Value */}
-        <p className="text-sm font-black" style={{ color: sc }}>
-          {formatCurrency(deal.value, settings)}
-        </p>
-
-        {/* Equipment chips */}
-        {(chips.length > 0 || customEq) && (
-          <div className="flex flex-wrap gap-1">
-            {chips.map((e) => (
-              <span
-                key={e.equipmentKey}
-                className="px-1.5 py-0.5 rounded-md text-xs"
-                style={{
-                  background: "var(--tag-bg)",
-                  border: "1px solid var(--tag-border)",
-                }}
-              >
-                {e.equipmentKey}
-              </span>
-            ))}
-            {customEq && (
-              <span
-                className="px-1.5 py-0.5 rounded-md text-xs truncate max-w-[100px]"
-                style={{
-                  background: "var(--tag-bg)",
-                  border: "1px solid var(--tag-border)",
-                }}
-              >
-                {customEq.customLabel}
-              </span>
-            )}
-            {overflow > 0 && (
-              <span
-                className="px-1.5 py-0.5 rounded-md text-xs"
-                style={{
-                  background: "var(--tag-bg)",
-                  border: "1px solid var(--tag-border)",
-                }}
-              >
-                +{overflow}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            {daysTotal}d / {daysStage}d etapa
-          </span>
-          <div className="flex items-center gap-1">
-            {deal.hasOverdueFollowUp && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold"
-                style={{ background: "#dc262618", color: "#dc2626", border: "1px solid #dc262640" }}>
-                Vencido
-              </span>
-            )}
-            {deal.statusKey !== "activo" && (
-              <span
-                className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                style={{
-                  background: `${statusColor}18`,
-                  color: statusColor,
-                  border: `1px solid ${statusColor}40`,
-                }}
-              >
-                {deal.statusKey}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Alert dot */}
+      {/* Alert dot for missing documents */}
       {(hasQuoteAlert || hasPaymentAlert) && (
         <div
-          className="absolute top-2 right-2"
-          role="img"
-          aria-label={[
-            hasQuoteAlert ? "Falta Cotización" : null,
-            hasPaymentAlert ? "Falta Pago" : null,
-          ]
-            .filter(Boolean)
-            .join(", ")}
+          className="absolute top-3 right-3 z-10"
           title={[
             hasQuoteAlert ? "Falta Cotización" : null,
             hasPaymentAlert ? "Falta Pago" : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
+          ].filter(Boolean).join(" · ")}
         >
-          <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
-            <span
-              className="absolute inline-flex h-full w-full rounded-full opacity-75"
-              style={{
-                background: "#ef4444",
-                animation: "sfPing 1.2s cubic-bezier(0,0,0.2,1) infinite",
-              }}
-            />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-sfPing" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-600" />
           </span>
         </div>
       )}
+
+      <div className={`${isCompact ? "p-2.5 space-y-1.5" : "p-3.5 space-y-3"}`}>
+        {/* Header: Avatar + Client Name */}
+        <div className="flex items-center gap-2.5">
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+            style={{ backgroundColor: hex2rgba(avatarCol, 0.15), color: avatarCol, border: `1px solid ${hex2rgba(avatarCol, 0.4)}` }}
+          >
+            {avatarInitials}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold leading-tight truncate text-slate-900">{deal.name}</p>
+            {deal.company && (
+              <p className="text-xs text-slate-500 truncate mt-0.5">{deal.company}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Value and Equipment */}
+        <div className="flex items-center justify-between mt-1 gap-2">
+          <p className="text-[13px] font-black truncate min-w-0" style={{ color: sc }}>
+            {formatCurrency(deal.value, settings)}
+          </p>
+          <div className="flex gap-1 shrink-0 min-w-0 justify-end">
+             {(chips.length > 0 || customEq) && (
+                <div className="flex gap-1 items-center flex-wrap justify-end">
+                  {chips.map((e) => (
+                    <span
+                      key={e.equipmentKey}
+                      className="text-[10px] font-medium text-slate-500 truncate max-w-[80px]"
+                    >
+                      {e.equipmentKey}
+                    </span>
+                  ))}
+                  {customEq && (
+                    <span className="text-[10px] font-medium text-slate-500 truncate max-w-[80px]">
+                      {customEq.customLabel}
+                    </span>
+                  )}
+                  {overflow > 0 && (
+                    <span className="flex items-center justify-center w-4 h-4 rounded-full bg-blue-50 text-blue-600 text-[9px] font-bold border border-blue-100 ml-1 shrink-0">
+                      +{overflow}
+                    </span>
+                  )}
+                </div>
+              )}
+          </div>
+        </div>
+
+        {/* Footer: Status Pill and Days */}
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex gap-1.5">
+            <span
+              className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+              style={{
+                background: hex2rgba(statusColor, 0.15),
+                color: statusColor,
+                border: `1px solid ${hex2rgba(statusColor, 0.3)}`,
+              }}
+            >
+              {deal.statusKey}
+            </span>
+            {deal.hasOverdueFollowUp && (
+               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                 style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fca5a5" }}>
+                 Vencido
+               </span>
+            )}
+          </div>
+          <span className="text-[10px] font-medium text-slate-400 flex items-center gap-1">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            {daysTotal}d
+          </span>
+        </div>
+
+        {showExpanded && (
+          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-2 animate-in slide-in-from-top-2 fade-in duration-200">
+            {deal.phone && (
+              <div className="flex justify-between items-center text-xs gap-2">
+                <span className="text-slate-500 font-medium shrink-0">Teléfono:</span>
+                <a href={`tel:${deal.phone}`} className="text-slate-800 font-bold hover:underline truncate text-right" onClick={e => e.stopPropagation()}>{deal.phone}</a>
+              </div>
+            )}
+            {deal.whatsapp && (
+              <div className="flex justify-between items-center text-xs gap-2">
+                <span className="text-slate-500 font-medium shrink-0">WhatsApp:</span>
+                <a href={`https://wa.me/${deal.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="text-slate-800 font-bold hover:underline truncate text-right" onClick={e => e.stopPropagation()}>{deal.whatsapp}</a>
+              </div>
+            )}
+            {deal.latestQuoteNumber && (
+              <div className="flex justify-between items-center text-xs gap-2">
+                <span className="text-slate-500 font-medium shrink-0">Cotización:</span>
+                <span className="text-slate-800 font-bold truncate text-right">{deal.latestQuoteNumber}</span>
+              </div>
+            )}
+            {deal.latestPaymentNumber && (
+              <div className="flex justify-between items-center text-xs gap-2">
+                <span className="text-slate-500 font-medium shrink-0">Doc. de Pago:</span>
+                <span className="text-slate-800 font-bold truncate text-right">{deal.latestPaymentNumber}</span>
+              </div>
+            )}
+            {hasQuoteAlert && (
+              <span className="text-[10px] font-semibold text-red-600">⚠ Falta cotización</span>
+            )}
+            {hasPaymentAlert && (
+              <span className="text-[10px] font-semibold text-red-600">⚠ Falta doc. de pago</span>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                ;(onOpenDetail ?? onClick)()
+              }}
+              className="mt-2 w-full py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-md text-xs font-bold transition-colors cursor-pointer"
+            >
+              Ver detalle
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
+

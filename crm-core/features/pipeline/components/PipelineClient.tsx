@@ -71,21 +71,23 @@ export function PipelineClient({
     .reduce((sum, d) => sum + d.value, 0)
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-[#f8faff]">
       {/* Header row */}
-      <div className="flex items-center gap-4 px-4 py-3 border-b flex-wrap">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-5 px-6 py-4 border-b border-indigo-500/10 bg-white/80 backdrop-blur-sm sticky top-0 z-10 flex-wrap">
+        <div className="flex items-center gap-3">
           <Button
             size="sm"
+            className="rounded-full bg-[#4f46e5] hover:bg-[#4338ca] text-white shadow-md shadow-indigo-500/20 px-6 h-10 font-bold tracking-wide"
             onClick={() => setNewDealOpen(true)}
             disabled={!canEdit}
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4 mr-1.5" />
             Nueva oportunidad
           </Button>
           <Button
             size="icon"
             variant="ghost"
+            className="rounded-full h-10 w-10 text-slate-500 hover:text-slate-900 border border-slate-200 shadow-sm bg-white"
             onClick={() => window.print()}
             title="Imprimir reporte"
           >
@@ -107,7 +109,7 @@ export function PipelineClient({
       </div>
 
       {/* Kanban */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden pt-4 px-2">
         <KanbanBoard
           tenantId={tenantId}
           tenantSlug={tenantSlug}

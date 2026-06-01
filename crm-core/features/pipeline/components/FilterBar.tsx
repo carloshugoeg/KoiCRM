@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { CatalogItem } from "@prisma/client"
 import type { PipelineFiltersParams } from "@/features/pipeline/schemas"
+import { User, Phone, Package, Bell, Calendar } from "lucide-react"
 
 interface FilterBarProps {
   members: { id: string; name: string | null; email: string }[]
@@ -41,12 +42,13 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
   }
 
   const hasFilters = Object.values(currentFilters).some(Boolean)
+  const triggerClasses = "h-9 text-xs bg-slate-50 border-slate-200 rounded-full font-medium text-slate-600 shadow-sm focus:ring-0 focus:ring-offset-0"
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-3">
       <Select value={currentFilters.owner ?? ALL} onValueChange={(v) => update("owner", v)}>
-        <SelectTrigger className={`w-36 h-8 text-xs${isPending ? " opacity-50" : ""}`} disabled={isPending} aria-label="Filtrar por asesor">
-          <SelectValue placeholder="Asesor" />
+        <SelectTrigger className={`w-40 ${triggerClasses}${isPending ? " opacity-50" : ""}`} disabled={isPending}>
+          <div className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 opacity-60" /><SelectValue placeholder="Asesor" /></div>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ALL}>Todos los asesores</SelectItem>
@@ -59,8 +61,8 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
       </Select>
 
       <Select value={currentFilters.channel ?? ALL} onValueChange={(v) => update("channel", v)}>
-        <SelectTrigger className={`w-36 h-8 text-xs${isPending ? " opacity-50" : ""}`} disabled={isPending} aria-label="Filtrar por canal">
-          <SelectValue placeholder="Canal" />
+        <SelectTrigger className={`w-40 ${triggerClasses}${isPending ? " opacity-50" : ""}`} disabled={isPending}>
+          <div className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 opacity-60" /><SelectValue placeholder="Canal" /></div>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ALL}>Todos los canales</SelectItem>
@@ -73,8 +75,8 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
       </Select>
 
       <Select value={currentFilters.equipment ?? ALL} onValueChange={(v) => update("equipment", v)}>
-        <SelectTrigger className={`w-36 h-8 text-xs${isPending ? " opacity-50" : ""}`} disabled={isPending} aria-label="Filtrar por equipo">
-          <SelectValue placeholder="Equipo" />
+        <SelectTrigger className={`w-40 ${triggerClasses}${isPending ? " opacity-50" : ""}`} disabled={isPending}>
+          <div className="flex items-center gap-1.5"><Package className="w-3.5 h-3.5 opacity-60" /><SelectValue placeholder="Equipo" /></div>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ALL}>Todos los equipos</SelectItem>
@@ -87,30 +89,31 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
       </Select>
 
       <Select value={currentFilters.alerts ?? ALL} onValueChange={(v) => update("alerts", v)}>
-        <SelectTrigger className={`w-40 h-8 text-xs${isPending ? " opacity-50" : ""}`} disabled={isPending} aria-label="Filtrar por alerta">
-          <SelectValue placeholder="Alertas" />
+        <SelectTrigger className={`w-40 ${triggerClasses}${isPending ? " opacity-50" : ""}`} disabled={isPending}>
+          <div className="flex items-center gap-1.5"><Bell className="w-3.5 h-3.5 opacity-60" /><SelectValue placeholder="Alertas" /></div>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={ALL}>Sin filtro de alerta</SelectItem>
+          <SelectItem value={ALL}>Sin alertas</SelectItem>
           <SelectItem value="missingQuote">Falta Cotización</SelectItem>
           <SelectItem value="missingPayment">Falta Pago</SelectItem>
           <SelectItem value="overdueFollowUp">Seguim. Vencido</SelectItem>
         </SelectContent>
       </Select>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center bg-slate-50 border border-slate-200 rounded-full px-3 h-9 shadow-sm">
+        <Calendar className="w-3.5 h-3.5 opacity-60 mr-2 text-slate-600" />
         <Input
           type="date"
-          className={`h-8 text-xs w-36${isPending ? " opacity-50" : ""}`}
+          className={`h-7 text-xs w-28 border-0 bg-transparent px-0 py-0 text-slate-600 focus-visible:ring-0 focus-visible:ring-offset-0${isPending ? " opacity-50" : ""}`}
           disabled={isPending}
           value={currentFilters.from ?? ""}
           onChange={(e) => update("from", e.target.value || undefined)}
           aria-label="Fecha desde"
         />
-        <span className="text-xs text-muted-foreground" aria-hidden="true">→</span>
+        <span className="text-xs text-slate-400 mx-2" aria-hidden="true">→</span>
         <Input
           type="date"
-          className={`h-8 text-xs w-36${isPending ? " opacity-50" : ""}`}
+          className={`h-7 text-xs w-28 border-0 bg-transparent px-0 py-0 text-slate-600 focus-visible:ring-0 focus-visible:ring-offset-0${isPending ? " opacity-50" : ""}`}
           disabled={isPending}
           value={currentFilters.to ?? ""}
           onChange={(e) => update("to", e.target.value || undefined)}
@@ -119,10 +122,11 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
       </div>
 
       {hasFilters && (
-        <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={clearAll}>
+        <Button variant="ghost" size="sm" className="h-9 text-xs rounded-full" onClick={clearAll}>
           Limpiar filtros
         </Button>
       )}
     </div>
   )
 }
+

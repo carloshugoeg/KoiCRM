@@ -1,6 +1,8 @@
 "use client"
 
+import { useState, useRef, useEffect } from "react"
 import { useDroppable } from "@dnd-kit/core"
+import { PlusCircle, MinusCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DealCard, type DealCardData } from "@/features/pipeline/components/DealCard"
 import { formatCurrency } from "@/lib/intl/format"
@@ -16,41 +18,84 @@ interface KanbanColumnProps {
   movingDealId?: string | null
 }
 
+function hex2rgba(hex: string, alpha = 0.15) {
+  let h = hex.replace("#", "")
+  if (h.length === 3) h = h.split("").map(c => c + c).join("")
+  const r = parseInt(h.substring(0, 2), 16)
+  const g = parseInt(h.substring(2, 4), 16)
+  const b = parseInt(h.substring(4, 6), 16)
+  return `rgba(${isNaN(r) ? 0 : r},${isNaN(g) ? 0 : g},${isNaN(b) ? 0 : b},${alpha})`
+}
+
 export function KanbanColumn({ stage, deals, settings, onDealClick, movingDealId }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
+
+  const [isCollapsed, setIsCollapsed] = useState(true)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [highlightedDealId, setHighlightedDealId] = useState<string | null>(null)
+  const columnRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (columnRef.current && !columnRef.current.contains(e.target as Node)) {
+        setExpandedIds(new Set())
+        setHighlightedDealId(null)
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  function handleCardClick(deal: DealCardData) {
+    if (isCollapsed) {
+      if (expandedIds.has(deal.id)) {
+        setExpandedIds(prev => { const next = new Set(prev); next.delete(deal.id); return next })
+      } else {
+        setExpandedIds(prev => new Set([...prev, deal.id]))
+        setHighlightedDealId(deal.id)
+      }
+    } else {
+      setHighlightedDealId(prev => prev === deal.id ? null : deal.id)
+    }
+  }
 
   const totalValue = deals.reduce((sum, d) => sum + d.value, 0)
 
   return (
     <div
-      className="flex flex-col w-64 shrink-0 rounded-2xl overflow-hidden"
+      ref={columnRef}
+      className={cn(
+        "flex flex-col shrink-0 rounded-2xl transition-all duration-300 ring-1 ring-black/5",
+        isCollapsed ? "flex-none w-[320px]" : "w-[400px]"
+      )}
       style={{
-        background: "var(--col-bg)",
-        border: `1px solid ${stage.color}30`,
+        background: isOver ? hex2rgba(stage.color, 0.1) : "#ffffff",
+        border: `1px solid ${hex2rgba(stage.color, 0.25)}`,
       }}
     >
-      {/* Column header */}
+      {/* Column header — click to toggle collapse */}
       <div
-        className="px-3 py-3 cursor-default"
+        className="px-4 py-3 cursor-pointer flex flex-col rounded-t-2xl"
+        onClick={() => setIsCollapsed(p => !p)}
         style={{
-          background: `${stage.color}1a`,
-          borderBottom: `2px solid ${stage.color}`,
+          background: hex2rgba(stage.color, 0.08),
+          borderBottom: `1px solid ${hex2rgba(stage.color, 0.15)}`,
         }}
       >
-        {/* Row 1: label pill + deal count */}
+        {/* Row 1: label pill + deal count + collapse icon */}
         <div className="flex items-center gap-2">
           <span
-            className="flex-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white truncate shadow-sm"
+            className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-sm"
             style={{ background: stage.color }}
           >
             {stage.label}
           </span>
           <span
-            className="text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shrink-0"
+            className="text-[11px] rounded-full w-5 h-5 flex items-center justify-center font-bold shrink-0"
             style={{
-              background: `${stage.color}1a`,
+              background: hex2rgba(stage.color, 0.15),
               color: stage.color,
-              border: `1px solid ${stage.color}4d`,
+              border: `1px solid ${hex2rgba(stage.color, 0.3)}`,
             }}
           >
             {deals.length}
@@ -60,14 +105,19 @@ export function KanbanColumn({ stage, deals, settings, onDealClick, movingDealId
               🔒
             </span>
           )}
+          <span className="ml-auto shrink-0" style={{ color: stage.color }}>
+            {isCollapsed
+              ? <PlusCircle size={15} />
+              : <MinusCircle size={15} />}
+          </span>
         </div>
         {/* Row 2: total value + sublabel */}
-        <div className="flex items-center justify-between mt-1.5">
-          <span className="text-xs font-black" style={{ color: stage.color }}>
+        <div className="flex items-center justify-between mt-2">
+          <span className="text-[13px] font-black" style={{ color: stage.color }}>
             {formatCurrency(totalValue, settings)}
           </span>
           {stage.sublabel && (
-            <span className="text-[10px] truncate ml-2 text-muted-foreground">{stage.sublabel}</span>
+            <span className="text-[11px] truncate ml-2 text-slate-500 font-medium">{stage.sublabel}</span>
           )}
         </div>
       </div>
@@ -78,11 +128,11 @@ export function KanbanColumn({ stage, deals, settings, onDealClick, movingDealId
         role="region"
         aria-label={stage.label}
         className={cn(
-          "flex-1 p-2 min-h-[200px] transition-colors",
+          "flex-1 p-3 min-h-[200px] transition-colors",
           isOver && stage.locked && "ring-2 ring-inset ring-destructive/30"
         )}
         style={{
-          background: isOver && !stage.locked ? `${stage.color}1a` : "transparent",
+          background: isOver && !stage.locked ? hex2rgba(stage.color, 0.05) : "transparent",
         }}
       >
         {isOver && stage.locked && (
@@ -90,18 +140,21 @@ export function KanbanColumn({ stage, deals, settings, onDealClick, movingDealId
             Etapa bloqueada
           </div>
         )}
-        <ScrollArea className="h-full">
-          <div className="space-y-2 pb-2">
+        <ScrollArea className="h-[calc(100vh-280px)] pr-3">
+          <div className="flex flex-col gap-3 pb-4 pt-1">
             {deals.map((deal) => (
               <div
                 key={deal.id}
-                className={deal.id === movingDealId ? "opacity-40 pointer-events-none" : undefined}
+                className={cn("w-full min-w-0 px-1", deal.id === movingDealId ? "opacity-40 pointer-events-none scale-95 transition-opacity" : "transition-opacity")}
               >
                 <DealCard
                   deal={deal}
                   settings={settings}
                   stageColor={stage.color}
-                  onClick={() => onDealClick(deal.id)}
+                  isCompact={isCollapsed && !expandedIds.has(deal.id)}
+                  isHighlighted={highlightedDealId === deal.id}
+                  onClick={() => handleCardClick(deal)}
+                  onOpenDetail={() => onDealClick(deal.id)}
                 />
               </div>
             ))}

@@ -50,7 +50,11 @@ export default async function TenantLayout({ children, params }: Props) {
       <div className="min-h-screen flex flex-col" style={{ background: "var(--app-bg)" }}>
         <TenantHeader memberships={memberships} />
         <main className="flex-1">{children}</main>
+        <footer className="py-4 text-center text-[11px] font-medium text-slate-400 bg-[#f8faff] w-full mt-auto border-t border-slate-200/50">
+          Diseñado por Vértice y Desarrollado por Koi Software 2026
+        </footer>
       </div>
     </TenantProvider>
   )
 }
+

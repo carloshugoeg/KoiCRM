@@ -95,6 +95,8 @@ export default async function PipelinePage({ params, searchParams }: Props) {
     hasPaymentAlert: d.hasPaymentAlert,
     quoteCount: d.quoteCount ?? 0,
     paymentCount: d.paymentCount ?? 0,
+    latestQuoteNumber: d.quotes?.[0]?.number ?? null,
+    latestPaymentNumber: d.payments?.[0]?.number ?? null,
   }))
 
   const memberList = members.map((m) => ({
