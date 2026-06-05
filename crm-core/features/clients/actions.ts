@@ -18,7 +18,7 @@ export async function createClientAction(raw: unknown): Promise<{ ok: boolean; e
   const { tenantId, tenantSlug, ...fields } = parsed.data
 
   try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
+    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
   } catch {
     return { ok: false, error: "Acceso denegado." }
   }
@@ -59,7 +59,7 @@ export async function updateClientAction(raw: unknown): Promise<{ ok: boolean; e
   const { tenantId, tenantSlug, id, ...fields } = parsed.data
 
   try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
+    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
   } catch {
     return { ok: false, error: "Acceso denegado." }
   }

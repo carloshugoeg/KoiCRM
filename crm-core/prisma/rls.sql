@@ -71,3 +71,8 @@ CREATE POLICY tenant_isolation ON "Counter"
 ALTER TABLE "CustomFieldDefinition" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON "CustomFieldDefinition"
   USING ("tenantId" = current_setting('app.tenant_id', true));
+
+-- DealViewer
+ALTER TABLE "DealViewer" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON "DealViewer"
+  USING ("tenantId" = current_setting('app.tenant_id', true));

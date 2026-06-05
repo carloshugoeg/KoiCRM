@@ -1,15 +1,16 @@
 "use server"
 
 import { auth } from "@/lib/auth/auth"
-import { withTenant } from "@/lib/db/rls"
-import { requireRole } from "@/lib/auth/rbac"
+import { getUserRole, canSeeAllDeals } from "@/lib/auth/rbac"
+import {
+  globalSearch,
+  getSearchIntlSettings,
+  type SearchResult,
+  type SearchResultMeta,
+  type SearchMatchVia,
+} from "@/features/search/queries"
 
-export interface SearchResult {
-  type: "deal" | "client"
-  id: string
-  title: string
-  subtitle: string | null
-}
+export type { SearchResult, SearchResultMeta, SearchMatchVia }
 
 export async function globalSearchAction(
   tenantId: string,
@@ -18,62 +19,15 @@ export async function globalSearchAction(
   const session = await auth()
   if (!session?.user?.id) return { ok: false, error: "No autenticado." }
 
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER", "VIEWER"])
-  } catch {
-    return { ok: false, error: "Acceso denegado." }
-  }
+  const role = await getUserRole(session, tenantId)
+  if (!role) return { ok: false, error: "Acceso denegado." }
 
-  const q = query.trim().slice(0, 200)
-  if (!q) return { ok: true, results: [] }
-
-  const [deals, clients] = await Promise.all([
-    withTenant(tenantId, (tx) =>
-      tx.deal.findMany({
-        where: {
-          tenantId,
-          isArchived: false,
-          OR: [
-            { name: { contains: q, mode: "insensitive" } },
-            { company: { contains: q, mode: "insensitive" } },
-            { phone: { contains: q, mode: "insensitive" } },
-            { id: { contains: q, mode: "insensitive" } },
-          ],
-        },
-        select: { id: true, name: true, company: true, stage: { select: { label: true } } },
-        take: 20,
-      }),
-    ),
-    withTenant(tenantId, (tx) =>
-      tx.client.findMany({
-        where: {
-          tenantId,
-          OR: [
-            { name: { contains: q, mode: "insensitive" } },
-            { company: { contains: q, mode: "insensitive" } },
-            { phone: { contains: q, mode: "insensitive" } },
-          ],
-        },
-        select: { id: true, name: true, company: true },
-        take: 10,
-      }),
-    ),
-  ])
-
-  const results: SearchResult[] = [
-    ...deals.map((d) => ({
-      type: "deal" as const,
-      id: d.id,
-      title: d.name,
-      subtitle: d.company ?? d.stage.label,
-    })),
-    ...clients.map((c) => ({
-      type: "client" as const,
-      id: c.id,
-      title: c.name,
-      subtitle: c.company,
-    })),
-  ]
-
+  const intl = await getSearchIntlSettings(tenantId)
+  const results = await globalSearch(
+    tenantId,
+    query,
+    intl,
+    canSeeAllDeals(role) ? undefined : session.user.id,
+  )
   return { ok: true, results }
 }

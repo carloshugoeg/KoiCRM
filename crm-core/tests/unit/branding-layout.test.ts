@@ -1,29 +1,12 @@
 import { describe, it, expect } from "vitest"
-
-const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/
-
-function buildCssVars(branding: {
-  primaryColor?: string | null
-  bgColorLight?: string | null
-  bgColorDark?: string | null
-  headerBgColor?: string | null
-  kpiBgColor?: string | null
-} | null): string {
-  if (!branding) return ""
-  const valid = (v: string | null | undefined): v is string => v != null && HEX_COLOR_RE.test(v)
-  const vars: string[] = []
-  if (valid(branding.primaryColor)) vars.push(`--color-primary: ${branding.primaryColor};`)
-  if (valid(branding.bgColorLight)) vars.push(`--color-bg-light: ${branding.bgColorLight};`)
-  if (valid(branding.bgColorDark)) vars.push(`--color-bg-dark: ${branding.bgColorDark};`)
-  if (valid(branding.headerBgColor)) vars.push(`--color-header-bg: ${branding.headerBgColor};`)
-  if (valid(branding.kpiBgColor)) vars.push(`--color-kpi-bg: ${branding.kpiBgColor};`)
-  return vars.length ? `:root { ${vars.join(" ")} }` : ""
-}
+import { buildCssVars } from "@/lib/branding/css-vars"
+import { hexToHslComponents, primaryForegroundForHex } from "@/lib/utils/color"
 
 describe("buildCssVars CSS injection guard", () => {
-  it("injects a valid hex color", () => {
+  it("converts a valid hex primary color to HSL components", () => {
     const result = buildCssVars({ primaryColor: "#ff0000" })
-    expect(result).toContain("--color-primary: #ff0000;")
+    expect(result).toContain(`--color-primary: ${hexToHslComponents("#ff0000")};`)
+    expect(result).toContain(`--primary-foreground: ${primaryForegroundForHex("#ff0000")};`)
   })
   it("strips malicious CSS injection", () => {
     const result = buildCssVars({ primaryColor: "red; } body { visibility: hidden; } .x { --a: b" })
@@ -40,6 +23,21 @@ describe("buildCssVars CSS injection guard", () => {
   })
   it("valid 6-char hex with uppercase letters passes", () => {
     const result = buildCssVars({ primaryColor: "#AABBCC" })
-    expect(result).toContain("--color-primary: #AABBCC;")
+    expect(result).toContain(`--color-primary: ${hexToHslComponents("#AABBCC")};`)
+  })
+})
+
+describe("hexToHslComponents", () => {
+  it("converts known hex values", () => {
+    expect(hexToHslComponents("#0ea5e9")).toBe("199 89% 48%")
+  })
+})
+
+describe("primaryForegroundForHex", () => {
+  it("uses dark text on light backgrounds", () => {
+    expect(primaryForegroundForHex("#ffffff")).toContain("11.2%")
+  })
+  it("uses light text on dark backgrounds", () => {
+    expect(primaryForegroundForHex("#000000")).toContain("98%")
   })
 })

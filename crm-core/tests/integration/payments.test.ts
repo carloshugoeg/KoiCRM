@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll, vi, type Mock } from "vitest";
 import type { Session } from "next-auth";
-import { randomBytes } from "crypto";
 import { prismaAdmin, cleanDatabase, disconnectAll } from "./helpers";
 
-/** Generate a cuid-compatible string (starts with 'c', lowercase hex). */
-function makeCuid(): string {
-  return "c" + randomBytes(12).toString("hex");
+const TEST_FILE_URL = "https://cdn.example.com/tenant/deals/FAC-001.pdf";
+
+function makeDealId(seq: number): string {
+  return `DEAL-${String(seq).padStart(4, "0")}-RO-26`;
 }
 
 // ── Mocks must be declared before any imports that use them ──────────────────
@@ -99,10 +99,9 @@ beforeAll(async () => {
   });
   stage2Id = stage2.id;
 
-  // Create a Deal in Stage 1 — use a cuid-compatible ID (Deal.id has no @default)
   const deal = await prismaAdmin.deal.create({
     data: {
-      id: makeCuid(),
+      id: makeDealId(1),
       tenantId,
       pipelineId: pipeline.id,
       stageId: stage1.id,
@@ -131,6 +130,7 @@ describe("createPayment", () => {
       dealId,
       number: "FAC-001",
       date: new Date("2026-01-15"),
+      fileUrl: TEST_FILE_URL,
     });
 
     expect(result.ok).toBe(true);
@@ -159,6 +159,7 @@ describe("createPayment", () => {
       dealId,
       number: "FAC-002",
       date: new Date(),
+      fileUrl: TEST_FILE_URL,
     });
 
     expect(result.ok).toBe(false);
@@ -180,6 +181,7 @@ describe("createPayment", () => {
       dealId,
       number: "FAC-003",
       date: new Date(),
+      fileUrl: TEST_FILE_URL,
     });
 
     expect(result.ok).toBe(false);

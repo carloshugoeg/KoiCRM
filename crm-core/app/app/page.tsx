@@ -1,17 +1,19 @@
 import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
-import { prisma } from "@/lib/db/client"
+import { resolveSessionUserId } from "@/lib/tenant/bootstrap"
+import { resolveUserAppDestination } from "@/lib/tenant/access"
 
 export default async function AppRootPage() {
   const session = await auth()
-  if (!session?.user?.id) redirect("/signin")
+  if (!session?.user) redirect("/signin")
 
-  const membership = await prisma.membership.findFirst({
-    where: { userId: session.user.id },
-    include: { tenant: { select: { slug: true } } },
-    orderBy: { createdAt: "asc" },
-  })
+  const userId = await resolveSessionUserId(session)
+  if (!userId) redirect("/signin")
 
-  if (!membership) redirect("/app/onboarding")
-  redirect(`/app/${membership.tenant.slug}/pipeline`)
+  const destination = await resolveUserAppDestination(userId)
+  if (destination.kind === "embudo") {
+    redirect(`/app/${destination.slug}/pipeline`)
+  }
+
+  redirect(`/app/access?reason=${destination.reason}`)
 }

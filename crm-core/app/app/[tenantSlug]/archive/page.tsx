@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
+import { canSeeAllDeals } from "@/lib/auth/rbac"
 import { getArchivedDeals } from "@/features/deals/queries"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
 import { withTenant } from "@/lib/db/rls"
@@ -21,16 +22,17 @@ export default async function ArchivePage({ params, searchParams }: Props) {
   const resolved = await resolveTenant(params.tenantSlug, session)
   if (!resolved) notFound()
 
-  const { tenant } = resolved
+  const { tenant, membership } = resolved
   const tenantId = tenant.id
   const tenantSlug = params.tenantSlug
+  const canSeeAll = canSeeAllDeals(membership.role)
 
   const cursor = searchParams.cursor as string | undefined
 
   const [{ deals, nextCursor }, pipeline, followUpReasons, settings] = await Promise.all([
-    getArchivedDeals(tenantId, cursor, 10),
+    getArchivedDeals(tenantId, cursor, 10, canSeeAll ? undefined : session.user.id),
     withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
-    getCatalogItems(tenantId, "followupReason"),
+    getCatalogItems(tenantId, "followupReason", { activeOnly: true }),
     prisma.tenantSettings.findUnique({ where: { tenantId } }),
   ])
 

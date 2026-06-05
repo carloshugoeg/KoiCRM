@@ -3,14 +3,8 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Paperclip, Loader2 } from "lucide-react";
-
-const ALLOWED_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "application/pdf",
-];
+import { prepareFileForUpload } from "@/lib/storage/compress-upload-file";
+import { DEAL_UPLOAD_ACCEPT } from "@/lib/storage/upload-mime";
 
 interface UploadResult {
   url: string;
@@ -24,7 +18,9 @@ interface FileUploadButtonProps {
   tenantId: string;
   onUpload: (result: UploadResult) => void;
   onError?: (message: string) => void;
+  onCompressed?: (savedPercent: number) => void;
   disabled?: boolean;
+  required?: boolean;
 }
 
 export function FileUploadButton({
@@ -32,28 +28,39 @@ export function FileUploadButton({
   tenantId,
   onUpload,
   onError,
+  onCompressed,
   disabled,
 }: FileUploadButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [readyLabel, setReadyLabel] = useState<string | null>(null);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      onError?.("Tipo de archivo no permitido. Usa JPG, PNG, WEBP, GIF o PDF.");
-      return;
-    }
-
     setUploading(true);
+    setReadyLabel(null);
     try {
+      const prepared = await prepareFileForUpload(file);
+      if ("error" in prepared) {
+        onError?.(prepared.error);
+        return;
+      }
+
+      const { file: uploadFile, mimeType, compressed, originalBytes, finalBytes } = prepared;
+
+      if (compressed && originalBytes > 0 && finalBytes < originalBytes) {
+        const savedPercent = Math.round((1 - finalBytes / originalBytes) * 100);
+        if (savedPercent >= 5) onCompressed?.(savedPercent);
+      }
+
       const signRes = await fetch("/api/upload/sign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contentType: file.type,
-          size: file.size,
+          contentType: mimeType,
+          size: uploadFile.size,
           dealId,
           tenantId,
         }),
@@ -75,8 +82,8 @@ export function FileUploadButton({
 
       const uploadRes = await fetch(signedUrl, {
         method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
+        body: uploadFile,
+        headers: { "Content-Type": mimeType },
       });
 
       if (!uploadRes.ok) {
@@ -84,7 +91,8 @@ export function FileUploadButton({
         return;
       }
 
-      onUpload({ url: publicUrl, key, mimeType: file.type, size: file.size });
+      setReadyLabel(uploadFile.name);
+      onUpload({ url: publicUrl, key, mimeType, size: uploadFile.size });
     } catch {
       onError?.("Error inesperado al subir el archivo.");
     } finally {
@@ -98,7 +106,7 @@ export function FileUploadButton({
       <input
         ref={inputRef}
         type="file"
-        accept={ALLOWED_TYPES.join(",")}
+        accept={DEAL_UPLOAD_ACCEPT}
         className="hidden"
         onChange={handleFileChange}
         disabled={disabled || uploading}
@@ -115,7 +123,7 @@ export function FileUploadButton({
         ) : (
           <Paperclip className="h-3 w-3 mr-1" />
         )}
-        {uploading ? "Subiendo…" : "Adjuntar"}
+        {uploading ? "Subiendo…" : readyLabel ? "Cambiar archivo" : "Adjuntar *"}
       </Button>
     </>
   );

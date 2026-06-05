@@ -1,10 +1,11 @@
 import { z } from "zod"
+import { dealIdSchema } from "@/lib/schemas/deal-id"
 
 export const CreatePaymentSchema = z.object({
-  dealId: z.string().cuid(),
+  dealId: dealIdSchema,
   number: z.string().min(1).max(50),
   date: z.coerce.date(),
-  fileUrl: z.string().url().optional(),
+  fileUrl: z.string().url(),
 })
 
 export const UpdatePaymentSchema = z.object({

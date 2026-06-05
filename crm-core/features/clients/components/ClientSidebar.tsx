@@ -18,7 +18,9 @@ export function ClientSidebar({ tenantSlug, clients, selectedClientId }: ClientS
   const router = useRouter()
   const searchParams = useSearchParams()
   const [search, setSearch] = useState(searchParams.get("q") ?? "")
-  const [sort, setSort] = useState<"name" | "recent">((searchParams.get("sort") as "name" | "recent") ?? "name")
+  const [sort, setSort] = useState<"name" | "recent">(
+    (searchParams.get("sort") as "name" | "recent") ?? "name"
+  )
 
   const pushParams = useCallback(
     (nextSearch: string, nextSort: "name" | "recent") => {
@@ -27,7 +29,7 @@ export function ClientSidebar({ tenantSlug, clients, selectedClientId }: ClientS
       if (nextSort !== "name") params.set("sort", nextSort)
       router.replace(`/app/${tenantSlug}/clients?${params.toString()}`)
     },
-    [router, tenantSlug],
+    [router, tenantSlug]
   )
 
   // Debounce search
@@ -39,45 +41,50 @@ export function ClientSidebar({ tenantSlug, clients, selectedClientId }: ClientS
   const alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".split("")
 
   return (
-    <aside className="w-72 shrink-0 border-r flex flex-col h-full">
+    <aside className="flex h-full w-72 shrink-0 flex-col border-r">
       {/* Search + sort */}
-      <div className="p-3 border-b space-y-2">
+      <div className="space-y-2 border-b p-3">
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            placeholder="Buscar clientes..."
-            className="pl-8 h-8 text-sm"
+            placeholder="Buscar por nombre, empresa o teléfono..."
+            className="h-8 pl-8 text-sm"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant={sort === "name" ? "default" : "outline"}
-            className="h-7 text-xs flex-1"
-            onClick={() => setSort("name")}
-          >
-            A–Z
-          </Button>
-          <Button
-            size="sm"
-            variant={sort === "recent" ? "default" : "outline"}
-            className="h-7 text-xs flex-1"
-            onClick={() => setSort("recent")}
-          >
-            Reciente
-          </Button>
+        <div className="flex items-center gap-2">
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {clients.length} {clients.length === 1 ? "cliente" : "clientes"}
+          </span>
+          <div className="ml-auto flex gap-1">
+            <Button
+              size="sm"
+              variant={sort === "name" ? "default" : "outline"}
+              className="h-7 text-xs"
+              onClick={() => setSort("name")}
+            >
+              A–Z
+            </Button>
+            <Button
+              size="sm"
+              variant={sort === "recent" ? "default" : "outline"}
+              className="h-7 text-xs"
+              onClick={() => setSort("recent")}
+            >
+              Fecha
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Jump nav */}
       {sort === "name" && (
-        <div className="px-3 pt-2 flex flex-wrap gap-0.5">
+        <div className="flex flex-wrap gap-0.5 px-3 pt-2">
           {alpha.map((letter) => (
             <button
               key={letter}
-              className="text-xs text-muted-foreground hover:text-primary w-5 h-5 flex items-center justify-center"
+              className="flex h-5 w-5 items-center justify-center text-xs text-muted-foreground hover:text-primary"
               onClick={() => {
                 const el = document.getElementById(`jump-${letter}`)
                 el?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -92,7 +99,7 @@ export function ClientSidebar({ tenantSlug, clients, selectedClientId }: ClientS
       {/* Client list */}
       <div className="flex-1 overflow-y-auto">
         {clients.length === 0 && (
-          <p className="text-xs text-muted-foreground p-4 text-center">Sin clientes.</p>
+          <p className="p-4 text-center text-xs text-muted-foreground">Sin clientes.</p>
         )}
         {clients.map((client, idx) => {
           const prevLetter = idx > 0 ? clients[idx - 1]!.name[0]!.toUpperCase() : null
@@ -106,32 +113,37 @@ export function ClientSidebar({ tenantSlug, clients, selectedClientId }: ClientS
               {showSection && (
                 <div
                   id={`jump-${/[A-Z]/.test(thisLetter) ? thisLetter : "#"}`}
-                  className="px-3 py-1 text-xs font-bold text-muted-foreground bg-muted/40 sticky top-0"
+                  className="sticky top-0 bg-muted/40 px-3 py-1 text-xs font-bold text-muted-foreground"
                 >
                   {/[A-Z]/.test(thisLetter) ? thisLetter : "#"}
                 </div>
               )}
               <button
-                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/40 transition-colors ${isSelected ? "bg-muted" : ""}`}
+                className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/40 ${isSelected ? "bg-muted" : ""}`}
                 onClick={() =>
-                  router.push(`/app/${tenantSlug}/clients?${new URLSearchParams({ ...Object.fromEntries(searchParams.entries()), client: client.id }).toString()}`)
+                  router.push(
+                    `/app/${tenantSlug}/clients?${new URLSearchParams({ ...Object.fromEntries(searchParams.entries()), client: client.id }).toString()}`
+                  )
                 }
               >
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
                   style={{ backgroundColor: color }}
                 >
                   {avatarInitials(client.name)}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{client.name}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{client.name}</p>
                   {client.company && (
-                    <p className="text-xs text-muted-foreground truncate">{client.company}</p>
+                    <p className="truncate text-xs text-muted-foreground">{client.company}</p>
+                  )}
+                  {client._count.deals > 0 && (
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {client._count.deals}{" "}
+                      {client._count.deals === 1 ? "oportunidad" : "oportunidades"}
+                    </p>
                   )}
                 </div>
-                {client._count.deals > 0 && (
-                  <span className="text-xs text-muted-foreground shrink-0">{client._count.deals}</span>
-                )}
               </button>
             </div>
           )

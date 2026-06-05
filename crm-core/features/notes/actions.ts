@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
 import { requireRole } from "@/lib/auth/rbac"
+import { userCanEditDeal } from "@/lib/auth/deal-access"
 import { prisma } from "@/lib/db/client"
 import { recordActivity } from "@/features/activity/queries"
 import { addNoteSchema, deleteNoteSchema } from "@/features/notes/schemas"
@@ -19,8 +20,12 @@ export async function addNoteAction(raw: unknown): Promise<{ ok: boolean; error?
   const { tenantId, tenantSlug, body, dealId, clientId } = parsed.data
 
   try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
+    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
   } catch {
+    return { ok: false, error: "Acceso denegado." }
+  }
+
+  if (dealId && !(await userCanEditDeal(session, tenantId, dealId))) {
     return { ok: false, error: "Acceso denegado." }
   }
 
@@ -61,7 +66,7 @@ export async function deleteNoteAction(raw: unknown): Promise<{ ok: boolean; err
   const { tenantId, tenantSlug, noteId } = parsed.data
 
   try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
+    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
   } catch {
     return { ok: false, error: "Acceso denegado." }
   }
@@ -79,13 +84,13 @@ export async function deleteNoteAction(raw: unknown): Promise<{ ok: boolean; err
 export async function getDealNotesAction(tenantId: string, dealId: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error("No autenticado.")
-  await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER", "VIEWER"])
+  await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"])
   return getDealNotes(tenantId, dealId)
 }
 
 export async function getClientNotesAction(tenantId: string, clientId: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error("No autenticado.")
-  await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER", "VIEWER"])
+  await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"])
   return getClientNotes(tenantId, clientId)
 }

@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const PRESIGN_TTL_SECONDS = 300;
@@ -37,8 +37,38 @@ export async function signUploadUrl(
   return { signedUrl, publicUrl };
 }
 
+export async function putObject(
+  key: string,
+  body: Buffer | Uint8Array,
+  contentType: string,
+): Promise<{ publicUrl: string }> {
+  await getClient().send(
+    new PutObjectCommand({
+      Bucket: BUCKET(),
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    }),
+  );
+  return { publicUrl: `${PUBLIC_URL()}/${key}` };
+}
+
 export async function deleteObject(key: string): Promise<void> {
   await getClient().send(
     new DeleteObjectCommand({ Bucket: BUCKET(), Key: key }),
   );
+}
+
+export async function getObject(
+  key: string,
+): Promise<{ body: Buffer; contentType: string }> {
+  const res = await getClient().send(
+    new GetObjectCommand({ Bucket: BUCKET(), Key: key }),
+  );
+  if (!res.Body) throw new Error("empty_object");
+  const bytes = await res.Body.transformToByteArray();
+  return {
+    body: Buffer.from(bytes),
+    contentType: res.ContentType ?? "application/octet-stream",
+  };
 }

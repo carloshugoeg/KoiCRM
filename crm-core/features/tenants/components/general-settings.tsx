@@ -2,11 +2,13 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { updateTenantSettingsAction } from "@/features/tenants/settings"
 import type { Tenant, TenantSettings } from "@prisma/client"
+import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 
 const LOCALES = [
   { value: "es-GT", label: "Español (Guatemala)" },
@@ -75,7 +77,13 @@ export function GeneralSettings({ tenant, settings, canManage }: Props) {
       dealIdYearDigits: Number(dealIdYearDigits),
     })
     setSaving(false)
-    if (!result.ok) { setError(result.error ?? "Error al guardar."); return }
+    if (!result.ok) {
+      const msg = toastErrorFromResult(result.error, toastMessages.settings.errorSave)
+      setError(msg)
+      toast.error(msg)
+      return
+    }
+    toast.success(toastMessages.settings.saved)
     setSaved(true)
     setTimeout(() => { setSaved(false); router.refresh() }, 1500)
   }

@@ -1,0 +1,22 @@
+# Dev / test — not needed on Vercel
+tests/
+playwright-report/
+test-results/
+tests/e2e/.auth/
+coverage/
+.husky/
+
+# Local env (secrets must come from Vercel dashboard)
+.env
+.env.*
+!.env.production.example
+
+# Ops / bootstrap (local only)
+.env.deploy.local
+bootstrap-state.json
+docker/
+
+# Docs and planning (optional trim)
+docs/
+*.md
+!README.md

@@ -8,7 +8,7 @@ export async function getTenantMembers(tenantId: string) {
   return withTenant(tenantId, (tx) =>
     tx.membership.findMany({
       where: { tenantId },
-      include: { user: { select: { id: true, name: true, email: true } } },
+      include: { user: { select: { id: true, name: true, email: true, image: true } } },
     }),
   )
 }

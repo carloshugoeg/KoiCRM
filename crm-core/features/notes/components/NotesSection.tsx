@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
+import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 import { Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -16,9 +17,10 @@ interface NotesSectionProps {
   dealId?: string
   clientId?: string
   settings: IntlSettings
+  canEdit?: boolean
 }
 
-export function NotesSection({ tenantId, tenantSlug, dealId, clientId, settings }: NotesSectionProps) {
+export function NotesSection({ tenantId, tenantSlug, dealId, clientId, settings, canEdit = true }: NotesSectionProps) {
   const [notes, setNotes] = useState<NoteEntry[]>([])
   const [body, setBody] = useState("")
   const [loading, setLoading] = useState(false)
@@ -38,10 +40,10 @@ export function NotesSection({ tenantId, tenantSlug, dealId, clientId, settings 
     const result = await addNoteAction({ tenantId, tenantSlug, body: body.trim(), dealId, clientId })
     setLoading(false)
     if (!result.ok) {
-      toast.error(result.error ?? "Error al guardar nota.")
+      toast.error(toastErrorFromResult(result.error, toastMessages.note.errorSave))
       return
     }
-    toast.success("Nota guardada.")
+    toast.success(toastMessages.note.saved)
     setBody("")
     const updated = dealId
       ? await getDealNotesAction(tenantId, dealId)
@@ -55,31 +57,40 @@ export function NotesSection({ tenantId, tenantSlug, dealId, clientId, settings 
     if (!confirm("¿Eliminar esta nota?")) return
     const result = await deleteNoteAction({ tenantId, tenantSlug, noteId })
     if (!result.ok) {
-      toast.error(result.error ?? "Error al eliminar.")
+      toast.error(toastErrorFromResult(result.error, toastMessages.note.errorRemove))
       return
     }
+    toast.success(toastMessages.note.removed)
     setNotes((prev) => prev.filter((n) => n.id !== noteId))
   }
 
   return (
     <div>
-      <Textarea
-        placeholder="Escribe una nota..."
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        className="text-sm min-h-[72px] resize-none"
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAdd()
-        }}
-      />
-      <Button
-        size="sm"
-        className="mt-2 h-7 text-xs"
-        onClick={handleAdd}
-        disabled={loading || !body.trim()}
-      >
-        {loading ? "Guardando..." : "Guardar nota"}
-      </Button>
+      {canEdit && (
+        <>
+          <Textarea
+            placeholder="Escribe una nota..."
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            className="text-sm min-h-[72px] resize-none"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAdd()
+            }}
+          />
+          <Button
+            size="sm"
+            className="mt-2 h-7 text-xs"
+            onClick={handleAdd}
+            disabled={loading || !body.trim()}
+          >
+            {loading ? "Guardando..." : "Guardar nota"}
+          </Button>
+        </>
+      )}
+
+      {notes.length === 0 && !canEdit && (
+        <p className="text-xs text-muted-foreground">Sin notas.</p>
+      )}
 
       {notes.length > 0 && (
         <ul className="mt-4 space-y-3">
@@ -90,14 +101,16 @@ export function NotesSection({ tenantId, tenantSlug, dealId, clientId, settings 
                 <p className="text-xs text-muted-foreground">
                   {n.authorName ?? "Sistema"} · {formatDateTime(n.createdAt, settings)}
                 </p>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => handleDelete(n.id)}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
+                {canEdit && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => handleDelete(n.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
             </li>
           ))}

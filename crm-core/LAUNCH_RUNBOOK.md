@@ -1,6 +1,67 @@
 # Launch Runbook — First Client Deployment
 
-This document covers the 8 manual steps required to deploy KoiCRM to production on Vercel + managed Postgres. Complete them in order.
+## Automated path (recommended)
+
+One-command bootstrap for **Supabase Postgres + Vercel** (no Sentry required).
+
+### Prerequisites
+
+- Node.js 20+, pnpm, `jq`, `curl`, `openssl` (`psql` optional — bootstrap uses Prisma if missing)
+- Vercel token: [vercel.com/account/tokens](https://vercel.com/account/tokens)
+- Supabase access token: [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens)
+- R2 bucket + API keys, Resend API key (app fails startup without them)
+- Optional: `vercel` and `supabase` CLIs (script falls back to `npx vercel` and Supabase HTTP API)
+
+### Steps
+
+```bash
+cd crm-core
+cp .env.deploy.example .env.deploy.local
+pnpm ops:sync-deploy-env   # copies R2/Resend/Google from .env.local + org IDs (MCP/defaults)
+# Still required manually: SUPABASE_DB_PASSWORD, real RESEND key for prod, vercel login OR VERCEL_TOKEN
+pnpm ops:check-deploy
+pnpm ops:bootstrap
+```
+
+With **Vercel + Supabase MCP** connected in Cursor, you do not need `VERCEL_TOKEN` / `SUPABASE_ACCESS_TOKEN` in the file if you run `pnpm exec vercel login` once (Vercel CLI is a devDependency).
+
+The script will:
+
+1. Create (or reuse) a Supabase project and `app_user` / `admin_user` roles
+2. Run `prisma migrate deploy`
+3. Push env vars to Vercel and deploy production
+4. Set `AUTH_URL` from the Vercel URL and redeploy
+5. Seed the first tenant from `SEED_*` variables
+6. Hit `/api/health`
+
+Progress is stored in `bootstrap-state.json` (gitignored). Re-run `pnpm ops:bootstrap` to resume after a failure.
+
+### After bootstrap (manual once)
+
+- **R2 CORS** — [`docs/ops/r2-production.md`](docs/ops/r2-production.md) (include your Vercel URL and `https://*.vercel.app`)
+- **Resend** — verify sending domain DNS at [resend.com/domains](https://resend.com/domains)
+
+### Deploy from GitHub (Vercel dashboard)
+
+Import the repo at [vercel.com/new](https://vercel.com/new) with **Root Directory = `crm-core`**. Full checklist: [`docs/ops/vercel-github.md`](docs/ops/vercel-github.md).
+
+### Ongoing deploys (CI)
+
+GitHub Actions workflow [`.github/workflows/deploy-production.yml`](../.github/workflows/deploy-production.yml) runs on push to `main` (or manually). Required repository secrets:
+
+| Secret | Description |
+|--------|-------------|
+| `VERCEL_TOKEN` | Vercel API token |
+| `VERCEL_ORG_ID` | Team ID (optional if default) |
+| `DATABASE_ADMIN_URL` | Direct Postgres URL (`admin_user`, port 5432) |
+| `AUTH_URL` | Production app URL for health check |
+| `VERCEL_PROJECT_NAME` | Optional — defaults to `koi-crm` |
+
+---
+
+## Manual path (legacy)
+
+The sections below cover the 8 manual steps for deploy without the bootstrap script. Complete them in order.
 
 ---
 
@@ -134,6 +195,7 @@ On success it prints the tenant ID and login URL.
 
 - [ ] `GET https://app.yourdomain.com/api/health` returns `{"ok":true,"db":"ok"}`
 - [ ] Sign in at `/signin` with the admin credentials created in Step 8
+- [ ] Validate tenant license: `UPDATE "Tenant" SET "subscriptionValidated" = true WHERE slug = '<slug>';` (new tenants default to `false`)
 - [ ] Verify you land on the tenant pipeline (`/app/<slug>/pipeline`)
 - [ ] Upload a test file (confirms R2 is connected)
 - [ ] Invite a second user and confirm the invite email arrives
@@ -159,4 +221,10 @@ DATABASE_URL="<ADMIN_URL>" pnpm exec prisma migrate deploy
 # Add a new team member to an existing tenant (from psql)
 -- INSERT INTO "Membership" ("id","tenantId","userId","role","createdAt")
 -- VALUES (gen_random_uuid(), '<tenantId>', '<userId>', 'MEMBER', now());
+
+# Activate owner workspace license (required before anyone can open the embudo)
+-- UPDATE "Tenant" SET "subscriptionValidated" = true WHERE slug = '<slug>';
+
+# Suspend a single user without affecting the rest of the team
+-- UPDATE "Membership" SET status = 'INACTIVE' WHERE "userId" = '<userId>' AND "tenantId" = '<tenantId>';
 ```

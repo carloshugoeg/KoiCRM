@@ -9,6 +9,20 @@ export interface PipelineFilters {
   alerts?: "missingQuote" | "missingPayment" | "overdueFollowUp"
   from?: Date
   to?: Date
+  /** When true, includes deals marked isArchived on the kanban (demo: sf-showArchived). */
+  includeArchived?: boolean
+  /**
+   * When set, restricts results to deals the user owns or has been granted read-only
+   * access to (via cesión). Pass for asesores; omit for supervisors/superadmins who see all.
+   */
+  visibleToUserId?: string
+}
+
+/** Prisma `where` fragment that limits deals to those a user can see (owned or ceded to them). */
+function dealVisibilityWhere(userId: string): Prisma.DealWhereInput {
+  return {
+    OR: [{ ownerId: userId }, { viewers: { some: { userId } } }],
+  }
 }
 
 const dealWithRelations = {
@@ -30,8 +44,12 @@ const dealWithRelations = {
 export type DealWithRelations = Awaited<ReturnType<typeof getPipelineDeals>>[number]
 
 export async function getPipelineDeals(tenantId: string, filters: PipelineFilters = {}) {
-  const where: Prisma.DealWhereInput = { tenantId, isArchived: false }
+  const where: Prisma.DealWhereInput = {
+    tenantId,
+    ...(filters.includeArchived ? {} : { isArchived: false }),
+  }
 
+  if (filters.visibleToUserId) Object.assign(where, dealVisibilityWhere(filters.visibleToUserId))
   if (filters.ownerId) where.ownerId = filters.ownerId
   if (filters.channelKey) where.channelKey = filters.channelKey
   if (filters.from || filters.to) {
@@ -55,7 +73,12 @@ export async function getPipelineDeals(tenantId: string, filters: PipelineFilter
         client: true,
         equipment: true,
         quotes: { where: { isVoid: false }, take: 1, orderBy: { createdAt: "desc" }, select: { number: true } },
-        payments: { where: { isVoid: false }, take: 1, orderBy: { createdAt: "desc" }, select: { number: true } },
+        payments: {
+          where: { isVoid: false },
+          orderBy: { createdAt: "desc" },
+          select: { number: true, fileUrl: true },
+        },
+        notes: { take: 1, orderBy: { createdAt: "desc" }, select: { text: true } },
         _count: {
           select: {
             quotes: { where: { isVoid: false } },
@@ -78,6 +101,7 @@ export async function getPipelineDeals(tenantId: string, filters: PipelineFilter
     paymentCount: d._count.payments,
     hasQuoteAlert: d.stage.requiresQuote && d._count.quotes === 0,
     hasPaymentAlert: d.stage.requiresPayment && d._count.payments === 0,
+    hasPaymentWithFile: d.payments.some((p) => !!p.fileUrl),
   }))
 
   // Apply alert filter after fetch (simpler than SQL subquery)
@@ -96,11 +120,11 @@ export async function getPipelineDeals(tenantId: string, filters: PipelineFilter
   return mapped
 }
 
-export async function getDeal(tenantId: string, dealId: string) {
+export async function getDeal(tenantId: string, dealId: string, visibleToUserId?: string) {
   const now = new Date()
   return withTenant(tenantId, (tx) =>
-    tx.deal.findUnique({
-      where: { id: dealId, tenantId },
+    tx.deal.findFirst({
+      where: { id: dealId, tenantId, ...(visibleToUserId ? dealVisibilityWhere(visibleToUserId) : {}) },
       include: {
         stage: true,
         owner: { select: { id: true, name: true, email: true } },
@@ -122,8 +146,9 @@ export async function getDeal(tenantId: string, dealId: string) {
   )
 }
 
-export async function getArchivedDeals(tenantId: string, cursor?: string, limit = 10) {
+export async function getArchivedDeals(tenantId: string, cursor?: string, limit = 10, visibleToUserId?: string) {
   const where: Prisma.DealWhereInput = { tenantId, isArchived: true }
+  if (visibleToUserId) Object.assign(where, dealVisibilityWhere(visibleToUserId))
   if (cursor) {
     const cursorDate = new Date(cursor)
     if (isNaN(cursorDate.getTime())) throw new Error("Invalid cursor: expected ISO 8601 date string")

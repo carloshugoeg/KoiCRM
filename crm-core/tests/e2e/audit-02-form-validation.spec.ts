@@ -31,7 +31,7 @@ test.describe("AUDIT-02: Form Validation", () => {
     await page.locator("input#phone").fill("1234-5678")
     // Deliberately leave equipment empty and equipmentCustom empty
     await page.locator("input#value").fill("5000")
-    await page.getByRole("button", { name: /guardar/i }).click()
+    await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
     // Expect either: toast error OR browser validation message
     const errorToast = page.getByText(/selecciona al menos un equipo|debe seleccionar un equipo/i)
@@ -53,7 +53,7 @@ test.describe("AUDIT-02: Form Validation", () => {
     // Fill only custom equipment, leave chips unselected
     const customInput = page.locator('input[placeholder*="Otro equipo"]')
     await customInput.fill("Piscina Olimpica")
-    await page.getByRole("button", { name: /guardar/i }).click()
+    await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
     await expect(page.getByText(/oportunidad creada/i)).toBeVisible({ timeout: 8_000 })
   })
@@ -68,7 +68,7 @@ test.describe("AUDIT-02: Form Validation", () => {
     await page.locator("input#phone").fill("12345678") // No dash, invalid per spec XXXX-XXXX
     const chips = page.locator('[type="button"]').filter({ hasText: /bomba|jacuzzi|sauna|calentador|filtro|hidrojet/i })
     if (await chips.count() > 0) await chips.first().click()
-    await page.getByRole("button", { name: /guardar/i }).click()
+    await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
     // Per DEMO_INVENTORY.md §7.11 this SHOULD be rejected
     // Per current implementation it will be accepted — THIS IS THE BUG
@@ -100,7 +100,7 @@ test.describe("AUDIT-02: Form Validation", () => {
     await page.locator("input#whatsapp").fill("99999999") // No +502 prefix, invalid per spec
     const chips = page.locator('[type="button"]').filter({ hasText: /bomba|jacuzzi|sauna|calentador|filtro|hidrojet/i })
     if (await chips.count() > 0) await chips.first().click()
-    await page.getByRole("button", { name: /guardar/i }).click()
+    await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
     await page.waitForTimeout(3_000)
     const errorMsg = await page.getByText(/formato.*whatsapp|\+502 XXXX/i).count()
@@ -118,7 +118,7 @@ test.describe("AUDIT-02: Form Validation", () => {
     await openNewDealModal(page)
     await fillMinimumValidForm(page)
     await page.locator("input#email").fill("not-an-email")
-    await page.getByRole("button", { name: /guardar/i }).click()
+    await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
     await expect(page.getByText(/email inválido/i)).toBeVisible({ timeout: 5_000 })
     await expect(page.getByRole("dialog")).toBeVisible() // modal still open
@@ -132,7 +132,7 @@ test.describe("AUDIT-02: Form Validation", () => {
     await fillMinimumValidForm(page)
     // Bypass HTML min=0 by filling the value directly
     await page.locator("input#value").fill("-5000")
-    await page.getByRole("button", { name: /guardar/i }).click()
+    await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
     await page.waitForTimeout(3_000)
     // Schema has min(0) — server should reject
@@ -156,7 +156,7 @@ test.describe("AUDIT-02: Form Validation", () => {
     await page.locator("input#phone").fill("1234-5678")
     const chips = page.locator('[type="button"]').filter({ hasText: /bomba|jacuzzi|sauna|calentador|filtro|hidrojet/i })
     if (await chips.count() > 0) await chips.first().click()
-    await page.getByRole("button", { name: /guardar/i }).click()
+    await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
     await page.waitForTimeout(3_000)
     const successMsg = await page.getByText(/oportunidad creada/i).count()
@@ -174,7 +174,7 @@ test.describe("AUDIT-02: Form Validation", () => {
     await page.locator("input#phone").fill("1234-5678")
     const chips = page.locator('[type="button"]').filter({ hasText: /bomba|jacuzzi|sauna|calentador|filtro|hidrojet/i })
     if (await chips.count() > 0) await chips.first().click()
-    await page.getByRole("button", { name: /guardar/i }).click()
+    await page.getByRole("button", { name: /crear oportunidad/i }).click()
     // HTML required attribute should prevent form submission
     // or server should return error
     await expect(page.getByRole("dialog")).toBeVisible()

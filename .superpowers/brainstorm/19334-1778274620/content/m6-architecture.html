@@ -1,0 +1,71 @@
+<h2>Milestone 6 — Quotes, Payments, Attachments</h2>
+<p class="subtitle">Three tasks building on top of the existing DealDetail modal</p>
+
+<div class="section">
+  <span class="label">Architecture overview</span>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:12px">
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">T6.1 — Upload Infrastructure</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">S3 Sign Helper</div>
+      <ul style="font-size:12px;color:var(--text-secondary);margin:0;padding-left:16px;line-height:1.8">
+        <li><code>lib/storage/s3.ts</code></li>
+        <li><code>app/api/upload/sign/route.ts</code></li>
+        <li><code>features/attachments/*</code></li>
+      </ul>
+      <div style="margin-top:10px;padding:8px;background:var(--surface-hover);border-radius:6px;font-size:11px;color:var(--text-secondary)">
+        Client → sign endpoint → R2 direct upload → URL saved
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">T6.2 — Quotes</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">Quote CRUD + Alert</div>
+      <ul style="font-size:12px;color:var(--text-secondary);margin:0;padding-left:16px;line-height:1.8">
+        <li>Add / Edit / Void / Delete</li>
+        <li>Optional file attachment</li>
+        <li>Activity: <code>quoteAdded</code></li>
+      </ul>
+      <div style="margin-top:10px;padding:8px;background:#fef3c7;border-radius:6px;font-size:11px;color:#92400e">
+        🔔 "Falta Cotización" fires on stages: <strong>contactado, cotizacion, negociacion, ganado</strong> when no active quote
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:11px;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">T6.3 — Payments</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">Payment CRUD + Alert</div>
+      <ul style="font-size:12px;color:var(--text-secondary);margin:0;padding-left:16px;line-height:1.8">
+        <li>Add / Edit / Void / Delete</li>
+        <li>Optional file attachment</li>
+        <li>Activity: <code>paymentAdded</code></li>
+      </ul>
+      <div style="margin-top:10px;padding:8px;background:#d1fae5;border-radius:6px;font-size:11px;color:#065f46">
+        🔔 "Falta Pago" fires only on stage: <strong>ganado</strong> when no active payment
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <span class="label">Upload flow (T6.1)</span>
+  <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px">
+    <div style="padding:8px 14px;background:var(--surface);border:1px solid var(--border);border-radius:20px">1. User clicks "Adjuntar archivo"</div>
+    <div style="color:var(--text-secondary)">→</div>
+    <div style="padding:8px 14px;background:var(--surface);border:1px solid var(--border);border-radius:20px">2. POST <code>/api/upload/sign</code> → signed R2 URL</div>
+    <div style="color:var(--text-secondary)">→</div>
+    <div style="padding:8px 14px;background:var(--surface);border:1px solid var(--border);border-radius:20px">3. PUT directly to R2</div>
+    <div style="color:var(--text-secondary)">→</div>
+    <div style="padding:8px 14px;background:var(--surface);border:1px solid var(--border);border-radius:20px">4. Save public URL with quote/payment</div>
+  </div>
+  <div style="margin-top:10px;font-size:12px;color:var(--text-secondary)">Max file size: 5 MB. Accepted types: image/*, application/pdf. Files stored under <code>tenantId/deals/dealId/</code> key prefix.</div>
+</div>
+
+<div class="section">
+  <span class="label">Where quotes & payments appear in the UI</span>
+  <div style="margin-top:10px;font-size:13px;color:var(--text-secondary)">
+    → Inside the <strong>DealDetail modal, left panel</strong> (already exists from M5). Two new collapsible sections added below the deal fields: <em>Cotizaciones</em> and <em>Comprobantes de Pago</em>.<br><br>
+    → <strong>Pipeline card</strong> gets a pulsing red dot when either alert is active.<br><br>
+    → <strong>Print Report</strong> already has columns for "Sin Cotiz." / "Sin Pago" — these will now be populated with real data.
+  </div>
+</div>

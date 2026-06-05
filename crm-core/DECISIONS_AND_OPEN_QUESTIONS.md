@@ -14,7 +14,7 @@ Estas decisiones ya están consolidadas en `ARCHITECTURE_PLAN.md` y no requieren
 | --- | -------------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | D1  | Stack frontend+backend     | **Next.js 14 (App Router) + TypeScript strict**                                                                     | `ARCHITECTURE_PLAN.md` §1                                        | RSC + Server Actions; un solo build; sin Express.                                                  |
 | D2  | DB + ORM                   | **PostgreSQL 15+ con RLS, Prisma como ORM**                                                                         | §1, §3, §5                                                       | Migraciones versionadas; RLS como defensa en profundidad por tenant.                               |
-| D3  | Auth                       | **Auth.js v5 (NextAuth) con email+password + OAuth Google**                                                         | §1, §4                                                           | Cookies httpOnly, RBAC propio. Clerk queda documentado como swap-in.                               |
+| D3  | Auth                       | **Auth.js v5 (NextAuth) con email+password + OAuth Google**                                                         | §1, §4                                                           | Cookies httpOnly, RBAC propio. Clerk queda documentado como swap-in. Google opcional vía `GOOGLE_*`; mismo email con password y Google muestra `OAuthAccountNotLinked` (login con contraseña). |
 | D4  | Object storage             | **S3-compatible (Cloudflare R2 default)**                                                                           | §1                                                               | Uploads firmados; reemplaza base64 en DB del demo.                                                 |
 | D5  | Email transaccional        | **Resend default**, Postmark/SES alternativos                                                                       | §1                                                               | Para invitaciones, password reset, alertas.                                                        |
 | D6  | UI primitives              | **Tailwind 3 + shadcn/ui (Radix)**                                                                                  | §1                                                               | Componentes accesibles; cero copia de código del demo.                                             |
@@ -36,6 +36,8 @@ Estas decisiones ya están consolidadas en `ARCHITECTURE_PLAN.md` y no requieren
 | D22 | Logger                     | **pino con correlación por requestId**                                                                              | §1                                                               | JSON logs, ligero.                                                                                 |
 | D23 | Estrategia de demo data    | Seeds separados, marcados como demo, **reemplazables**; nunca como fuente real del sistema                          | `prompt1.md` Restricción 8                                       | `prisma/seed/demo-aquasistemas.ts`.                                                                |
 | D24 | Definición de done         | Multitenancy + RLS + tests + persistencia real + validación Zod + sin datos hardcodeados como fuente                | `IMPLEMENTATION_BACKLOG.md` "Regla de oro" + `AGENT_RULES.md` §4 | "Compila" no es done.                                                                              |
+| D25 | Acceso al embudo           | **`Membership.status` (ACTIVE/INACTIVE) + `Tenant.subscriptionValidated`**; gate en layout y `/app/access` con invitación y contacto de renovación | Solicitud producto 2026-06-03                                    | Nuevos tenants arrancan sin validar; miembros bloqueados si el owner no tiene licencia validada. Activar: `UPDATE "Tenant" SET "subscriptionValidated" = true WHERE slug = '…'`. |
+| D26 | Unión al equipo            | **`JoinLink`** reutilizable con `role` editable; aceptación en `/api/join/accept` sin email fijo; invitación por email (`Invitation`) legada | Solicitud producto 2026-06-03                                    | UI en Ajustes → Colaboradores: generar/copiar/revocar enlaces; actualizar permiso del enlace afecta solo nuevos ingresos. |
 
 ---
 
@@ -54,7 +56,7 @@ Estas viven en `DEMO_INVENTORY.md §17` como "Decisión-pendiente". Resolverlas 
 | DP-07 | **Storage / email providers concretos** | R2 vs S3, Resend vs Postmark vs SES                                        | R2 + Resend (default del plan).                                                   | T6.1, T3.6.                                                                       |
 | DP-08 | **Multi-pipeline**                      | V1 / Post-V1                                                               | Post-V1; V1 = un pipeline por tenant.                                             | T4.4.                                                                             |
 | DP-09 | **Auditoría**                           | Solo Activity por Deal / Audit log global por tabla                        | Solo Activity por Deal en V1; audit global Post-V1.                               | T5.6.                                                                             |
-| DP-10 | **Formato exacto de IDs Deal**          | `AQX-1234-XX-26` (counter 4d, año 2d) / `AQX-1234-XX-2026` (año 4d) / otro | `AQX-1234-XX-26` (4 dígitos counter, 2 dígitos año, replicando el demo).          | T2.4.                                                                             |
+| DP-10 | **Formato exacto de IDs Deal** ⚠️ corregido | (A) calcar demo `0032-AQX-RO-26` = **counter-prefijo-iniciales-YY** / (B) actual impl `AQX-0032-RO-26` = prefijo-counter-iniciales-YY | **A** si el objetivo es calco exacto (el demo, `SalesFunnel.jsx:3847`, pone el counter PRIMERO). El generador actual (`lib/id/deal-id.ts`) usa B. **Marcado para confirmación del owner** (sesión paridad 2026-06-01). | T2.4. |
 | DP-11 | **Retención de datos / GDPR-like**      | Sin política V1 / política básica V1                                       | Política básica: export por tenant + delete por tenant; retención formal Post-V1. | M3, M4.                                                                           |
 | DP-12 | **Subdomains por tenant**               | Slug en path `/[tenantSlug]` / subdomain `tenant.app.com`                  | Path en V1 (DNS más simple); subdomain Post-V1.                                   | T3.3.                                                                             |
 
@@ -77,6 +79,19 @@ No son decisiones aún; son inputs que el owner debe proveer para destrabar dise
 9. **Time zone**: ¿es por tenant o por usuario? El demo asume `America/Guatemala`.
 10. **Onboarding**: ¿quién paga por el dominio del primer tenant en signup? ¿hay free trial?
 
+### 3.1 Confirmaciones pendientes — sesión paridad demo→PROD (2026-06-01)
+
+Defaults aplicados (sensatos) que el owner debe confirmar. Detalle de paridad visual en `PARITY_AUDIT.md`.
+
+| Tema | Default aplicado en esta sesión | Confirmar |
+| --- | --- | --- |
+| **Delete (DP-01)** | Soft-delete / archivado; sin hard-delete en UI. | ¿OK o se requiere hard-delete para el owner? |
+| **Formato ID Deal (DP-10)** | Se mantiene `AQX-0032-RO-26` (impl actual). El demo usa `0032-AQX-RO-26`. **No cambiado** por implicar generador+seed+test y consistencia de IDs existentes. | ¿Calcar el orden del demo (counter primero) o conservar el actual? |
+| **Settings: panel vs página** | Se conserva la **página** con tabs (mejor para white-label/PROD); el demo usa panel deslizante (Sheet). Contenido equivalente. | ¿Aceptable como página o se quiere el Sheet deslizante? |
+| **Header avanzado** | Diferido: input de búsqueda siempre visible, toggle rápido de tema, y botones "Nueva Oportunidad"/imprimir en el header (en CRM viven dentro de cada vista). | ¿Prioridad para igualar el header del demo? |
+| **Checkbox Google Calendar en seguimiento** | Fuera de V1 (sync GCal diferido a post-V1). | ¿Confirmar que queda post-V1? |
+| **Línea de stats por cliente** | Parcial: se muestra "N oportunidades". Falta "N activas · Ganado $$" (requiere agregados por cliente con costo de performance). | ¿Incluir agregados completos por fila? |
+
 ---
 
 ## 4. Riesgos principales
@@ -91,7 +106,7 @@ No son decisiones aún; son inputs que el owner debe proveer para destrabar dise
 | R6  | **Leak de "aquasistemas" en core** → fork por industria, no white label real.                         | Alto (rompe el modelo de negocio).    | Lint rule + grep en CI; regla en `AGENT_RULES.md` §5.                                                                           |
 | R7  | **Migraciones de `CustomFieldDefinition` sin estrategia** → datos huérfanos al eliminar definiciones. | Medio.                                | Soft-deprecate de definiciones con datos; migración explícita documentada por cambio.                                           |
 | R8  | **Auth.js v5 cambios breaking** → bloqueo durante upgrade.                                            | Bajo-Medio.                           | Pin de versión + plan de upgrade documentado; abstracción mínima del adapter.                                                   |
-| R9  | **RLS policies y `withTenant()` divergen** → query bypass de aislamiento.                             | Crítico.                              | `withTenant()` es la ÚNICA forma de abrir conexión transaccional; lint rule contra `prisma.$queryRaw` directo fuera de helpers. |
+| R9  | **RLS policies y `withTenant()` divergen** → query bypass de aislamiento.                             | Crítico.                              | `withTenant()` es la ÚNICA forma de abrir conexión transaccional; lint rule contra `prisma.$queryRaw` directo fuera de helpers. **Mitigado (2026-06-02):** `getCatalogItems` / `getCatalogItemUsageCount` en `features/catalogs/queries.ts` usan `withTenant()`; lecturas sin contexto devolvían 0 filas y el alta de Equipos parecía fallar en silencio. |
 | R10 | **Demo data filtrada a producción** → tenants reales con seeds aquasistemas mezclados.                | Alto.                                 | Seeds demo solo en entorno dev/staging; flag `DATABASE_URL` separada; CI bloquea seed demo en producción.                       |
 
 ---
@@ -103,6 +118,7 @@ Cualquier agente que necesite releer `hardcoded-demo/` después del scan inicial
 | Fecha (YYYY-MM-DD) | Agente / Sesión              | Archivo releído                                       | Motivo                                                                                                                  | Hallazgo nuevo registrado en                                                                                                                                                                                                                          |
 | ------------------ | ---------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-05-01         | Agente de verificación Task1 | `hardcoded-demo/src/SalesFunnel.jsx` líneas 2499–4813 | Verificar cobertura del scan inicial (StatsPanel, ArchivePage, ClientsPage, CalendarView, main component, print layout) | Tres gaps nuevos integrados en `DEMO_INVENTORY.md`: (1) Print Report feature con layout completo; (2) Scope real de alerta "Falta Cotización" incluye stage `contactado` (no solo `cotizacion`+); (3) Pre-carga de ClientFormModal desde ClientsPage. |
+| 2026-06-01         | Sesión usuarios/avatares     | —                                                     | Bug avatares: upload OK, imagen rota en UI                                                                              | `V2_BACKLOG.md` V2-C01, V2-C02; log § final                                                                                                                                                                                                          |
 
 **Política**:
 

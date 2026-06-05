@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { dealIdSchema } from "@/lib/schemas/deal-id";
 
 export const ConfirmUploadSchema = z.object({
-  dealId: z.string().cuid().optional(),
+  dealId: dealIdSchema.optional(),
   clientId: z.string().cuid().optional(),
   key: z.string().min(1),
   url: z.string().url(),

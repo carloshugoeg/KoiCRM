@@ -30,7 +30,7 @@ test.describe("AUDIT-01: Happy Paths", () => {
 
     await page.locator("input#value").fill("15000")
 
-    await page.getByRole("button", { name: /guardar/i }).click()
+    await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
     // Expect toast success
     await expect(page.getByText(/oportunidad creada/i)).toBeVisible({ timeout: 8_000 })

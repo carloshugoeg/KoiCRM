@@ -1,8 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { X, Phone, MessageCircle, Mail, ChevronDown, Trash2 } from "lucide-react"
+import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
+import { PAYMENT_DOC_REQUIRED_FOR_WON } from "@/lib/pipeline/stage-block-message"
+import { X, Phone, MessageCircle, Mail, Trash2, Lock } from "lucide-react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { DialogPortal, DialogOverlay, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog } from "@/components/ui/alert-dialog"
@@ -16,7 +19,8 @@ import { HistoryPanel } from "@/features/deals/components/HistoryPanel"
 import { NotesSection } from "@/features/notes/components/NotesSection"
 import { QuoteSection } from "@/features/quotes/components/QuoteSection"
 import { PaymentSection } from "@/features/payments/components/PaymentSection"
-import { updateDealFieldAction, moveDealAction, archiveDealAction } from "@/features/deals/actions"
+import { DealAttachmentsSection } from "@/features/attachments/components/DealAttachmentsSection"
+import { updateDealFieldAction, moveDealAction, archiveDealAction, transferDealAction, deleteDealAction } from "@/features/deals/actions"
 import { addFollowUpAction, completeFollowUpAction, deleteFollowUpAction } from "@/features/follow-ups/actions"
 import { getDealActivityAction, getDealFollowUpsAction, getQuotesForDealAction, getPaymentsForDealAction } from "@/features/deals/actions"
 import type { ActivityEntry } from "@/features/activity/queries"
@@ -52,8 +56,14 @@ interface DealDetailModalProps {
   tenantId: string
   tenantSlug: string
   settings: IntlSettings
+  /** Whether the current user can edit THIS deal (owner or supervisor+). */
   canEdit?: boolean
+  /** Whether the current user can archive (supervisor+). */
+  canArchive?: boolean
+  /** Whether the current user can permanently delete (superadmin). */
   canDelete?: boolean
+  /** Team members for the cesión / reassignment selector. */
+  members?: { id: string; name: string | null; email: string }[]
   onClose: () => void
   onAction?: () => void
 }
@@ -70,10 +80,13 @@ export function DealDetailModal({
   tenantSlug,
   settings,
   canEdit = true,
+  canArchive = false,
   canDelete = false,
+  members = [],
   onClose,
   onAction,
 }: DealDetailModalProps) {
+  const router = useRouter()
   const [activities, setActivities] = useState<ActivityEntry[]>([])
   const [followUps, setFollowUps] = useState<FollowUp[]>([])
   const [quotes, setQuotes] = useState<Quote[]>([])
@@ -81,6 +94,8 @@ export function DealDetailModal({
   const [loadingAct, setLoadingAct] = useState(true)
   const [moving, setMoving] = useState(false)
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [transferring, setTransferring] = useState(false)
   const [deleteFollowUpId, setDeleteFollowUpId] = useState<string | null>(null)
 
   // Inline edit state
@@ -109,11 +124,23 @@ export function DealDetailModal({
     })
   }, [tenantId, deal.id])
 
+  async function refreshQuotesAndPayments() {
+    const [qs, ps, acts] = await Promise.all([
+      getQuotesForDealAction(tenantId, deal.id),
+      getPaymentsForDealAction(tenantId, deal.id),
+      getDealActivityAction(tenantId, deal.id),
+    ])
+    setQuotes(qs)
+    setPayments(ps)
+    setActivities(acts)
+    router.refresh()
+  }
+
   async function saveField(field: string, value: string | number) {
     const result = await updateDealFieldAction({ tenantId, tenantSlug, dealId: deal.id, field, value })
-    if (!result.ok) toast.error(result.error ?? "Error al guardar.")
+    if (!result.ok) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorSave))
     else {
-      toast.success("Guardado.", { onAutoClose: () => onAction?.() })
+      toast.success(toastMessages.deal.saved, { onAutoClose: () => onAction?.() })
       setEditField(null)
     }
   }
@@ -123,9 +150,9 @@ export function DealDetailModal({
     setMoving(true)
     try {
       const result = await moveDealAction({ tenantId, tenantSlug, dealId: deal.id, toStageId, force })
-      if (!result.ok) toast.error(result.error ?? "Error al mover.")
+      if (!result.ok) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorMove))
       else {
-        toast.success("Etapa actualizada.", { onAutoClose: () => onAction?.() })
+        toast.success(toastMessages.deal.stageUpdated, { onAutoClose: () => onAction?.() })
         onClose()
       }
     } finally {
@@ -138,9 +165,39 @@ export function DealDetailModal({
     setMoving(true)
     try {
       const result = await archiveDealAction({ tenantId, tenantSlug, dealId: deal.id })
-      if (!result.ok) toast.error(result.error ?? "Error al archivar.")
+      if (!result.ok) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorArchive))
       else {
-        toast.success("Archivado.", { onAutoClose: () => onAction?.() })
+        toast.success(toastMessages.deal.archived, { onAutoClose: () => onAction?.() })
+        onClose()
+      }
+    } finally {
+      setMoving(false)
+    }
+  }
+
+  async function handleTransfer(toUserId: string) {
+    if (transferring) return
+    setTransferring(true)
+    try {
+      const result = await transferDealAction({ tenantId, tenantSlug, dealId: deal.id, toUserId })
+      if (!result.ok) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorSave))
+      else {
+        toast.success(toastMessages.deal.transferred, { onAutoClose: () => onAction?.() })
+        onClose()
+      }
+    } finally {
+      setTransferring(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (moving) return
+    setMoving(true)
+    try {
+      const result = await deleteDealAction({ tenantId, tenantSlug, dealId: deal.id })
+      if (!result.ok) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorDelete))
+      else {
+        toast.success(toastMessages.deal.deleted, { onAutoClose: () => onAction?.() })
         onClose()
       }
     } finally {
@@ -153,9 +210,9 @@ export function DealDetailModal({
     setFuLoading(true)
     const result = await addFollowUpAction({ tenantId, tenantSlug, dealId: deal.id, date: fuDate, reasonKey: fuReason })
     setFuLoading(false)
-    if (!result.ok) toast.error(result.error ?? "Error al agregar seguimiento.")
+    if (!result.ok) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorFollowUp))
     else {
-      toast.success("Seguimiento agregado.")
+      toast.success(toastMessages.deal.followUpAdded)
       const updated = await getDealFollowUpsAction(tenantId, deal.id)
       setFollowUps(updated)
       setFuDate("")
@@ -164,8 +221,9 @@ export function DealDetailModal({
 
   async function handleCompleteFollowUp(followUpId: string, result: string) {
     const res = await completeFollowUpAction({ tenantId, tenantSlug, followUpId, result: result || undefined })
-    if (!res.ok) toast.error(res.error ?? "Error.")
+    if (!res.ok) toast.error(toastErrorFromResult(res.error, toastMessages.deal.errorFollowUp))
     else {
+      toast.success(toastMessages.deal.followUpCompleted)
       setCompletingId(null)
       setCompletingResult("")
       const updated = await getDealFollowUpsAction(tenantId, deal.id)
@@ -175,8 +233,9 @@ export function DealDetailModal({
 
   async function handleDeleteFollowUp(followUpId: string) {
     const res = await deleteFollowUpAction({ tenantId, tenantSlug, followUpId })
-    if (!res.ok) toast.error(res.error ?? "Error.")
+    if (!res.ok) toast.error(toastErrorFromResult(res.error, toastMessages.deal.errorFollowUp))
     else {
+      toast.success(toastMessages.deal.followUpRemoved)
       const updated = await getDealFollowUpsAction(tenantId, deal.id)
       setFollowUps(updated)
     }
@@ -219,6 +278,13 @@ export function DealDetailModal({
           </div>
         </div>
 
+        {!canEdit && (
+          <div className="flex items-center gap-2 px-6 py-2 border-b bg-amber-50 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+            <Lock className="h-3 w-3 shrink-0" />
+            Solo lectura — esta oportunidad fue cedida. Pídela de vuelta para poder editarla.
+          </div>
+        )}
+
         {/* Three-panel body */}
         <div className="flex flex-1 overflow-hidden divide-x">
           {/* LEFT PANEL – Deal data */}
@@ -233,6 +299,25 @@ export function DealDetailModal({
               </div>
               <span className="text-sm font-medium">{deal.ownerName ?? "Sin asesor"}</span>
             </div>
+
+            {/* Cesión / reasignación */}
+            {canEdit && members.filter((m) => m.id !== deal.ownerId).length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs text-muted-foreground mb-1">Ceder / reasignar a</p>
+                <Select onValueChange={handleTransfer} disabled={transferring}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Elegir asesor…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {members
+                      .filter((m) => m.id !== deal.ownerId)
+                      .map((m) => (
+                        <SelectItem key={m.id} value={m.id}>{m.name ?? m.email}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Value */}
             <div className="mb-3">
@@ -252,13 +337,15 @@ export function DealDetailModal({
                     }}
                   />
                 </div>
-              ) : (
+              ) : canEdit ? (
                 <p
                   className="text-base font-bold cursor-pointer hover:text-primary"
                   onClick={() => { setEditField("value"); setEditValue(String(deal.value)) }}
                 >
                   {formatCurrency(deal.value, settings)}
                 </p>
+              ) : (
+                <p className="text-base font-bold">{formatCurrency(deal.value, settings)}</p>
               )}
             </div>
 
@@ -321,6 +408,7 @@ export function DealDetailModal({
                 quotes={quotes}
                 canEdit={canEdit}
                 canDelete={canDelete}
+                onRefresh={refreshQuotesAndPayments}
               />
             </div>
 
@@ -332,6 +420,19 @@ export function DealDetailModal({
                 payments={payments}
                 canEdit={canEdit}
                 canDelete={canDelete}
+                onRefresh={refreshQuotesAndPayments}
+              />
+            </div>
+
+            {/* Files & images (screenshots, product photos, etc.) */}
+            <div className="border-t pt-4 mt-3">
+              <DealAttachmentsSection
+                dealId={deal.id}
+                tenantId={tenantId}
+                canEdit={canEdit}
+                excludeUrls={[...quotes.map((q) => q.fileUrl), ...payments.map((p) => p.fileUrl)].filter(
+                  (u): u is string => !!u,
+                )}
               />
             </div>
           </ScrollArea>
@@ -339,40 +440,68 @@ export function DealDetailModal({
           {/* CENTER PANEL – Operations */}
           <ScrollArea className="flex-1 p-4">
             {/* Action buttons */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {unlockedStages.length > 0 && (
-                <Select onValueChange={(v) => handleMove(v)}>
-                  <SelectTrigger className="w-40 h-8 text-xs" disabled={moving}>
-                    <SelectValue placeholder="Mover a..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {unlockedStages.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              {wonStage && deal.stageKey !== "ganado" && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 text-xs text-emerald-600 border-emerald-300"
-                  onClick={() => handleMove(wonStage.id, true)}
-                  disabled={loadingAct || !hasPaymentDoc || moving}
-                  title={!hasPaymentDoc ? "Adjunta un documento de pago antes de marcar como ganado" : undefined}
-                >
-                  Marcar como ganado
-                </Button>
-              )}
-              {lostStage && deal.stageKey !== "perdido" && (
-                <Button size="sm" variant="outline" className="h-8 text-xs text-red-600 border-red-300" onClick={() => handleMove(lostStage.id, true)} disabled={moving}>
-                  Marcar como perdido
-                </Button>
-              )}
-              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setArchiveConfirmOpen(true)} disabled={moving}>
-                Archivar
-              </Button>
-            </div>
+            {wonStage && deal.stageKey !== "ganado" && !hasPaymentDoc && (
+              <div
+                role="alert"
+                className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-950 dark:text-amber-100"
+              >
+                <p className="font-semibold text-amber-800 dark:text-amber-200">
+                  Etapa «Ganado» bloqueada para esta oportunidad
+                </p>
+                <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">{PAYMENT_DOC_REQUIRED_FOR_WON}</p>
+              </div>
+            )}
+
+            {(canEdit || canArchive || canDelete) && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {canEdit && unlockedStages.length > 0 && (
+                  <Select onValueChange={(v) => handleMove(v)}>
+                    <SelectTrigger className="w-40 h-8 text-xs" disabled={moving}>
+                      <SelectValue placeholder="Mover a..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unlockedStages.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {canEdit && wonStage && deal.stageKey !== "ganado" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs text-emerald-600 border-emerald-300"
+                    onClick={() => {
+                      if (!hasPaymentDoc) {
+                        toast.error(toastMessages.deal.paymentDocRequiredForWon, { duration: 8000 })
+                        return
+                      }
+                      void handleMove(wonStage.id, true)
+                    }}
+                    disabled={loadingAct || moving}
+                    title={!hasPaymentDoc ? PAYMENT_DOC_REQUIRED_FOR_WON : undefined}
+                  >
+                    Marcar como ganado
+                  </Button>
+                )}
+                {canEdit && lostStage && deal.stageKey !== "perdido" && (
+                  <Button size="sm" variant="outline" className="h-8 text-xs text-red-600 border-red-300" onClick={() => handleMove(lostStage.id, true)} disabled={moving}>
+                    Marcar como perdido
+                  </Button>
+                )}
+                {canArchive && (
+                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setArchiveConfirmOpen(true)} disabled={moving}>
+                    Archivar
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button size="sm" variant="outline" className="h-8 text-xs text-red-600 border-red-300" onClick={() => setDeleteConfirmOpen(true)} disabled={moving}>
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Eliminar
+                  </Button>
+                )}
+              </div>
+            )}
 
             <Separator className="mb-4" />
 
@@ -489,6 +618,7 @@ export function DealDetailModal({
                 tenantSlug={tenantSlug}
                 dealId={deal.id}
                 settings={settings}
+                canEdit={canEdit}
               />
             </div>
           </ScrollArea>
@@ -516,6 +646,17 @@ export function DealDetailModal({
       cancelLabel="Cancelar"
       destructive
       onConfirm={handleArchive}
+    />
+
+    <AlertDialog
+      open={deleteConfirmOpen}
+      onOpenChange={setDeleteConfirmOpen}
+      title="¿Eliminar oportunidad?"
+      description="La oportunidad se eliminará de forma permanente, junto con sus cotizaciones, pagos, seguimientos y archivos. Esta acción no se puede deshacer."
+      confirmLabel="Eliminar"
+      cancelLabel="Cancelar"
+      destructive
+      onConfirm={handleDelete}
     />
 
     <AlertDialog

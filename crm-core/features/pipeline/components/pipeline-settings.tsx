@@ -2,35 +2,24 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core"
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
-  arrayMove,
-} from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
-import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
+import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { updateStageAction, reorderStagesAction, deleteStageAction, createStageAction } from "@/features/pipeline/actions"
+import { Button } from "@/components/ui/button"
+import {
+  updateStageAction,
+  reorderStagesAction,
+  deleteStageAction,
+  createStageAction,
+} from "@/features/pipeline/actions"
+import {
+  SettingsCard,
+  SettingsSectionTitle,
+} from "@/components/settings/settings-section"
+import { PRESET_COLORS } from "@/lib/settings/constants"
+import { getStageIcon } from "@/lib/pipeline/stage-icon"
+import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 import type { Pipeline, PipelineStage, Tenant } from "@prisma/client"
-
-const PRESET_COLORS = [
-  "#818cf8","#38bdf8","#fbbf24","#f472b6",
-  "#34d399","#fb923c","#f87171","#a78bfa",
-  "#4ade80","#e879f9","#facc15","#60a5fa",
-]
-
-const STAGE_ICONS = ["Star","User","Phone","DollarSign","Flame","CheckCircle2","Clock","Zap","Package","Waves"]
 
 type PipelineWithStages = Pipeline & { stages: PipelineStage[] }
 
@@ -40,181 +29,70 @@ interface Props {
   canManage: boolean
 }
 
-function SortableStageRow({
-  stage,
-  tenant,
-  canManage,
-  onDelete,
-}: {
-  stage: PipelineStage
-  tenant: Tenant
-  canManage: boolean
-  onDelete: () => void
-}) {
-  const router = useRouter()
-  const [editing, setEditing] = useState(false)
-  const [label, setLabel] = useState(stage.label)
-  const [sublabel, setSublabel] = useState(stage.sublabel ?? "")
-  const [color, setColor] = useState(stage.color)
-  const [iconKey, setIconKey] = useState(stage.iconKey)
-  const [saving, setSaving] = useState(false)
-
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: stage.id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  }
-
-  async function handleSave() {
-    setSaving(true)
-    await updateStageAction({
-      tenantId: tenant.id,
-      tenantSlug: tenant.slug,
-      id: stage.id,
-      label,
-      sublabel: sublabel || null,
-      color,
-      iconKey,
-    })
-    setSaving(false)
-    setEditing(false)
-    router.refresh()
-  }
-
-  return (
-    <li ref={setNodeRef} style={style} className="flex items-center gap-3 px-4 py-3 bg-background">
-      {canManage && (
-        <button
-          {...attributes}
-          {...listeners}
-          className="cursor-grab text-muted-foreground hover:text-foreground touch-none"
-          aria-label="Arrastrar para reordenar"
-        >
-          ⠿
-        </button>
-      )}
-      <div
-        className="w-4 h-4 rounded-full shrink-0 border"
-        style={{ backgroundColor: color }}
-      />
-      {editing ? (
-        <div className="flex-1 flex flex-col gap-2">
-          <Input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="Nombre de etapa"
-            autoFocus
-          />
-          <Input
-            value={sublabel}
-            onChange={(e) => setSublabel(e.target.value)}
-            placeholder="Descripción corta (opcional)"
-          />
-          <div className="flex flex-wrap gap-1">
-            {PRESET_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                className={`w-3 h-3 cursor-pointer rounded-full border-2 ${color === c ? "border-foreground" : "border-transparent"}`}
-                style={{ backgroundColor: c }}
-                aria-label={c}
-              />
-            ))}
-          </div>
-          <select
-            value={iconKey}
-            onChange={(e) => setIconKey(e.target.value)}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            {STAGE_ICONS.map((icon) => (
-              <option key={icon} value={icon}>{icon}</option>
-            ))}
-          </select>
-          <div className="flex gap-2">
-            <Button size="sm" onClick={handleSave} disabled={saving}>
-              {saving ? "…" : "Guardar"}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancelar</Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 min-w-0">
-          <p className="font-medium truncate">{stage.label}</p>
-          {stage.sublabel && <p className="text-xs text-muted-foreground truncate">{stage.sublabel}</p>}
-          {stage.locked && <span className="text-xs text-muted-foreground">Bloqueada</span>}
-        </div>
-      )}
-      {canManage && !editing && (
-        <div className="flex gap-1">
-          <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>Editar</Button>
-          {!stage.locked && (
-            <Button variant="ghost" size="sm" className="text-destructive" onClick={onDelete}>
-              Eliminar
-            </Button>
-          )}
-        </div>
-      )}
-    </li>
-  )
+function hex2rgba(hex: string, alpha = 0.15) {
+  let h = hex.replace("#", "")
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("")
+  const r = parseInt(h.substring(0, 2), 16)
+  const g = parseInt(h.substring(2, 4), 16)
+  const b = parseInt(h.substring(4, 6), 16)
+  return `rgba(${isNaN(r) ? 0 : r},${isNaN(g) ? 0 : g},${isNaN(b) ? 0 : b},${alpha})`
 }
 
 export function PipelineSettings({ tenant, pipeline, canManage }: Props) {
   const router = useRouter()
   const [stages, setStages] = useState(pipeline?.stages ?? [])
   const [error, setError] = useState<string | null>(null)
-
-  // Sync stages list when server component re-renders after router.refresh()
-  useEffect(() => { setStages(pipeline?.stages ?? []) }, [pipeline])
   const [newLabel, setNewLabel] = useState("")
   const [newSublabel, setNewSublabel] = useState("")
   const [newColor, setNewColor] = useState("#818cf8")
-  const [newIconKey, setNewIconKey] = useState("Star")
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  )
+  useEffect(() => {
+    setStages(pipeline?.stages ?? [])
+  }, [pipeline])
 
-  async function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-
-    const oldIdx = stages.findIndex((s) => s.id === active.id)
-    const newIdx = stages.findIndex((s) => s.id === over.id)
-    const newStages = arrayMove(stages, oldIdx, newIdx)
-    setStages(newStages)
-
-    await reorderStagesAction({
+  function moveStage(index: number, dir: -1 | 1) {
+    const arr = [...stages]
+    const fixed = arr.filter((s) => s.locked).map((s) => s.id)
+    if (fixed.includes(arr[index]!.id)) return
+    const ni = index + dir
+    if (ni < 0 || ni >= arr.length || fixed.includes(arr[ni]?.id)) return
+    ;[arr[index], arr[ni]] = [arr[ni]!, arr[index]!]
+    setStages(arr)
+    void reorderStagesAction({
       tenantId: tenant.id,
       tenantSlug: tenant.slug,
       pipelineId: pipeline!.id,
-      orderedIds: newStages.map((s) => s.id),
+      orderedIds: arr.map((s) => s.id),
+    }).then((result) => {
+      if (!result.ok) {
+        toast.error(toastErrorFromResult(result.error, toastMessages.pipeline.errorUpdateStage))
+        return
+      }
+      toast.success(toastMessages.pipeline.orderUpdated)
+      router.refresh()
     })
-    router.refresh()
   }
 
-  async function handleAddStage(e: React.FormEvent) {
-    e.preventDefault()
-    setAdding(true)
-    setAddError(null)
-    const result = await createStageAction({
+  async function handleFieldChange(
+    stage: PipelineStage,
+    fields: Partial<Pick<PipelineStage, "label" | "sublabel" | "color">>,
+  ) {
+    const result = await updateStageAction({
       tenantId: tenant.id,
       tenantSlug: tenant.slug,
-      pipelineId: pipeline!.id,
-      label: newLabel,
-      sublabel: newSublabel || null,
-      color: newColor,
-      iconKey: newIconKey,
+      id: stage.id,
+      label: fields.label ?? stage.label,
+      sublabel: fields.sublabel !== undefined ? fields.sublabel : stage.sublabel,
+      color: fields.color ?? stage.color,
+      iconKey: stage.iconKey,
     })
-    setAdding(false)
-    if (!result.ok) { setAddError(result.error ?? "Error."); return }
-    setNewLabel("")
-    setNewSublabel("")
+    if (!result.ok) {
+      toast.error(toastErrorFromResult(result.error, toastMessages.pipeline.errorUpdateStage))
+      return
+    }
+    toast.success(toastMessages.pipeline.stageUpdated)
     router.refresh()
   }
 
@@ -226,84 +104,231 @@ export function PipelineSettings({ tenant, pipeline, canManage }: Props) {
       tenantSlug: tenant.slug,
       id: stageId,
     })
-    if (!result.ok) { setError(result.error ?? "Error."); return }
+    if (!result.ok) {
+      const msg = toastErrorFromResult(result.error, toastMessages.pipeline.errorRemoveStage)
+      setError(msg)
+      toast.error(msg)
+      return
+    }
+    toast.success(toastMessages.pipeline.stageRemoved)
+    router.refresh()
+  }
+
+  async function handleAddStage() {
+    if (!newLabel.trim()) return
+    setAdding(true)
+    setAddError(null)
+    const result = await createStageAction({
+      tenantId: tenant.id,
+      tenantSlug: tenant.slug,
+      pipelineId: pipeline!.id,
+      label: newLabel,
+      sublabel: newSublabel || null,
+      color: newColor,
+      iconKey: "Star",
+    })
+    setAdding(false)
+    if (!result.ok) {
+      const msg = toastErrorFromResult(result.error, toastMessages.pipeline.errorAddStage)
+      setAddError(msg)
+      toast.error(msg)
+      return
+    }
+    setNewLabel("")
+    setNewSublabel("")
+    setNewColor("#818cf8")
+    toast.success(toastMessages.pipeline.stageAdded)
     router.refresh()
   }
 
   if (!pipeline) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-semibold mb-4">Embudo</h1>
-        <p className="text-muted-foreground">No hay un pipeline configurado para este tenant.</p>
-      </div>
+      <p className="text-muted-foreground text-sm">
+        No hay un pipeline configurado para este tenant.
+      </p>
     )
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl">
-      <h1 className="text-2xl font-semibold">Embudo: {pipeline.name}</h1>
+    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain">
+      <SettingsSectionTitle>Etapas del embudo</SettingsSectionTitle>
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {canManage && (
-        <p className="text-sm text-muted-foreground">
-          Arrastra las etapas para reordenarlas. Las etapas bloqueadas no se pueden eliminar.
-        </p>
-      )}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={stages.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-          <ul className="divide-y border rounded-lg">
-            {stages.map((stage) => (
-              <SortableStageRow
-                key={stage.id}
-                stage={stage}
-                tenant={tenant}
-                canManage={canManage}
-                onDelete={() => handleDelete(stage.id)}
-              />
-            ))}
-          </ul>
-        </SortableContext>
-      </DndContext>
+
+      <div className="space-y-2">
+        {stages.map((stage, i) => {
+          const Icon = getStageIcon(stage.iconKey)
+          const isLocked = stage.locked
+          return (
+            <div
+              key={stage.id}
+              className="rounded-xl border overflow-hidden"
+              style={{
+                borderColor: hex2rgba(stage.color, 0.45),
+                background: "hsl(var(--muted) / 0.2)",
+              }}
+            >
+              <div className="flex items-center gap-3 p-3">
+                <div
+                  className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+                  style={{
+                    background: hex2rgba(stage.color, 0.2),
+                    border: `1px solid ${hex2rgba(stage.color, 0.45)}`,
+                  }}
+                >
+                  <Icon className="h-3 w-3" style={{ color: stage.color }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold truncate">{stage.label}</p>
+                  {stage.sublabel && (
+                    <p className="text-xs text-muted-foreground truncate">{stage.sublabel}</p>
+                  )}
+                </div>
+                {isLocked ? (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-500/15 text-slate-500 border border-slate-500/30">
+                    Fijo
+                  </span>
+                ) : canManage ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={i === 0}
+                      onClick={() => moveStage(i, -1)}
+                      className="w-6 h-6 rounded flex items-center justify-center bg-muted disabled:opacity-20"
+                      aria-label="Subir etapa"
+                    >
+                      <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={i >= stages.length - 1}
+                      onClick={() => moveStage(i, 1)}
+                      className="w-6 h-6 rounded flex items-center justify-center bg-muted disabled:opacity-20"
+                      aria-label="Bajar etapa"
+                    >
+                      <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(stage.id)}
+                      className="w-6 h-6 rounded flex items-center justify-center bg-muted text-red-400 hover:opacity-70"
+                      aria-label="Eliminar etapa"
+                    >
+                      <Trash2 className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              {!isLocked && canManage && (
+                <div className="px-3 pb-3 pt-0 space-y-2 border-t border-border/60">
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <Input
+                      value={stage.label}
+                      onChange={(e) =>
+                        setStages((ss) =>
+                          ss.map((x) => (x.id === stage.id ? { ...x, label: e.target.value } : x)),
+                        )
+                      }
+                      onBlur={(e) => handleFieldChange(stage, { label: e.target.value })}
+                      placeholder="Etiqueta"
+                      className="text-sm h-9"
+                    />
+                    <Input
+                      value={stage.sublabel ?? ""}
+                      onChange={(e) =>
+                        setStages((ss) =>
+                          ss.map((x) =>
+                            x.id === stage.id ? { ...x, sublabel: e.target.value } : x,
+                          ),
+                        )
+                      }
+                      onBlur={(e) =>
+                        handleFieldChange(stage, { sublabel: e.target.value || null })
+                      }
+                      placeholder="Subtítulo"
+                      className="text-sm h-9"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs mb-1.5 text-muted-foreground">Color</p>
+                    <div className="flex flex-wrap gap-2">
+                      {PRESET_COLORS.map((col) => (
+                        <button
+                          key={col}
+                          type="button"
+                          onClick={() => {
+                            setStages((ss) =>
+                              ss.map((x) => (x.id === stage.id ? { ...x, color: col } : x)),
+                            )
+                            void handleFieldChange(stage, { color: col })
+                          }}
+                          className="w-5 h-5 rounded-full border-2 transition-all"
+                          style={{
+                            background: col,
+                            borderColor: stage.color === col ? "white" : "transparent",
+                            boxShadow: stage.color === col ? `0 0 0 2px ${col}` : "none",
+                          }}
+                          aria-label={col}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
 
       {canManage && (
-        <form onSubmit={handleAddStage} className="border rounded-lg p-4 space-y-3">
-          <h2 className="text-base font-semibold">Nueva etapa</h2>
-          <Input
-            value={newLabel}
-            onChange={(e) => setNewLabel(e.target.value)}
-            placeholder="Nombre de etapa"
-            required
-          />
-          <Input
-            value={newSublabel}
-            onChange={(e) => setNewSublabel(e.target.value)}
-            placeholder="Descripción corta (opcional)"
-          />
-          <div className="flex flex-wrap gap-1">
-            {PRESET_COLORS.map((c) => (
+        <SettingsCard className="space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground">Agregar etapa</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Input
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              placeholder="Ej. Demo"
+              className="text-sm h-9"
+            />
+            <Input
+              value={newSublabel}
+              onChange={(e) => setNewSublabel(e.target.value)}
+              placeholder="Descripción corta"
+              className="text-sm h-9"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {PRESET_COLORS.map((col) => (
               <button
-                key={c}
+                key={col}
                 type="button"
-                onClick={() => setNewColor(c)}
-                className={`w-3 h-3 cursor-pointer rounded-full border-2 ${newColor === c ? "border-foreground" : "border-transparent"}`}
-                style={{ backgroundColor: c }}
-                aria-label={c}
+                onClick={() => setNewColor(col)}
+                className="w-6 h-6 rounded-full border-2 transition-all"
+                style={{
+                  background: col,
+                  borderColor: newColor === col ? "white" : "transparent",
+                  boxShadow: newColor === col ? `0 0 0 2px ${col}` : "none",
+                }}
+                aria-label={col}
               />
             ))}
           </div>
-          <select
-            value={newIconKey}
-            onChange={(e) => setNewIconKey(e.target.value)}
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-          >
-            {STAGE_ICONS.map((icon) => (
-              <option key={icon} value={icon}>{icon}</option>
-            ))}
-          </select>
           {addError && <p className="text-sm text-destructive">{addError}</p>}
-          <Button type="submit" disabled={adding}>
-            {adding ? "Agregando…" : "Agregar"}
+          <Button
+            type="button"
+            disabled={adding || !newLabel.trim()}
+            onClick={() => void handleAddStage()}
+            className="w-full text-xs font-bold gap-1.5"
+            style={{
+              background: hex2rgba(newColor, 0.2),
+              color: newColor,
+              border: `1px solid ${hex2rgba(newColor, 0.4)}`,
+            }}
+            variant="ghost"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {adding ? "Agregando…" : "Agregar etapa"}
           </Button>
-        </form>
+        </SettingsCard>
       )}
     </div>
   )

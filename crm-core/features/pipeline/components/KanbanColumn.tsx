@@ -9,13 +9,19 @@ import { formatCurrency } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
 import type { PipelineStage } from "@prisma/client"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  lockedStageColumnHint,
+  lockedStageHeaderTitle,
+} from "@/lib/pipeline/stage-block-message"
 
 interface KanbanColumnProps {
   stage: PipelineStage
   deals: DealCardData[]
   settings: IntlSettings
+  equipmentLabels?: Record<string, string>
   onDealClick: (dealId: string) => void
   movingDealId?: string | null
+  draggingDeal?: DealCardData
 }
 
 function hex2rgba(hex: string, alpha = 0.15) {
@@ -27,7 +33,23 @@ function hex2rgba(hex: string, alpha = 0.15) {
   return `rgba(${isNaN(r) ? 0 : r},${isNaN(g) ? 0 : g},${isNaN(b) ? 0 : b},${alpha})`
 }
 
-export function KanbanColumn({ stage, deals, settings, onDealClick, movingDealId }: KanbanColumnProps) {
+export function KanbanColumn({
+  stage,
+  deals,
+  settings,
+  equipmentLabels,
+  onDealClick,
+  movingDealId,
+  draggingDeal,
+}: KanbanColumnProps) {
+  const dropHint =
+    stage.locked && draggingDeal
+      ? lockedStageColumnHint({
+          stageKey: stage.key,
+          stageLabel: stage.label,
+          hasPaymentWithFile: draggingDeal.hasPaymentWithFile,
+        })
+      : lockedStageColumnHint({ stageKey: stage.key, stageLabel: stage.label })
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
 
   const [isCollapsed, setIsCollapsed] = useState(true)
@@ -64,10 +86,7 @@ export function KanbanColumn({ stage, deals, settings, onDealClick, movingDealId
   return (
     <div
       ref={columnRef}
-      className={cn(
-        "flex flex-col shrink-0 rounded-2xl transition-all duration-300 ring-1 ring-black/5",
-        isCollapsed ? "flex-none w-[320px]" : "w-[400px]"
-      )}
+      className="flex min-w-0 flex-1 basis-0 flex-col rounded-2xl transition-all duration-300 ring-1 ring-black/5"
       style={{
         background: isOver ? hex2rgba(stage.color, 0.1) : "#ffffff",
         border: `1px solid ${hex2rgba(stage.color, 0.25)}`,
@@ -83,10 +102,11 @@ export function KanbanColumn({ stage, deals, settings, onDealClick, movingDealId
         }}
       >
         {/* Row 1: label pill + deal count + collapse icon */}
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <span
-            className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-sm"
+            className="min-w-0 max-w-full truncate px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-sm"
             style={{ background: stage.color }}
+            title={stage.label}
           >
             {stage.label}
           </span>
@@ -101,7 +121,11 @@ export function KanbanColumn({ stage, deals, settings, onDealClick, movingDealId
             {deals.length}
           </span>
           {stage.locked && (
-            <span aria-label="Etapa bloqueada" title="Etapa bloqueada" className="text-sm shrink-0">
+            <span
+              aria-label="Etapa bloqueada"
+              title={lockedStageHeaderTitle(stage.key) ?? "Etapa bloqueada"}
+              className="text-sm shrink-0"
+            >
               🔒
             </span>
           )}
@@ -136,8 +160,8 @@ export function KanbanColumn({ stage, deals, settings, onDealClick, movingDealId
         }}
       >
         {isOver && stage.locked && (
-          <div className="text-xs text-destructive text-center py-2 font-medium">
-            Etapa bloqueada
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 text-xs text-destructive text-center py-2 px-2 font-medium leading-snug mx-1 mb-2">
+            {dropHint}
           </div>
         )}
         <ScrollArea className="h-[calc(100vh-280px)] pr-3">
@@ -150,6 +174,7 @@ export function KanbanColumn({ stage, deals, settings, onDealClick, movingDealId
                 <DealCard
                   deal={deal}
                   settings={settings}
+                  equipmentLabels={equipmentLabels}
                   stageColor={stage.color}
                   isCompact={isCollapsed && !expandedIds.has(deal.id)}
                   isHighlighted={highlightedDealId === deal.id}

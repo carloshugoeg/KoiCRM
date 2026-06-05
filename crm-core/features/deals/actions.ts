@@ -4,7 +4,16 @@ import { revalidatePath } from "next/cache"
 import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
-import { requireRole } from "@/lib/auth/rbac"
+import {
+  requireRole,
+  getUserRole,
+  canCreateDeal,
+  canEditDeal,
+  canEditDealRow,
+  canSeeAllDeals,
+  canArchiveDeal,
+  canDeleteDeal,
+} from "@/lib/auth/rbac"
 import { generateDealId } from "@/lib/id/deal-id"
 import { ownerInitials } from "@/lib/utils/avatar-color"
 import { findOrCreateClient } from "@/features/clients/queries"
@@ -18,8 +27,11 @@ import {
   moveDealSchema,
   archiveDealSchema,
   updateDealFieldSchema,
+  transferDealSchema,
+  deleteDealSchema,
 } from "@/features/deals/schemas"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
+import { isActiveCatalogItemKey } from "@/features/catalogs/queries"
 import { z } from "zod"
 import { getDeal } from "@/features/deals/queries"
 
@@ -34,11 +46,11 @@ export async function createDealAction(
 
   const { tenantId, tenantSlug, ...fields } = parsed.data
 
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
-  } catch {
-    return { ok: false, error: "Acceso denegado." }
-  }
+  const role = await getUserRole(session, tenantId)
+  if (!role || !canCreateDeal(role)) return { ok: false, error: "Acceso denegado." }
+
+  // Asesores can only create deals they own; supervisors/superadmins choose the owner.
+  const ownerId = canSeeAllDeals(role) ? fields.ownerId : session.user.id
 
   let dealId: string | undefined
   let createError: string | undefined
@@ -52,12 +64,18 @@ export async function createDealAction(
 
       // Validate ownerId is a member of this tenant (BUG-003 fix)
       const ownerMembership = await tx.membership.findUnique({
-        where: { userId_tenantId: { userId: fields.ownerId, tenantId } },
+        where: { userId_tenantId: { userId: ownerId, tenantId } },
       })
       if (!ownerMembership) { createError = "El asesor seleccionado no pertenece al equipo."; return }
 
+      const channelValid = await isActiveCatalogItemKey(tenantId, "salesChannel", fields.channelKey)
+      if (!channelValid) {
+        createError = "El origen seleccionado no es válido o está inactivo."
+        return
+      }
+
       // Get owner name for ID generation
-      const owner = await tx.user.findUnique({ where: { id: fields.ownerId }, select: { name: true } })
+      const owner = await tx.user.findUnique({ where: { id: ownerId }, select: { name: true } })
       const initials = ownerInitials(owner?.name)
       const id = await generateDealId(tx, tenantId, initials)
 
@@ -77,7 +95,8 @@ export async function createDealAction(
           pipelineId: pipeline.id,
           stageId: firstStage.id,
           clientId: client.id,
-          ownerId: fields.ownerId,
+          ownerId,
+          createdById: session.user.id,
           channelKey: fields.channelKey,
           statusKey: fields.statusKey,
           name: fields.name.trim(),
@@ -108,7 +127,7 @@ export async function createDealAction(
         entity: "Deal",
         entityId: id,
         type: "created",
-        payload: { name: fields.name, ownerId: fields.ownerId },
+        payload: { name: fields.name, ownerId },
         userId: session.user!.id,
       })
 
@@ -136,22 +155,30 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
 
   const { tenantId, tenantSlug, dealId, ...fields } = parsed.data
 
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
-  } catch {
-    return { ok: false, error: "Acceso denegado." }
-  }
+  const role = await getUserRole(session, tenantId)
+  if (!role || !canEditDeal(role)) return { ok: false, error: "Acceso denegado." }
 
   let notFound = false
+  let permissionError = false
+  let validationError: string | undefined
   await withTenant(tenantId, async (tx) => {
     const existing = await tx.deal.findUnique({ where: { id: dealId, tenantId } })
     if (!existing) { notFound = true; return }
+    if (!canEditDealRow(role, existing.ownerId, session.user!.id)) { permissionError = true; return }
 
     if (fields.ownerId && fields.ownerId !== existing.ownerId) {
       const ownerMembership = await tx.membership.findUnique({
         where: { userId_tenantId: { userId: fields.ownerId, tenantId } },
       })
       if (!ownerMembership) { notFound = true; return }
+    }
+
+    if (fields.channelKey !== undefined) {
+      const channelValid = await isActiveCatalogItemKey(tenantId, "salesChannel", fields.channelKey)
+      if (!channelValid) {
+        validationError = "El origen seleccionado no es válido o está inactivo."
+        return
+      }
     }
 
     const updateData: Prisma.DealUpdateInput = {}
@@ -188,6 +215,8 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
       await recordActivity(tx, { tenantId, entity: "Deal", entityId: dealId, type: "valueChanged", payload: { old: Number(existing.value), new: fields.value }, userId: session.user!.id })
     }
   })
+  if (permissionError) return { ok: false, error: "Acceso denegado." }
+  if (validationError) return { ok: false, error: validationError }
   if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
 
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
@@ -203,24 +232,34 @@ export async function moveDealAction(raw: unknown): Promise<{ ok: boolean; error
 
   const { tenantId, tenantSlug, dealId, toStageId, force } = parsed.data
 
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
-  } catch {
-    return { ok: false, error: "Acceso denegado." }
-  }
+  const role = await getUserRole(session, tenantId)
+  if (!role || !canEditDeal(role)) return { ok: false, error: "Acceso denegado." }
 
   let moveError: string | undefined
 
   await withTenant(tenantId, async (tx) => {
     const [deal, targetStage] = await Promise.all([
-      tx.deal.findUnique({ where: { id: dealId, tenantId }, select: { stageId: true } }),
+      tx.deal.findUnique({ where: { id: dealId, tenantId }, select: { stageId: true, ownerId: true } }),
       tx.pipelineStage.findUnique({ where: { id: toStageId, tenantId } }),
     ])
 
     if (!deal) { moveError = "Oportunidad no encontrada."; return }
+    if (!canEditDealRow(role, deal.ownerId, session.user!.id)) { moveError = "Acceso denegado."; return }
     if (!targetStage) { moveError = "Etapa no encontrada."; return }
     if (targetStage.locked && !force) {
-      moveError = `La etapa "${targetStage.label}" está bloqueada. Usa las acciones del panel de detalle.`
+      if (targetStage.key === "ganado") {
+        const paymentWithDoc = await tx.payment.findFirst({
+          where: { dealId, tenantId, isVoid: false, fileUrl: { not: null } },
+          select: { id: true },
+        })
+        moveError = paymentWithDoc
+          ? `La etapa «${targetStage.label}» está bloqueada. Usa el botón «Marcar como ganado» en el detalle de la oportunidad.`
+          : "Para marcar como ganado debes adjuntar un comprobante de pago (PDF o imagen) en «Documentos de Pago»."
+      } else if (targetStage.key === "perdido") {
+        moveError = `La etapa «${targetStage.label}» está bloqueada. Usa el botón «Marcar como perdido» en el detalle.`
+      } else {
+        moveError = `La etapa «${targetStage.label}» está bloqueada. Usa las acciones del panel de detalle.`
+      }
       return
     }
 
@@ -230,7 +269,8 @@ export async function moveDealAction(raw: unknown): Promise<{ ok: boolean; error
         select: { id: true },
       })
       if (!paymentWithDoc) {
-        moveError = "Para marcar como ganado, debes adjuntar un documento de pago a la oportunidad."
+        moveError =
+          "Para marcar como ganado debes adjuntar un comprobante de pago (PDF o imagen) en «Documentos de Pago»."
         return
       }
     }
@@ -265,11 +305,8 @@ export async function archiveDealAction(raw: unknown): Promise<{ ok: boolean; er
 
   const { tenantId, tenantSlug, dealId } = parsed.data
 
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
-  } catch {
-    return { ok: false, error: "Acceso denegado." }
-  }
+  const role = await getUserRole(session, tenantId)
+  if (!role || !canArchiveDeal(role)) return { ok: false, error: "Acceso denegado." }
 
   let notFound = false
   await withTenant(tenantId, async (tx) => {
@@ -301,19 +338,18 @@ export async function updateDealFieldAction(raw: unknown): Promise<{ ok: boolean
 
   const { tenantId, tenantSlug, dealId, field, value } = parsed.data
 
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
-  } catch {
-    return { ok: false, error: "Acceso denegado." }
-  }
+  const role = await getUserRole(session, tenantId)
+  if (!role || !canEditDeal(role)) return { ok: false, error: "Acceso denegado." }
 
   let notFound = false
+  let permissionError = false
   await withTenant(tenantId, async (tx) => {
     const deal = await tx.deal.findUnique({
       where: { id: dealId, tenantId },
-      select: { value: true, statusKey: true, phone: true, whatsapp: true, email: true, name: true, company: true },
+      select: { ownerId: true, value: true, statusKey: true, phone: true, whatsapp: true, email: true, name: true, company: true },
     })
     if (!deal) { notFound = true; return }
+    if (!canEditDealRow(role, deal.ownerId, session.user!.id)) { permissionError = true; return }
     await tx.deal.update({ where: { id: dealId, tenantId }, data: { [field]: value } })
     if (field === "value") {
       await recordActivity(tx, {
@@ -326,9 +362,99 @@ export async function updateDealFieldAction(raw: unknown): Promise<{ ok: boolean
       })
     }
   })
+  if (permissionError) return { ok: false, error: "Acceso denegado." }
   if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
 
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
+  return { ok: true }
+}
+
+export async function transferDealAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
+  const session = await auth()
+  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
+
+  const parsed = transferDealSchema.safeParse(raw)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
+
+  const { tenantId, tenantSlug, dealId, toUserId } = parsed.data
+
+  const role = await getUserRole(session, tenantId)
+  if (!role || !canEditDeal(role)) return { ok: false, error: "Acceso denegado." }
+
+  let notFound = false
+  let permissionError = false
+  let validationError: string | undefined
+  await withTenant(tenantId, async (tx) => {
+    const existing = await tx.deal.findUnique({ where: { id: dealId, tenantId }, select: { ownerId: true } })
+    if (!existing) { notFound = true; return }
+    // Only the current owner (cesión) or a supervisor+ (reasignación) can transfer.
+    if (!canEditDealRow(role, existing.ownerId, session.user!.id)) { permissionError = true; return }
+    if (existing.ownerId === toUserId) { validationError = "La oportunidad ya pertenece a ese asesor."; return }
+
+    const targetMembership = await tx.membership.findUnique({
+      where: { userId_tenantId: { userId: toUserId, tenantId } },
+    })
+    if (!targetMembership) { validationError = "El asesor seleccionado no pertenece al equipo."; return }
+
+    await tx.deal.update({ where: { id: dealId, tenantId }, data: { ownerId: toUserId } })
+
+    // The previous owner keeps read-only access (cesión); the new owner regains full edit
+    // (returning the deal simply removes their viewer grant).
+    await tx.dealViewer.deleteMany({ where: { dealId, userId: toUserId } })
+    await tx.dealViewer.upsert({
+      where: { dealId_userId: { dealId, userId: existing.ownerId } },
+      create: { tenantId, dealId, userId: existing.ownerId },
+      update: {},
+    })
+
+    await recordActivity(tx, {
+      tenantId,
+      entity: "Deal",
+      entityId: dealId,
+      type: "ownerChanged",
+      payload: { from: existing.ownerId, to: toUserId },
+      userId: session.user!.id,
+    })
+  })
+  if (permissionError) return { ok: false, error: "Acceso denegado." }
+  if (validationError) return { ok: false, error: validationError }
+  if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
+
+  revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
+  return { ok: true }
+}
+
+export async function deleteDealAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
+  const session = await auth()
+  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
+
+  const parsed = deleteDealSchema.safeParse(raw)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
+
+  const { tenantId, tenantSlug, dealId } = parsed.data
+
+  // Only superadmins (OWNER/ADMIN) may permanently delete an opportunity.
+  const role = await getUserRole(session, tenantId)
+  if (!role || !canDeleteDeal(role)) return { ok: false, error: "Acceso denegado." }
+
+  let notFound = false
+  await withTenant(tenantId, async (tx) => {
+    const existing = await tx.deal.findUnique({ where: { id: dealId, tenantId }, select: { id: true, name: true } })
+    if (!existing) { notFound = true; return }
+    await tx.deal.delete({ where: { id: dealId, tenantId } })
+    await recordActivity(tx, {
+      tenantId,
+      entity: "Deal",
+      entityId: dealId,
+      type: "deleted",
+      payload: { name: existing.name },
+      userId: session.user!.id,
+    })
+  })
+  if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
+
+  revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
+  revalidatePath(`/app/${tenantSlug}/archive`, "page")
   return { ok: true }
 }
 
@@ -352,13 +478,10 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
 
   const { tenantId, dealId } = parsed.data
 
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER", "VIEWER"])
-  } catch {
-    return { ok: false, error: "Acceso denegado." }
-  }
+  const role = await getUserRole(session, tenantId)
+  if (!role) return { ok: false, error: "Acceso denegado." }
 
-  const d = await getDeal(tenantId, dealId)
+  const d = await getDeal(tenantId, dealId, canSeeAllDeals(role) ? undefined : session.user.id)
   if (!d) return { ok: false, error: "Oportunidad no encontrada." }
 
   return {
@@ -388,7 +511,7 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
 export async function getDealActivityAction(tenantId: string, dealId: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error("No autenticado.")
-  await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER", "VIEWER"])
+  await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"])
   return getDealActivity(tenantId, dealId)
 }
 

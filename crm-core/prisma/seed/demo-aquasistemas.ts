@@ -84,7 +84,7 @@ export async function seedDemo() {
   await prisma.user.deleteMany({ where: { email: { in: demoEmails } } })
 
   const tenant = await prisma.tenant.create({
-    data: { slug: "demo-aqua", name: "Aquasistemas Demo" },
+    data: { slug: "demo-aqua", name: "Aquasistemas Demo", subscriptionValidated: true },
   })
 
   const pipeline = await prisma.pipeline.create({

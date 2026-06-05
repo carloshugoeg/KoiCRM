@@ -1,8 +1,8 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth/auth"
-import { prisma } from "@/lib/db/client"
 import { withTenant } from "@/lib/db/rls"
 import { requireRole } from "@/lib/auth/rbac"
 import { getCatalogItemUsageCount } from "@/features/catalogs/queries"
@@ -13,6 +13,14 @@ import {
   reorderCatalogItemsSchema,
 } from "@/features/catalogs/schemas"
 import type { CatalogKey } from "@/features/catalogs/queries"
+
+function revalidateCatalogPaths(tenantSlug: string) {
+  revalidatePath(`/app/${tenantSlug}/settings/catalogs`, "page")
+  revalidatePath(`/app/${tenantSlug}/settings/equipment`, "page")
+  revalidatePath(`/app/${tenantSlug}/settings/origen`, "page")
+  revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
+  revalidatePath(`/app/${tenantSlug}/clients`, "page")
+}
 
 export async function createCatalogItemAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
   const session = await auth()
@@ -29,10 +37,24 @@ export async function createCatalogItemAction(raw: unknown): Promise<{ ok: boole
     return { ok: false, error: "Acceso denegado." }
   }
 
-  await withTenant(tenantId, async (tx) => {
-    await tx.catalogItem.create({ data: { tenantId, ...data } })
-  })
-  revalidatePath(`/app/${tenantSlug}/settings/catalogs`, "page")
+  try {
+    await withTenant(tenantId, async (tx) => {
+      await tx.catalogItem.create({ data: { tenantId, ...data } })
+    })
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      const label =
+        parsed.data.catalogKey === "salesChannel"
+          ? "origen"
+          : parsed.data.catalogKey === "equipment"
+            ? "equipo"
+            : "ítem"
+      return { ok: false, error: `Ya existe un ${label} con ese identificador.` }
+    }
+    throw e
+  }
+
+  revalidateCatalogPaths(tenantSlug)
   return { ok: true }
 }
 
@@ -54,7 +76,7 @@ export async function updateCatalogItemAction(raw: unknown): Promise<{ ok: boole
   await withTenant(tenantId, async (tx) => {
     await tx.catalogItem.update({ where: { id }, data: fields })
   })
-  revalidatePath(`/app/${tenantSlug}/settings/catalogs`, "page")
+  revalidateCatalogPaths(tenantSlug)
   return { ok: true }
 }
 
@@ -73,7 +95,9 @@ export async function deleteCatalogItemAction(raw: unknown): Promise<{ ok: boole
     return { ok: false, error: "Acceso denegado." }
   }
 
-  const item = await prisma.catalogItem.findUnique({ where: { id, tenantId } })
+  const item = await withTenant(tenantId, (tx) =>
+    tx.catalogItem.findFirst({ where: { id, tenantId } }),
+  )
   if (!item) return { ok: false, error: "Item no encontrado." }
 
   const usage = await getCatalogItemUsageCount(tenantId, item.catalogKey as CatalogKey, item.key)
@@ -84,7 +108,7 @@ export async function deleteCatalogItemAction(raw: unknown): Promise<{ ok: boole
   await withTenant(tenantId, async (tx) => {
     await tx.catalogItem.delete({ where: { id } })
   })
-  revalidatePath(`/app/${tenantSlug}/settings/catalogs`, "page")
+  revalidateCatalogPaths(tenantSlug)
   return { ok: true }
 }
 
@@ -103,16 +127,18 @@ export async function reorderCatalogItemsAction(raw: unknown): Promise<{ ok: boo
     return { ok: false, error: "Acceso denegado." }
   }
 
-  const count = await prisma.catalogItem.count({
-    where: { id: { in: orderedIds }, tenantId, catalogKey: parsed.data.catalogKey },
-  })
+  const count = await withTenant(tenantId, (tx) =>
+    tx.catalogItem.count({
+      where: { id: { in: orderedIds }, tenantId, catalogKey: parsed.data.catalogKey },
+    }),
+  )
   if (count !== orderedIds.length) return { ok: false, error: "IDs inválidos." }
 
   await withTenant(tenantId, async (tx) => {
     await Promise.all(
-      orderedIds.map((id, idx) => tx.catalogItem.update({ where: { id }, data: { order: idx } }))
+      orderedIds.map((id, idx) => tx.catalogItem.update({ where: { id }, data: { order: idx } })),
     )
   })
-  revalidatePath(`/app/${tenantSlug}/settings/catalogs`, "page")
+  revalidateCatalogPaths(tenantSlug)
   return { ok: true }
 }

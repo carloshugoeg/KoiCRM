@@ -100,7 +100,71 @@ const AQUASISTEMAS: IndustryConfig = {
   },
 }
 
+const GENERIC: IndustryConfig = {
+  slug: "generic",
+  name: "Genérico",
+  stages: [
+    { key: "prospecto", label: "Prospecto", color: "#6366f1", iconKey: "circle", order: 0 },
+    { key: "contactado", label: "Contactado", color: "#f59e0b", iconKey: "phone", order: 1 },
+    {
+      key: "cotizacion",
+      label: "Cotización",
+      color: "#3b82f6",
+      iconKey: "file-text",
+      order: 2,
+      requiresQuote: true,
+    },
+    {
+      key: "negociacion",
+      label: "En negociación",
+      color: "#8b5cf6",
+      iconKey: "handshake",
+      order: 3,
+      requiresQuote: true,
+    },
+    {
+      key: "ganado",
+      label: "Ganado",
+      color: "#22c55e",
+      iconKey: "check-circle",
+      order: 4,
+      locked: true,
+      requiresQuote: true,
+      requiresPayment: true,
+    },
+    { key: "perdido", label: "Perdido", color: "#ef4444", iconKey: "x-circle", order: 5, locked: true },
+  ],
+  catalogItems: [
+    { catalogKey: "salesChannel", key: "sala", label: "Sala", color: "#6366f1", order: 0 },
+    { catalogKey: "salesChannel", key: "telefono", label: "Teléfono", color: "#f59e0b", order: 1 },
+    { catalogKey: "salesChannel", key: "whatsapp", label: "WhatsApp", color: "#22c55e", order: 2 },
+    { catalogKey: "salesChannel", key: "facebook", label: "Facebook", color: "#3b82f6", order: 3 },
+    { catalogKey: "salesChannel", key: "instagram", label: "Instagram", color: "#ec4899", order: 4 },
+    { catalogKey: "dealStatus", key: "activo", label: "Activo", color: "#22c55e", order: 0 },
+    { catalogKey: "dealStatus", key: "seguimiento", label: "Seguimiento", color: "#f59e0b", order: 1 },
+    { catalogKey: "dealStatus", key: "esperando", label: "Esperando", color: "#6366f1", order: 2 },
+    { catalogKey: "dealStatus", key: "frio", label: "Frío", color: "#6b7280", order: 3 },
+    { catalogKey: "dealStatus", key: "urgente", label: "Urgente", color: "#ef4444", order: 4 },
+    { catalogKey: "followupReason", key: "no_responde", label: "No responde", order: 0 },
+    { catalogKey: "followupReason", key: "pide_informacion", label: "Pide más información", order: 1 },
+    { catalogKey: "followupReason", key: "necesita_tiempo", label: "Necesita tiempo", order: 2 },
+    { catalogKey: "followupReason", key: "revisar_cotizacion", label: "Revisar cotización", order: 3 },
+    { catalogKey: "followupReason", key: "agendar_visita", label: "Agendar visita", order: 4 },
+    { catalogKey: "followupReason", key: "otro", label: "Otro", order: 5 },
+  ],
+  settings: {
+    dealIdPrefix: "TST",
+    locale: "es-GT",
+    currency: "GTQ",
+    timezone: "America/Guatemala",
+  },
+  branding: {
+    productName: "KoiCRM",
+  },
+}
+
 export const INDUSTRY_REGISTRY: Record<string, IndustryConfig> = {
+  generic: GENERIC,
   aquasistemas: AQUASISTEMAS,
 }
 
@@ -119,6 +183,9 @@ export async function applyIndustryTemplate(
 ): Promise<void> {
   const config = getIndustry(industrySlug)
   if (!config) throw new Error(`Unknown industry: ${industrySlug}`)
+
+  // Required for app_user (RLS): pipeline/catalog inserts are tenant-scoped.
+  await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`
 
   const pipeline = await tx.pipeline.create({
     data: {

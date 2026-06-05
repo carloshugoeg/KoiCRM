@@ -16,6 +16,8 @@ import { toast } from "sonner"
 import { KanbanColumn } from "@/features/pipeline/components/KanbanColumn"
 import { DealCard, type DealCardData } from "@/features/pipeline/components/DealCard"
 import { moveDealAction } from "@/features/deals/actions"
+import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
+import { lockedStageDropMessage } from "@/lib/pipeline/stage-block-message"
 import type { PipelineStage } from "@prisma/client"
 import type { IntlSettings } from "@/lib/intl/format"
 
@@ -25,6 +27,7 @@ interface KanbanBoardProps {
   stages: PipelineStage[]
   initialDeals: DealCardData[]
   settings: IntlSettings
+  equipmentLabels?: Record<string, string>
   onDealClick: (dealId: string) => void
 }
 
@@ -34,6 +37,7 @@ export function KanbanBoard({
   stages,
   initialDeals,
   settings,
+  equipmentLabels,
   onDealClick,
 }: KanbanBoardProps) {
   const [deals, setDeals] = useState(initialDeals)
@@ -69,7 +73,14 @@ export function KanbanBoard({
     if (!targetStage) return
 
     if (targetStage.locked) {
-      toast.error(`La etapa "${targetStage.label}" está bloqueada. Usa las acciones del panel de detalle.`)
+      toast.error(
+        lockedStageDropMessage({
+          stageKey: targetStage.key,
+          stageLabel: targetStage.label,
+          hasPaymentWithFile: deal.hasPaymentWithFile,
+        }),
+        { duration: 8000 },
+      )
       return
     }
 
@@ -88,7 +99,9 @@ export function KanbanBoard({
       const result = await moveDealAction({ tenantId, tenantSlug, dealId, toStageId, force: false })
       if (!result.ok) {
         setDeals(previous)
-        toast.error(result.error ?? "Error al mover la oportunidad.")
+        toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorMove))
+      } else {
+        toast.success(toastMessages.deal.moved)
       }
       setMovingDealId(null)
     })
@@ -101,15 +114,17 @@ export function KanbanBoard({
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex gap-4 overflow-x-auto pb-4 px-4 pt-2 min-h-[calc(100vh-180px)]">
+      <div className="flex h-full w-full min-w-0 gap-2 overflow-hidden px-2 pb-4 pt-2 sm:gap-3 sm:px-3 md:gap-4 md:px-4 min-h-[calc(100vh-180px)]">
         {stages.map((stage) => (
           <KanbanColumn
             key={stage.id}
             stage={stage}
             deals={deals.filter((d) => d.stageId === stage.id)}
             settings={settings}
+            equipmentLabels={equipmentLabels}
             onDealClick={onDealClick}
             movingDealId={movingDealId}
+            draggingDeal={activeId ? deals.find((d) => d.id === activeId) : undefined}
           />
         ))}
       </div>
@@ -119,6 +134,7 @@ export function KanbanBoard({
           <DealCard
             deal={activeDeal}
             settings={settings}
+            equipmentLabels={equipmentLabels}
             stageColor={activeDealStageColor}
             onClick={() => {}}
           />

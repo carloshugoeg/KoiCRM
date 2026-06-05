@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -13,22 +14,31 @@ datasource db {
 enum Role {
   OWNER
   ADMIN
+  SUPERVISOR
   MEMBER
   VIEWER
 }
 
+enum MembershipStatus {
+  ACTIVE
+  INACTIVE
+}
+
 model Tenant {
-  id           String   @id @default(cuid())
-  slug         String   @unique
-  name         String
-  industrySlug String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  slug                  String   @unique
+  name                  String
+  industrySlug          String?
+  /// Owner workspace license; when false, no member can access the embudo.
+  subscriptionValidated Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   branding     TenantBranding?
   settings     TenantSettings?
   memberships  Membership[]
   invitations  Invitation[]
+  joinLinks    JoinLink[]
 }
 
 model User {
@@ -40,10 +50,12 @@ model User {
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
 
-  memberships Membership[]
-  ownedDeals  Deal[]
-  accounts    Account[]
-  sessions    Session[]
+  memberships  Membership[]
+  ownedDeals   Deal[]       @relation("DealOwner")
+  createdDeals Deal[]       @relation("DealCreator")
+  dealViews    DealViewer[]
+  accounts     Account[]
+  sessions     Session[]
 }
 
 model Account {
@@ -86,11 +98,12 @@ model VerificationToken {
 }
 
 model Membership {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   userId    String
   tenantId  String
   role      Role
-  createdAt DateTime @default(now())
+  status    MembershipStatus @default(ACTIVE)
+  createdAt DateTime         @default(now())
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -112,6 +125,23 @@ model Invitation {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+/// Reusable workspace join link with configurable role (updatable without regenerating token).
+model JoinLink {
+  id        String    @id @default(cuid())
+  tenantId  String
+  token     String    @unique @default(cuid())
+  role      Role      @default(MEMBER)
+  label     String?
+  expiresAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@index([tenantId])
 }
 
@@ -235,6 +265,7 @@ model Deal {
   stageId        String
   clientId       String?
   ownerId        String
+  createdById    String?
   channelKey     String
   statusKey      String
   name           String
@@ -252,13 +283,15 @@ model Deal {
   client      Client?       @relation(fields: [clientId], references: [id])
   pipeline    Pipeline      @relation(fields: [pipelineId], references: [id])
   stage       PipelineStage @relation(fields: [stageId], references: [id])
-  owner       User          @relation(fields: [ownerId], references: [id])
+  owner       User          @relation("DealOwner", fields: [ownerId], references: [id])
+  createdBy   User?         @relation("DealCreator", fields: [createdById], references: [id])
   equipment   DealEquipment[]
   quotes      Quote[]
   payments    Payment[]
   followUps   FollowUp[]
   notes       Note[]
   attachments Attachment[]
+  viewers     DealViewer[]
 
   @@index([tenantId, isArchived])
   @@index([tenantId, stageId])
@@ -276,6 +309,22 @@ model DealEquipment {
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   @@id([dealId, equipmentKey])
+}
+
+/// Read-only access grant created when a deal is ceded: the previous owner keeps
+/// visibility (but not edit) until the new owner returns the deal to them.
+model DealViewer {
+  id        String   @id @default(cuid())
+  tenantId  String
+  dealId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, userId])
+  @@index([tenantId, userId])
 }
 
 model Quote {

@@ -289,7 +289,7 @@ Cada task usa este formato:
 - **Subtasks**:
   - [x] Adapter Prisma para Auth.js v5.
   - [x] Páginas `/signin`, `/signup`, `/forgot`, `/reset`.
-  - [ ] Provider Google.
+  - [x] Provider Google.
   - [x] Email de verificación + reset (mock en dev, Resend en prod).
   - [x] Rate limit en endpoints de auth.
 
@@ -373,6 +373,7 @@ Cada task usa este formato:
   - [x] Tabla `Invitation(tenantId, email, role, token, expiresAt, acceptedAt)`.
   - [x] Email template (Resend en prod, log en dev).
   - [x] UI de Settings → Usuarios con lista, invitar, cambiar rol, remover.
+  - [x] Enlaces de unión (`JoinLink`): generar, copiar, actualizar rol del enlace, revocar; aceptación en `/api/join/accept` (2026-06-03, reemplaza invitación por email en UI).
 
 ---
 
@@ -618,9 +619,10 @@ Cada task usa este formato:
 - **Tests requeridos**: integration de búsqueda con varios términos.
 - **Notas**: §3.6, §15 de DEMO_INVENTORY.
 - **Subtasks**:
-  - [ ] Server action `search(tenantId, query)`.
-  - [ ] UI con cmdk o shadcn command.
-  - [ ] Trigger global.
+  - [x] Server action `search(tenantId, query)` + `features/search/queries.ts` (ILIKE, cotización, pago).
+  - [x] UI con cmdk (`shouldFilter={false}`, previews, deep link `?deal=` / `?client=`).
+  - [x] Trigger global (⌘K + botón header + evento `koi:open-command-menu`).
+  - [x] Integration tests `tests/integration/search.test.ts`.
 
 ### T5.10 Notes en Deal y Client
 

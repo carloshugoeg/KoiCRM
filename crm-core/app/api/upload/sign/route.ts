@@ -4,31 +4,17 @@ import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/client";
 import { withTenant } from "@/lib/db/rls";
 import { signUploadUrl } from "@/lib/storage/s3";
+import { dealIdSchema } from "@/lib/schemas/deal-id";
+import { extensionForMime, isDealUploadMimeType } from "@/lib/storage/upload-mime";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 
 const SignRequestSchema = z.object({
   contentType: z.string(),
   size: z.number().int().positive(),
-  dealId: z.string().cuid(),
+  dealId: dealIdSchema,
   tenantId: z.string().cuid(),
 });
-
-const ALLOWED_CONTENT_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "application/pdf",
-]);
-
-const EXT_MAP: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/gif": "gif",
-  "application/pdf": "pdf",
-};
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -44,7 +30,7 @@ export async function POST(req: NextRequest) {
 
   const { contentType, size, dealId, tenantId } = parsed.data;
 
-  if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
+  if (!isDealUploadMimeType(contentType)) {
     return NextResponse.json({ error: "invalid_content_type" }, { status: 400 });
   }
 
@@ -77,15 +63,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const deal = await prisma.deal.findUnique({
-    where: { id: dealId, tenantId },
-    select: { id: true },
-  });
+  const deal = await withTenant(tenantId, (tx) =>
+    tx.deal.findUnique({
+      where: { id: dealId, tenantId },
+      select: { id: true },
+    }),
+  );
   if (!deal) {
     return NextResponse.json({ error: "Deal not found" }, { status: 404 });
   }
 
-  const ext = EXT_MAP[contentType] ?? "bin";
+  const ext = extensionForMime(contentType);
   const key = `${tenantId}/deals/${dealId}/${randomUUID()}.${ext}`;
   const { signedUrl, publicUrl } = await signUploadUrl(key, contentType, size);
 

@@ -32,15 +32,17 @@ export default async function ClientsPage({ params, searchParams }: Props) {
   const sort = (searchParams.sort as "name" | "recent" | undefined) ?? "name"
   const selectedClientId = searchParams.client as string | undefined
 
-  const [clients, pipeline, members, channels, equipment, statuses, settings] = await Promise.all([
-    listClients(tenantId, { search: q, sort }),
-    withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
-    getTenantMembers(tenantId),
-    getCatalogItems(tenantId, "salesChannel"),
-    getCatalogItems(tenantId, "equipment"),
-    getCatalogItems(tenantId, "dealStatus"),
-    prisma.tenantSettings.findUnique({ where: { tenantId } }),
-  ])
+  const [clients, pipeline, members, channels, equipment, statuses, followUpReasons, settings] =
+    await Promise.all([
+      listClients(tenantId, { search: q, sort }),
+      withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
+      getTenantMembers(tenantId),
+      getCatalogItems(tenantId, "salesChannel", { activeOnly: true }),
+      getCatalogItems(tenantId, "equipment", { activeOnly: true }),
+      getCatalogItems(tenantId, "dealStatus", { activeOnly: true }),
+      getCatalogItems(tenantId, "followupReason", { activeOnly: true }),
+      prisma.tenantSettings.findUnique({ where: { tenantId } }),
+    ])
 
   const intlSettings: IntlSettings = {
     locale: settings?.locale ?? "es-GT",
@@ -52,6 +54,7 @@ export default async function ClientsPage({ params, searchParams }: Props) {
     id: m.user.id,
     name: m.user.name,
     email: m.user.email,
+    image: m.user.image,
   }))
 
   const stages = pipeline?.stages ?? []
@@ -99,6 +102,7 @@ export default async function ClientsPage({ params, searchParams }: Props) {
           channels={channels}
           equipment={equipment}
           statuses={statuses}
+          followUpReasons={followUpReasons}
           settings={intlSettings}
           canEdit={canEdit}
         />

@@ -2,10 +2,17 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
+import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 import { useRouter, usePathname } from "next/navigation"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { MonthGrid } from "@/features/calendar/components/MonthGrid"
 import { DayPanel } from "@/features/calendar/components/DayPanel"
 import { DealDetailModal } from "@/features/deals/components/DealDetailModal"
@@ -15,8 +22,18 @@ import type { IntlSettings } from "@/lib/intl/format"
 import type { PipelineStage, CatalogItem } from "@prisma/client"
 
 const MONTH_NAMES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
 ]
 
 type SelectedDeal = NonNullable<Awaited<ReturnType<typeof getDealSummaryAction>>["deal"]>
@@ -32,6 +49,10 @@ interface CalendarClientProps {
   followUpReasons: CatalogItem[]
   currentOwnerId?: string
   settings: IntlSettings
+  currentUserId: string
+  canSeeAll: boolean
+  canArchive: boolean
+  canDelete: boolean
 }
 
 export function CalendarClient({
@@ -45,6 +66,10 @@ export function CalendarClient({
   followUpReasons,
   currentOwnerId,
   settings,
+  currentUserId,
+  canSeeAll,
+  canArchive,
+  canDelete,
 }: CalendarClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -87,41 +112,48 @@ export function CalendarClient({
     try {
       const res = await getDealSummaryAction({ tenantId, dealId })
       if (res.ok && res.deal) setSelectedDeal(res.deal)
-      else toast.error(res.error ?? "No se pudo abrir la oportunidad.")
+      else toast.error(toastErrorFromResult(res.error, toastMessages.calendar.errorOpenDeal))
     } finally {
       setOpeningDealId(null)
     }
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
-        <Button variant="ghost" size="icon" onClick={goPrev} aria-label="Mes anterior">
-          <ChevronLeft className="w-4 h-4" />
-        </Button>
+    <div className="flex h-full flex-col">
+      <div className="flex shrink-0 items-center gap-3 border-b px-4 py-3">
+        <h2 className="mr-1 text-xl font-black" style={{ color: "var(--foreground)" }}>
+          Calendario de Seguimientos
+        </h2>
         <Button variant="outline" size="sm" onClick={goToday}>
           Hoy
         </Button>
-        <Button variant="ghost" size="icon" onClick={goNext} aria-label="Mes siguiente">
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-        <span className="font-semibold text-sm">
-          {MONTH_NAMES[month]} {year}
-        </span>
-        <div className="ml-auto w-48">
-          <Select value={currentOwnerId ?? "__all__"} onValueChange={handleOwnerChange}>
-            <SelectTrigger className="h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todos los asesores</SelectItem>
-              {members.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.name ?? m.email}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {canSeeAll && (
+          <div className="w-48">
+            <Select value={currentOwnerId ?? "__all__"} onValueChange={handleOwnerChange}>
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos los asesores</SelectItem>
+                {members.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name ?? m.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={goPrev} aria-label="Mes anterior">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="min-w-[120px] text-center text-base font-bold">
+            {MONTH_NAMES[month]} {year}
+          </span>
+          <Button variant="ghost" size="icon" onClick={goNext} aria-label="Mes siguiente">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
       </div>
       <div className="flex flex-1 overflow-hidden">
@@ -134,7 +166,7 @@ export function CalendarClient({
             onSelectDay={setSelectedDay}
           />
         </div>
-        <div className="w-80 border-l shrink-0 overflow-hidden flex flex-col">
+        <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l">
           {selectedDay !== null ? (
             <DayPanel
               day={selectedDay}
@@ -146,7 +178,7 @@ export function CalendarClient({
               loadingDealId={openingDealId}
             />
           ) : (
-            <div className="flex items-center justify-center h-full text-muted-foreground text-sm p-6 text-center">
+            <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
               Selecciona un día para ver los seguimientos.
             </div>
           )}
@@ -160,7 +192,15 @@ export function CalendarClient({
           tenantId={tenantId}
           tenantSlug={tenantSlug}
           settings={settings}
+          canEdit={canSeeAll || selectedDeal.ownerId === currentUserId}
+          canArchive={canArchive}
+          canDelete={canDelete}
+          members={members}
           onClose={() => setSelectedDeal(null)}
+          onAction={() => {
+            setSelectedDeal(null)
+            router.refresh()
+          }}
         />
       )}
     </div>

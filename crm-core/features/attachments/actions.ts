@@ -6,6 +6,36 @@ import { requireRole } from "@/lib/auth/rbac";
 import { deleteObject } from "@/lib/storage/s3";
 import { Prisma } from "@prisma/client";
 import { ConfirmUploadSchema, DeleteAttachmentSchema } from "./schemas";
+import { listDealAttachments } from "./queries";
+
+export interface DealAttachmentDTO {
+  id: string;
+  url: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+}
+
+export async function getDealAttachmentsAction(
+  tenantId: string,
+  dealId: string,
+): Promise<DealAttachmentDTO[]> {
+  const session = await auth();
+  if (!session?.user?.id) return [];
+  try {
+    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"]);
+  } catch {
+    return [];
+  }
+  const rows = await listDealAttachments(tenantId, dealId);
+  return rows.map((r) => ({
+    id: r.id,
+    url: r.url,
+    mimeType: r.mimeType,
+    size: Number(r.size),
+    createdAt: r.createdAt.toISOString(),
+  }));
+}
 
 export async function confirmUpload(tenantId: string, input: unknown) {
   const session = await auth();
@@ -13,7 +43,7 @@ export async function confirmUpload(tenantId: string, input: unknown) {
     return { ok: false as const, error: "Unauthorized", code: "unauthorized" };
   }
   try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"]);
+    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"]);
   } catch {
     return { ok: false as const, error: "Unauthorized", code: "unauthorized" };
   }
@@ -81,7 +111,7 @@ export async function deleteAttachment(tenantId: string, attachmentId: string) {
     return { ok: false as const, error: "Unauthorized", code: "unauthorized" };
   }
   try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"]);
+    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"]);
   } catch {
     return { ok: false as const, error: "Unauthorized", code: "unauthorized" };
   }

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,6 +13,7 @@ import {
 } from "@/features/custom-fields/actions"
 import type { CustomFieldDefinition, Tenant } from "@prisma/client"
 import type { CustomFieldType } from "@/lib/config/custom-fields"
+import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 
 const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
   text: "Texto",
@@ -74,18 +76,28 @@ function FieldList({
       order: fields.length,
     })
     setAdding(false)
-    if (!result.ok) { setError(result.error ?? "Error."); return }
+    if (!result.ok) {
+      const msg = toastErrorFromResult(result.error, toastMessages.customField.errorAdd)
+      setError(msg)
+      toast.error(msg)
+      return
+    }
     setKey("")
     setFieldLabel("")
     setOptionsRaw("")
     setRequired(false)
+    toast.success(toastMessages.customField.added)
     router.refresh()
   }
 
   async function handleDelete(id: string) {
     if (!confirm("¿Eliminar este campo? Los datos existentes no se borrarán del customData.")) return
     const result = await deleteCustomFieldAction({ tenantId: tenant.id, tenantSlug: tenant.slug, id })
-    if (!result.ok) { alert(result.error ?? "Error."); return }
+    if (!result.ok) {
+      toast.error(toastErrorFromResult(result.error, toastMessages.customField.errorRemove))
+      return
+    }
+    toast.success(toastMessages.customField.removed)
     router.refresh()
   }
 

@@ -16,7 +16,7 @@ export async function findOrCreateClient(
     phone?: string | null
     whatsapp?: string | null
     email?: string | null
-  },
+  }
 ) {
   const name = input.name.trim()
   const company = input.company?.trim() || null
@@ -26,9 +26,7 @@ export async function findOrCreateClient(
     where: {
       tenantId,
       name: { equals: name, mode: "insensitive" },
-      company: company
-        ? { equals: company, mode: "insensitive" }
-        : null,
+      company: company ? { equals: company, mode: "insensitive" } : null,
     },
   })
   if (existing) return existing
@@ -46,14 +44,17 @@ export async function findOrCreateClient(
 }
 
 export async function getClient(tenantId: string, clientId: string) {
-  return withTenant(tenantId, (tx) =>
-    tx.client.findUnique({ where: { id: clientId, tenantId } })
-  )
+  return withTenant(tenantId, (tx) => tx.client.findUnique({ where: { id: clientId, tenantId } }))
+}
+
+/** Total client count for the tenant — used for the nav badge (mirrors demo "Clientes N"). */
+export async function countClients(tenantId: string) {
+  return withTenant(tenantId, (tx) => tx.client.count({ where: { tenantId } }))
 }
 
 export async function listClients(
   tenantId: string,
-  opts: { search?: string; sort?: "name" | "recent" } = {},
+  opts: { search?: string; sort?: "name" | "recent" } = {}
 ) {
   const { search, sort = "name" } = opts
 
@@ -106,11 +107,9 @@ export async function getClientWithDeals(tenantId: string, clientId: string) {
 export async function getClientKpis(
   tenantId: string,
   clientId: string,
-  dateRange?: { from: Date; to: Date },
+  dateRange?: { from: Date; to: Date }
 ) {
-  const dateFilter = dateRange
-    ? { createdAt: { gte: dateRange.from, lte: dateRange.to } }
-    : {}
+  const dateFilter = dateRange ? { createdAt: { gte: dateRange.from, lte: dateRange.to } } : {}
 
   const [allDeals, wonDeals] = await withTenant(tenantId, (tx) =>
     Promise.all([
@@ -126,7 +125,9 @@ export async function getClientKpis(
   )
 
   const totalOpps = allDeals.length
-  const activeOpps = allDeals.filter((d) => !d.isArchived && d.stage.key !== "ganado" && d.stage.key !== "perdido").length
+  const activeOpps = allDeals.filter(
+    (d) => !d.isArchived && d.stage.key !== "ganado" && d.stage.key !== "perdido"
+  ).length
   const wonCount = wonDeals.length
   const totalValue = wonDeals.reduce((sum, d) => sum + Number(d.value), 0)
 

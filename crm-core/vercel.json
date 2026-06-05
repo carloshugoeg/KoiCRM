@@ -1,6 +1,10 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "regions": ["iad1"],
+  "installCommand": "HUSKY=0 pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm exec prisma generate && pnpm build",
+  "devCommand": "pnpm dev",
   "functions": {
     "app/api/**": { "maxDuration": 30 }
   }

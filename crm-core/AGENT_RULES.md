@@ -10,9 +10,10 @@ Antes de cualquier acción de implementación, lee en este orden:
 
 1. `crm-core/DEMO_INVENTORY.md` — qué hace el demo (fuente de requisitos).
 2. `crm-core/ARCHITECTURE_PLAN.md` — cómo está diseñado el producto real.
-3. `crm-core/IMPLEMENTATION_BACKLOG.md` — qué task vas a ejecutar y sus criterios.
-4. `crm-core/AGENT_RULES.md` — este archivo.
-5. `crm-core/DECISIONS_AND_OPEN_QUESTIONS.md` — decisiones tomadas, pendientes y riesgos.
+3. `crm-core/IMPLEMENTATION_BACKLOG.md` — qué task vas a ejecutar y sus criterios (V1).
+4. `crm-core/V2_BACKLOG.md` — solo si trabajas en post-V1 (correcciones y features V2).
+5. `crm-core/AGENT_RULES.md` — este archivo.
+6. `crm-core/DECISIONS_AND_OPEN_QUESTIONS.md` — decisiones tomadas, pendientes y riesgos.
 
 Si vas a trabajar una task acotada, lee solo las secciones relevantes (índice + sección detallada de la task + tabla §24 de `ARCHITECTURE_PLAN` si tocas core vs plantilla). No leas los 5 archivos completos cada vez.
 

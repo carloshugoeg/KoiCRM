@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -14,6 +15,7 @@ import {
 import { CATALOG_LABELS } from "@/features/catalogs/constants"
 import type { CatalogItem, Tenant } from "@prisma/client"
 import type { CatalogKey } from "@/features/catalogs/queries"
+import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 
 const CATALOG_KEYS: CatalogKey[] = ["equipment", "salesChannel", "dealStatus", "followupReason"]
 
@@ -54,14 +56,21 @@ function CatalogTab({
       order: items.length,
     })
     setAdding(false)
-    if (!result.ok) { setError(result.error ?? "Error."); return }
+    if (!result.ok) {
+      const msg = toastErrorFromResult(result.error, toastMessages.catalog.errorAdd)
+      setError(msg)
+      toast.error(msg)
+      return
+    }
+    const addedLabel = newLabel
     setNewKey("")
     setNewLabel("")
+    toast.success(toastMessages.catalog.itemAdded(addedLabel))
     router.refresh()
   }
 
   async function handleToggleActive(item: CatalogItem) {
-    await updateCatalogItemAction({
+    const result = await updateCatalogItemAction({
       tenantId: tenant.id,
       tenantSlug: tenant.slug,
       id: item.id,
@@ -69,6 +78,15 @@ function CatalogTab({
       color: item.color,
       active: !item.active,
     })
+    if (!result.ok) {
+      toast.error(toastErrorFromResult(result.error, toastMessages.catalog.errorAdd))
+      return
+    }
+    toast.success(
+      item.active
+        ? toastMessages.catalog.itemDeactivated(item.label)
+        : toastMessages.catalog.itemActivated(item.label),
+    )
     router.refresh()
   }
 
@@ -80,9 +98,10 @@ function CatalogTab({
       id: item.id,
     })
     if (!result.ok) {
-      alert(result.error ?? "Error al eliminar.")
+      toast.error(toastErrorFromResult(result.error, toastMessages.catalog.errorRemove))
       return
     }
+    toast.success(toastMessages.catalog.itemRemoved(item.label))
     router.refresh()
   }
 
@@ -91,12 +110,17 @@ function CatalogTab({
     const newOrder = [...items]
     ;[newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]]
     setItems(newOrder)
-    await reorderCatalogItemsAction({
+    const result = await reorderCatalogItemsAction({
       tenantId: tenant.id,
       tenantSlug: tenant.slug,
       catalogKey,
       orderedIds: newOrder.map((i) => i.id),
     })
+    if (!result.ok) {
+      toast.error(toastErrorFromResult(result.error, toastMessages.catalog.errorAdd))
+      return
+    }
+    toast.success(toastMessages.catalog.orderUpdated)
     router.refresh()
   }
 
@@ -105,12 +129,17 @@ function CatalogTab({
     const newOrder = [...items]
     ;[newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]]
     setItems(newOrder)
-    await reorderCatalogItemsAction({
+    const result = await reorderCatalogItemsAction({
       tenantId: tenant.id,
       tenantSlug: tenant.slug,
       catalogKey,
       orderedIds: newOrder.map((i) => i.id),
     })
+    if (!result.ok) {
+      toast.error(toastErrorFromResult(result.error, toastMessages.catalog.errorAdd))
+      return
+    }
+    toast.success(toastMessages.catalog.orderUpdated)
     router.refresh()
   }
 

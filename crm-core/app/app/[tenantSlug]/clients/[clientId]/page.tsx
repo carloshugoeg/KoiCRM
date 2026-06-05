@@ -26,16 +26,18 @@ export default async function ClientDetailPage({ params }: Props) {
   const tenantSlug = params.tenantSlug
   const canEdit = membership.role !== "VIEWER"
 
-  const [clientData, kpis, pipeline, members, channels, equipment, statuses, settings] = await Promise.all([
-    getClientWithDeals(tenantId, params.clientId),
-    getClientKpis(tenantId, params.clientId),
-    withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
-    getTenantMembers(tenantId),
-    getCatalogItems(tenantId, "salesChannel"),
-    getCatalogItems(tenantId, "equipment"),
-    getCatalogItems(tenantId, "dealStatus"),
-    prisma.tenantSettings.findUnique({ where: { tenantId } }),
-  ])
+  const [clientData, kpis, pipeline, members, channels, equipment, statuses, followUpReasons, settings] =
+    await Promise.all([
+      getClientWithDeals(tenantId, params.clientId),
+      getClientKpis(tenantId, params.clientId),
+      withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
+      getTenantMembers(tenantId),
+      getCatalogItems(tenantId, "salesChannel", { activeOnly: true }),
+      getCatalogItems(tenantId, "equipment", { activeOnly: true }),
+      getCatalogItems(tenantId, "dealStatus", { activeOnly: true }),
+      getCatalogItems(tenantId, "followupReason", { activeOnly: true }),
+      prisma.tenantSettings.findUnique({ where: { tenantId } }),
+    ])
 
   if (!clientData) notFound()
 
@@ -49,6 +51,7 @@ export default async function ClientDetailPage({ params }: Props) {
     id: m.user.id,
     name: m.user.name,
     email: m.user.email,
+    image: m.user.image,
   }))
 
   const stages = pipeline?.stages ?? []
@@ -83,6 +86,7 @@ export default async function ClientDetailPage({ params }: Props) {
         channels={channels}
         equipment={equipment}
         statuses={statuses}
+        followUpReasons={followUpReasons}
         settings={intlSettings}
         canEdit={canEdit}
       />

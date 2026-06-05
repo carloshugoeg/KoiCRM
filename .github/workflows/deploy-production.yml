@@ -1,0 +1,68 @@
+# Production deploy: migrate Postgres then Vercel.
+# Configure GitHub repository secrets (same keys as crm-core/.env.deploy.example).
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "crm-core/**"
+      - ".github/workflows/deploy-production.yml"
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crm-core
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: crm-core/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply database migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_ADMIN_URL }}
+        run: pnpm exec prisma migrate deploy
+
+      - name: Deploy to Vercel (production)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_NAME: ${{ secrets.VERCEL_PROJECT_NAME }}
+        run: |
+          PROJECT="${VERCEL_PROJECT_NAME:-koi-crm}"
+          LINK_ARGS=(--yes --token "$VERCEL_TOKEN" --project "$PROJECT")
+          [[ -n "${VERCEL_TEAM_ID:-}" ]] && LINK_ARGS+=(--scope "$VERCEL_TEAM_ID")
+          env -u VERCEL_ORG_ID -u VERCEL_PROJECT_ID npx vercel@latest link "${LINK_ARGS[@]}"
+          env -u VERCEL_ORG_ID -u VERCEL_PROJECT_ID npx vercel@latest deploy --prod --token "$VERCEL_TOKEN"
+
+      - name: Health check
+        env:
+          AUTH_URL: ${{ secrets.AUTH_URL }}
+        run: |
+          for i in $(seq 1 12); do
+            if curl -sf "${AUTH_URL}/api/health" | grep -q '"db":"ok"'; then
+              echo "Health OK"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Health check failed"
+          exit 1

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
 import { requireRole } from "@/lib/auth/rbac"
+import { userCanEditDeal } from "@/lib/auth/deal-access"
 import { prisma } from "@/lib/db/client"
 import { recordActivity } from "@/features/activity/queries"
 import { addFollowUpSchema, completeFollowUpSchema, deleteFollowUpSchema } from "@/features/follow-ups/schemas"
@@ -18,8 +19,12 @@ export async function addFollowUpAction(raw: unknown): Promise<{ ok: boolean; er
   const { tenantId, tenantSlug, dealId, date, reasonKey } = parsed.data
 
   try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
+    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
   } catch {
+    return { ok: false, error: "Acceso denegado." }
+  }
+
+  if (!(await userCanEditDeal(session, tenantId, dealId))) {
     return { ok: false, error: "Acceso denegado." }
   }
 
@@ -60,7 +65,7 @@ export async function completeFollowUpAction(raw: unknown): Promise<{ ok: boolea
   const { tenantId, tenantSlug, followUpId, result } = parsed.data
 
   try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
+    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
   } catch {
     return { ok: false, error: "Acceso denegado." }
   }
@@ -97,7 +102,7 @@ export async function deleteFollowUpAction(raw: unknown): Promise<{ ok: boolean;
   const { tenantId, tenantSlug, followUpId } = parsed.data
 
   try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
+    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
   } catch {
     return { ok: false, error: "Acceso denegado." }
   }

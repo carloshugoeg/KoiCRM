@@ -1,4 +1,6 @@
 import { redirect, notFound } from "next/navigation"
+import { cookies } from "next/headers"
+import { readShowArchivedFromCookieHeader } from "@/lib/settings/preferences"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
@@ -7,6 +9,7 @@ import { getPipelineDeals } from "@/features/deals/queries"
 import { getCatalogItems } from "@/features/catalogs/queries"
 import { getTenantMembers } from "@/features/tenants/queries"
 import { pipelineFiltersSchema } from "@/features/pipeline/schemas"
+import { canSeeAllDeals, canArchiveDeal, canDeleteDeal, canCreateDeal } from "@/lib/auth/rbac"
 import { PipelineClient } from "@/features/pipeline/components/PipelineClient"
 import { PrintReport } from "@/features/pipeline/components/PrintReport"
 import { prisma } from "@/lib/db/client"
@@ -27,6 +30,7 @@ export default async function PipelinePage({ params, searchParams }: Props) {
   const { tenant, membership } = resolved
   const tenantId = tenant.id
   const tenantSlug = params.tenantSlug
+  const canSeeAll = canSeeAllDeals(membership.role)
 
   const rawParams = {
     owner: searchParams.owner as string | undefined,
@@ -37,14 +41,16 @@ export default async function PipelinePage({ params, searchParams }: Props) {
     to: searchParams.to as string | undefined,
   }
   const filters = pipelineFiltersSchema.parse(rawParams)
+  const cookieStore = cookies()
+  const includeArchived = readShowArchivedFromCookieHeader(cookieStore.toString())
 
   const [pipeline, members, channels, equipment, statuses, followUpReasons, settings] = await Promise.all([
     withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
     getTenantMembers(tenantId),
-    getCatalogItems(tenantId, "salesChannel"),
-    getCatalogItems(tenantId, "equipment"),
-    getCatalogItems(tenantId, "dealStatus"),
-    getCatalogItems(tenantId, "followupReason"),
+    getCatalogItems(tenantId, "salesChannel", { activeOnly: true }),
+    getCatalogItems(tenantId, "equipment", { activeOnly: true }),
+    getCatalogItems(tenantId, "dealStatus", { activeOnly: true }),
+    getCatalogItems(tenantId, "followupReason", { activeOnly: true }),
     prisma.tenantSettings.findUnique({ where: { tenantId } }),
   ])
 
@@ -57,12 +63,16 @@ export default async function PipelinePage({ params, searchParams }: Props) {
   }
 
   const deals = await getPipelineDeals(tenantId, {
-    ownerId: filters.owner,
+    // Asesores only ever see their own deals (and deals ceded to them); the owner filter
+    // is reserved for supervisors/superadmins who can browse the whole team's pipeline.
+    visibleToUserId: canSeeAll ? undefined : session.user.id,
+    ownerId: canSeeAll ? filters.owner : undefined,
     channelKey: filters.channel,
     equipmentKey: filters.equipment,
     alerts: filters.alerts,
     from: filters.from ? new Date(filters.from) : undefined,
     to: filters.to ? new Date(filters.to) : undefined,
+    includeArchived,
   })
 
   const intlSettings: IntlSettings = {
@@ -70,6 +80,25 @@ export default async function PipelinePage({ params, searchParams }: Props) {
     currency: settings?.currency ?? "GTQ",
     timezone: settings?.timezone ?? "America/Guatemala",
   }
+
+  const channelByKey = Object.fromEntries(channels.map((c) => [c.key, c.label]))
+  const equipmentLabels = Object.fromEntries(equipment.map((e) => [e.key, e.label]))
+
+  const filterParts: string[] = []
+  if (filters.owner) {
+    const m = members.find((x) => x.user.id === filters.owner)
+    filterParts.push(`Asesor: ${m?.user.name ?? m?.user.email ?? filters.owner}`)
+  }
+  if (filters.channel) {
+    filterParts.push(`Origen: ${channelByKey[filters.channel] ?? filters.channel}`)
+  }
+  if (filters.equipment) {
+    filterParts.push(`Equipo: ${equipmentLabels[filters.equipment] ?? filters.equipment}`)
+  }
+  if (filters.alerts === "missingQuote") filterParts.push("Alerta: sin cotización")
+  if (filters.alerts === "missingPayment") filterParts.push("Alerta: sin pago")
+  if (filters.alerts === "overdueFollowUp") filterParts.push("Alerta: seguimiento vencido")
+  const filterSummary = filterParts.length > 0 ? filterParts.join(" · ") : null
 
   // Serialize deals for client (convert Decimal and Date to primitives)
   const serializedDeals = deals.map((d) => ({
@@ -84,6 +113,10 @@ export default async function PipelinePage({ params, searchParams }: Props) {
     ownerName: d.owner.name,
     stageId: d.stageId,
     stageKey: d.stage.key,
+    stageLabel: d.stage.label,
+    stageColor: d.stage.color,
+    channelKey: d.channelKey,
+    channelLabel: channelByKey[d.channelKey] ?? d.channelKey,
     statusKey: d.statusKey,
     createdAt: d.createdAt.toISOString(),
     stageEnteredAt: d.stageEnteredAt.toISOString(),
@@ -93,43 +126,56 @@ export default async function PipelinePage({ params, searchParams }: Props) {
     hasOverdueFollowUp: d.hasOverdueFollowUp,
     hasQuoteAlert: d.hasQuoteAlert,
     hasPaymentAlert: d.hasPaymentAlert,
+    hasPaymentWithFile: d.hasPaymentWithFile,
     quoteCount: d.quoteCount ?? 0,
     paymentCount: d.paymentCount ?? 0,
     latestQuoteNumber: d.quotes?.[0]?.number ?? null,
     latestPaymentNumber: d.payments?.[0]?.number ?? null,
+    latestNote: d.notes?.[0]?.text ?? null,
   }))
 
   const memberList = members.map((m) => ({
     id: m.user.id,
     name: m.user.name,
     email: m.user.email,
+    image: m.user.image,
   }))
 
   const productName = tenant.branding?.productName ?? tenant.name
 
+  const logoUrl = tenant.branding?.logoUrl ?? null
+
   return (
     <>
-      <PipelineClient
-        tenantId={tenantId}
-        tenantSlug={tenantSlug}
-        stages={pipeline.stages}
-        deals={serializedDeals}
-        members={memberList}
-        channels={channels}
-        equipment={equipment}
-        statuses={statuses}
-        currentFilters={filters}
-        intlSettings={intlSettings}
-        logoUrl={tenant.branding?.logoUrl ?? null}
-        productName={productName}
-        canEdit={membership.role !== "VIEWER"}
-        canDelete={["OWNER", "ADMIN"].includes(membership.role)}
-        followUpReasons={followUpReasons}
-      />
+      <div className="print:hidden h-full">
+        <PipelineClient
+          tenantId={tenantId}
+          tenantSlug={tenantSlug}
+          stages={pipeline.stages}
+          deals={serializedDeals}
+          members={memberList}
+          channels={channels}
+          equipment={equipment}
+          statuses={statuses}
+          currentFilters={filters}
+          intlSettings={intlSettings}
+          logoUrl={logoUrl}
+          productName={productName}
+          currentUserId={session.user.id}
+          canCreate={canCreateDeal(membership.role)}
+          canSeeAll={canSeeAll}
+          canArchive={canArchiveDeal(membership.role)}
+          canDelete={canDeleteDeal(membership.role)}
+          followUpReasons={followUpReasons}
+        />
+      </div>
       <PrintReport
         deals={serializedDeals}
         settings={intlSettings}
         productName={productName}
+        logoUrl={logoUrl}
+        filterSummary={filterSummary}
+        equipmentLabels={equipmentLabels}
       />
     </>
   )

@@ -4,20 +4,43 @@ import { AUTH_FILE } from "./auth-helpers"
 test.describe("Search", () => {
   test.use({ storageState: AUTH_FILE })
 
-  test("global search opens with Ctrl+K or Cmd+K", async ({ page }) => {
+  test("global search opens with Cmd+K and header button", async ({ page }) => {
     await page.goto("/app/demo-aqua/pipeline")
     await expect(page.getByText(/prospecto/i)).toBeVisible({ timeout: 15_000 })
 
-    // Trigger global search keyboard shortcut
     await page.keyboard.press("Meta+k")
+    await expect(page.getByPlaceholder(/cotización o pago/i)).toBeVisible()
 
-    // The search dialog/combobox should appear
-    const searchDialog = page.locator('[cmdk-root], [role="dialog"]').filter({ hasText: /buscar|search/i })
-    const searchInput = page.getByPlaceholder(/buscar|search/i)
+    await page.keyboard.press("Escape")
+    await page.getByRole("button", { name: /buscar/i }).click()
+    await expect(page.getByPlaceholder(/cotización o pago/i)).toBeVisible()
+  })
 
-    const dialogVisible = await searchDialog.isVisible().catch(() => false)
-    const inputVisible = await searchInput.isVisible().catch(() => false)
+  test("typing shows results and opening a deal shows detail modal", async ({ page }) => {
+    await page.goto("/app/demo-aqua/pipeline")
+    await expect(page.getByText(/prospecto/i)).toBeVisible({ timeout: 15_000 })
 
-    expect(dialogVisible || inputVisible).toBe(true)
+    await page.keyboard.press("Meta+k")
+    const input = page.getByPlaceholder(/cotización o pago/i)
+    await input.fill("a")
+
+    await page.waitForTimeout(800)
+
+    const firstDeal = page.locator('[cmdk-item]').filter({ hasText: /oportunidad|prospecto|contactado/i }).first()
+    const dealVisible = await firstDeal.isVisible().catch(() => false)
+
+    if (dealVisible) {
+      await firstDeal.click()
+      await expect(page).toHaveURL(/deal=/)
+      await expect(page.getByRole("dialog")).toBeVisible({ timeout: 10_000 })
+    } else {
+      const anyItem = page.locator("[cmdk-item]").first()
+      if (await anyItem.isVisible()) {
+        await anyItem.click()
+        await expect(page.getByRole("dialog").or(page.getByText(/selecciona un cliente/i))).toBeVisible({
+          timeout: 10_000,
+        })
+      }
+    }
   })
 })

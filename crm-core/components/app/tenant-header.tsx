@@ -3,30 +3,53 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
-import { Search, Settings } from "lucide-react"
+import {
+  Search,
+  Settings,
+  LayoutDashboard,
+  Users,
+  Calendar,
+  Archive,
+  BarChart2,
+  type LucideIcon,
+} from "lucide-react"
 import { useTenant } from "@/lib/tenant/context"
 import { Button } from "@/components/ui/button"
-import { CommandMenu } from "@/components/CommandMenu"
+import { CommandMenu, openCommandMenu } from "@/components/CommandMenu"
 import type { Membership, Tenant } from "@prisma/client"
 
 type MembershipWithTenant = Membership & { tenant: Pick<Tenant, "slug" | "name"> }
 
 interface Props {
   memberships: MembershipWithTenant[]
+  clientsCount: number
+  /** Stats are a supervisory view — hidden from asesores. */
+  canViewStats: boolean
 }
 
-export function TenantHeader({ memberships }: Props) {
+export function TenantHeader({ memberships, clientsCount, canViewStats }: Props) {
   const { tenant } = useTenant()
   const pathname = usePathname()
   function navClass(href: string) {
     return pathname.startsWith(href)
-      ? "text-sm font-semibold"
-      : "text-sm text-muted-foreground hover:text-foreground transition-colors"
+      ? "flex items-center gap-1.5 text-sm font-semibold"
+      : "flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
   }
+
+  const base = `/app/${tenant.slug}`
+  const navItems: { href: string; label: string; icon: LucideIcon; badge?: number }[] = [
+    { href: `${base}/pipeline`, label: "Embudo", icon: LayoutDashboard },
+    { href: `${base}/clients`, label: "Clientes", icon: Users, badge: clientsCount },
+    { href: `${base}/calendar`, label: "Calendario", icon: Calendar },
+    { href: `${base}/archive`, label: "Archivo", icon: Archive },
+    ...(canViewStats
+      ? [{ href: `${base}/stats`, label: "Estadísticas", icon: BarChart2 }]
+      : []),
+  ]
 
   return (
     <header
-      className="h-14 flex items-center px-4 gap-4 shrink-0 backdrop-blur-sm sticky top-0 z-40"
+      className="print:hidden sticky top-0 z-40 flex h-14 shrink-0 items-center gap-4 px-4 backdrop-blur-sm"
       style={{ background: "var(--header-bg)", borderBottom: "1px solid var(--header-border)" }}
     >
       <span className="font-semibold">{tenant.branding?.productName ?? tenant.name}</span>
@@ -48,20 +71,22 @@ export function TenantHeader({ memberships }: Props) {
         </nav>
       )}
       <nav className="flex gap-4">
-        <Link href={`/app/${tenant.slug}/pipeline`} className={navClass(`/app/${tenant.slug}/pipeline`)}>
-          Embudo
-        </Link>
-        <Link href={`/app/${tenant.slug}/calendar`} className={navClass(`/app/${tenant.slug}/calendar`)}>
-          Calendario
-        </Link>
-        <Link href={`/app/${tenant.slug}/stats`} className={navClass(`/app/${tenant.slug}/stats`)}>
-          Estadísticas
-        </Link>
+        {navItems.map(({ href, label, icon: Icon, badge }) => (
+          <Link key={href} href={href} className={navClass(href)}>
+            <Icon className="h-4 w-4" />
+            {label}
+            {badge != null && badge > 0 && (
+              <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold leading-none text-muted-foreground">
+                {badge}
+              </span>
+            )}
+          </Link>
+        ))}
       </nav>
       <div className="ml-auto flex items-center gap-2">
         <Link
-          href={`/app/${tenant.slug}/settings/appearance`}
-          className={navClass(`/app/${tenant.slug}/settings`)}
+          href={`${base}/settings/appearance`}
+          className={navClass(`${base}/settings`)}
           title="Configuración"
         >
           <Settings className="h-4 w-4" />
@@ -69,8 +94,8 @@ export function TenantHeader({ memberships }: Props) {
         <Button
           variant="outline"
           size="sm"
-          className="text-muted-foreground text-xs gap-2"
-          onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }))}
+          className="gap-2 text-xs text-muted-foreground"
+          onClick={() => openCommandMenu()}
         >
           <Search className="h-3.5 w-3.5" />
           Buscar

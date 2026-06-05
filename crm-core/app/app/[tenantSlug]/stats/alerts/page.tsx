@@ -69,7 +69,7 @@ export default async function AlertsPage({ params, searchParams }: Props) {
   const [alerts, members, followUpReasons] = await Promise.all([
     getFollowUpAlerts(tenantId, ownerId, { from, to }),
     getTenantMembers(tenantId),
-    getCatalogItems(tenantId, "followupReason"),
+    getCatalogItems(tenantId, "followupReason", { activeOnly: true }),
   ])
 
   const memberList = members.map((m) => ({ id: m.user.id, name: m.user.name, email: m.user.email }))

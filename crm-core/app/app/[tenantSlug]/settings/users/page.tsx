@@ -18,14 +18,18 @@ export default async function UsersSettingsPage({ params }: Props) {
 
   const { tenant, membership } = resolved
 
-  const [members, pendingInvitations] = await Promise.all([
+  const [members, joinLinks] = await Promise.all([
     prisma.membership.findMany({
       where: { tenantId: tenant.id },
-      include: { user: { select: { id: true, name: true, email: true } } },
+      include: { user: { select: { id: true, name: true, email: true, image: true } } },
       orderBy: { createdAt: "asc" },
     }),
-    prisma.invitation.findMany({
-      where: { tenantId: tenant.id, acceptedAt: null, expiresAt: { gt: new Date() } },
+    prisma.joinLink.findMany({
+      where: {
+        tenantId: tenant.id,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
       orderBy: { createdAt: "desc" },
     }),
   ])
@@ -35,7 +39,7 @@ export default async function UsersSettingsPage({ params }: Props) {
       tenant={tenant}
       currentMembership={membership}
       members={members}
-      pendingInvitations={pendingInvitations}
+      joinLinks={joinLinks}
       canManage={canManageMembers(membership.role)}
     />
   )

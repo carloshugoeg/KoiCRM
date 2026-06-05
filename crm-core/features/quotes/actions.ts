@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
 import { requireRole } from "@/lib/auth/rbac"
+import { userCanEditDeal } from "@/lib/auth/deal-access"
 import { recordActivity } from "@/features/activity/queries"
 import { CreateQuoteSchema, UpdateQuoteSchema } from "./schemas"
 
@@ -12,7 +13,7 @@ export async function createQuote(tenantId: string, input: unknown) {
   if (!session?.user?.id) return { ok: false as const, error: "Unauthorized", code: "unauthorized" }
 
   try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
+    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
   } catch {
     return { ok: false as const, error: "Unauthorized", code: "unauthorized" }
   }
@@ -20,6 +21,10 @@ export async function createQuote(tenantId: string, input: unknown) {
   const parsed = CreateQuoteSchema.safeParse(input)
   if (!parsed.success) return { ok: false as const, error: "Invalid input", code: "invalid_input" }
   const data = parsed.data
+
+  if (!(await userCanEditDeal(session, tenantId, data.dealId))) {
+    return { ok: false as const, error: "Unauthorized", code: "unauthorized" }
+  }
 
   const quote = await withTenant(tenantId, async (tx) => {
     const q = await tx.quote.create({
@@ -51,7 +56,7 @@ export async function updateQuote(tenantId: string, input: unknown) {
   if (!session?.user?.id) return { ok: false as const, error: "Unauthorized", code: "unauthorized" }
 
   try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
+    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
   } catch {
     return { ok: false as const, error: "Unauthorized", code: "unauthorized" }
   }
@@ -73,7 +78,7 @@ export async function voidQuote(tenantId: string, quoteId: string) {
   if (!session?.user?.id) return { ok: false as const, error: "Unauthorized", code: "unauthorized" }
 
   try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "MEMBER"])
+    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
   } catch {
     return { ok: false as const, error: "Unauthorized", code: "unauthorized" }
   }

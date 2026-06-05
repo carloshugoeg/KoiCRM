@@ -1,142 +1,131 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { inviteUserAction, removeMemberAction, changeMemberRoleAction } from "@/features/users/actions"
-import type { Membership, Tenant, User, Invitation, Role } from "@prisma/client"
+import { Edit3 } from "lucide-react"
+import { EditMemberModal, type EditMemberData } from "@/features/users/components/EditMemberModal"
+import { JoinLinksPanel } from "@/features/users/components/join-links-panel"
+import { SettingsRowCard, SettingsSectionTitle } from "@/components/settings/settings-section"
+import { avatarColor } from "@/lib/utils/avatar-color"
+import { UserAvatar } from "@/components/ui/user-avatar"
+import { ROLE_LABELS } from "@/lib/auth/rbac"
+import { Badge } from "@/components/ui/badge"
+import type { Membership, Tenant, User, JoinLink } from "@prisma/client"
 
-type MemberWithUser = Membership & { user: Pick<User, "id" | "name" | "email"> }
+type MemberWithUser = Membership & { user: Pick<User, "id" | "name" | "email" | "image"> }
 
 interface Props {
   tenant: Tenant
   currentMembership: Membership
   members: MemberWithUser[]
-  pendingInvitations: Invitation[]
+  joinLinks: JoinLink[]
   canManage: boolean
 }
 
-const ROLE_LABELS: Record<Role, string> = {
-  OWNER: "Propietario",
-  ADMIN: "Admin",
-  MEMBER: "Miembro",
-  VIEWER: "Lector",
+function canEditMember(
+  m: MemberWithUser,
+  currentMembership: Membership,
+  canManage: boolean,
+): boolean {
+  if (m.userId === currentMembership.userId) return true
+  return canManage && m.role !== "OWNER"
 }
 
-export function UsersSettings({ tenant, currentMembership, members, pendingInvitations, canManage }: Props) {
-  const router = useRouter()
-  const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteRole, setInviteRole] = useState<"ADMIN" | "MEMBER" | "VIEWER">("MEMBER")
-  const [inviteError, setInviteError] = useState<string | null>(null)
-  const [invitePending, setInvitePending] = useState(false)
-  const [inviteSent, setInviteSent] = useState(false)
+export function UsersSettings({
+  tenant,
+  currentMembership,
+  members,
+  joinLinks,
+  canManage,
+}: Props) {
+  const [editingMember, setEditingMember] = useState<EditMemberData | null>(null)
 
-  async function handleInvite(e: React.FormEvent) {
-    e.preventDefault()
-    setInvitePending(true)
-    setInviteError(null)
-    const result = await inviteUserAction({ tenantId: tenant.id, email: inviteEmail, role: inviteRole })
-    setInvitePending(false)
-    if (!result.ok) { setInviteError(result.error ?? "Error al invitar."); return }
-    setInviteSent(true)
-    setInviteEmail("")
-    setTimeout(() => { setInviteSent(false); router.refresh() }, 2000)
+  function openEditModal(m: MemberWithUser) {
+    setEditingMember({
+      userId: m.userId,
+      name: m.user.name,
+      email: m.user.email,
+      image: m.user.image,
+      role: m.role,
+      status: m.status,
+    })
   }
 
-  async function handleRemove(targetUserId: string) {
-    if (!confirm("¿Remover este miembro?")) return
-    await removeMemberAction({ tenantId: tenant.id, targetUserId })
-    router.refresh()
-  }
+  const editingIsSelf = editingMember?.userId === currentMembership.userId
+  const editingCanManageRole =
+    canManage && editingMember?.role !== "OWNER" && !editingIsSelf
+  const editingCanDelete =
+    canManage && editingMember?.role !== "OWNER" && !editingIsSelf
 
-  async function handleRoleChange(targetUserId: string, role: "ADMIN" | "MEMBER" | "VIEWER") {
-    await changeMemberRoleAction({ tenantId: tenant.id, targetUserId, role })
-    router.refresh()
-  }
+  const reassignTargets = members
+    .filter((m) => m.status === "ACTIVE" && m.userId !== editingMember?.userId)
+    .map((m) => ({ id: m.userId, name: m.user.name, email: m.user.email }))
 
   return (
-    <div className="p-6 space-y-8 max-w-2xl">
-      <h1 className="text-2xl font-semibold">Usuarios</h1>
+    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain">
+      <SettingsSectionTitle>Colaboradores activos</SettingsSectionTitle>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">Miembros</h2>
-        <ul className="divide-y border rounded-lg">
-          {members.map((m) => (
-            <li key={m.userId} className="flex items-center gap-3 px-4 py-3">
-              <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{m.user.name ?? m.user.email}</p>
-                <p className="text-sm text-muted-foreground truncate">{m.user.email}</p>
-              </div>
-              {canManage && m.role !== "OWNER" && m.userId !== currentMembership.userId ? (
-                <>
-                  <select
-                    value={m.role}
-                    onChange={(e) => handleRoleChange(m.userId, e.target.value as "ADMIN" | "MEMBER" | "VIEWER")}
-                    className="text-sm border rounded px-2 py-1"
-                  >
-                    {(["ADMIN", "MEMBER", "VIEWER"] as const).map((r) => (
-                      <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                    ))}
-                  </select>
-                  <Button variant="ghost" size="sm" onClick={() => handleRemove(m.userId)}>
-                    Remover
-                  </Button>
-                </>
-              ) : (
-                <span className="text-sm text-muted-foreground">{ROLE_LABELS[m.role]}</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
+      <div className="space-y-2">
+        {members.map((m) => {
+          const color = avatarColor(m.userId)
+          const editable = canEditMember(m, currentMembership, canManage)
 
-      {pendingInvitations.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-medium">Invitaciones pendientes</h2>
-          <ul className="divide-y border rounded-lg">
-            {pendingInvitations.map((inv) => (
-              <li key={inv.id} className="flex items-center gap-3 px-4 py-3">
-                <p className="flex-1 text-sm">{inv.email}</p>
-                <span className="text-xs text-muted-foreground">{ROLE_LABELS[inv.role]}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {canManage && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-medium">Invitar usuario</h2>
-          {inviteError && <p className="text-sm text-destructive">{inviteError}</p>}
-          {inviteSent && <p className="text-sm text-green-600">Invitación enviada.</p>}
-          <form onSubmit={handleInvite} className="flex gap-2">
-            <div className="flex-1 space-y-1">
-              <Label htmlFor="invite-email" className="sr-only">Correo</Label>
-              <Input
-                id="invite-email"
-                type="email"
-                placeholder="correo@ejemplo.com"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                required
+          return (
+            <SettingsRowCard key={m.userId}>
+              <UserAvatar
+                userId={m.userId}
+                name={m.user.name}
+                email={m.user.email}
+                imageUrl={m.user.image}
+                size={32}
               />
-            </div>
-            <select
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as "ADMIN" | "MEMBER" | "VIEWER")}
-              className="text-sm border rounded px-2 py-1"
-            >
-              <option value="MEMBER">Miembro</option>
-              <option value="ADMIN">Admin</option>
-              <option value="VIEWER">Lector</option>
-            </select>
-            <Button type="submit" disabled={invitePending}>
-              {invitePending ? "Enviando…" : "Invitar"}
-            </Button>
-          </form>
-        </section>
+              <div className="flex-1 min-w-0">
+                <span className="text-sm font-semibold block truncate">
+                  {m.user.name ?? m.user.email}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {ROLE_LABELS[m.role]}
+                  {m.status === "INACTIVE" && (
+                    <Badge variant="outline" className="ml-2 h-4 py-0 text-[10px] text-amber-600 border-amber-300">
+                      Inactivo
+                    </Badge>
+                  )}
+                </span>
+              </div>
+              <div
+                className="w-3 h-3 rounded-full shrink-0"
+                style={{ background: color }}
+              />
+              {editable ? (
+                <button
+                  type="button"
+                  onClick={() => openEditModal(m)}
+                  className="text-muted-foreground hover:opacity-70 transition-opacity"
+                  aria-label="Editar colaborador"
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            </SettingsRowCard>
+          )
+        })}
+      </div>
+
+      {canManage && <JoinLinksPanel tenant={tenant} joinLinks={joinLinks} />}
+
+      {editingMember && (
+        <EditMemberModal
+          key={editingMember.userId}
+          open={!!editingMember}
+          onOpenChange={(open) => {
+            if (!open) setEditingMember(null)
+          }}
+          member={editingMember}
+          tenantId={tenant.id}
+          canManageRole={editingCanManageRole}
+          canDelete={editingCanDelete}
+          canManage={canManage && !editingIsSelf}
+          reassignTargets={reassignTargets}
+        />
       )}
     </div>
   )

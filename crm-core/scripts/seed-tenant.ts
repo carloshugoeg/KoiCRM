@@ -1,6 +1,8 @@
 /**
  * First-tenant onboarding script.
  * Usage: pnpm tsx scripts/seed-tenant.ts --name "Aquasistemas" --slug "aquasistemas" [--prefix "AQX"]
+ *        [--admin-name "Admin"] [--admin-email "a@b.com"] [--admin-password "secret"]
+ * Env (non-interactive): SEED_ADMIN_NAME, SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD
  *
  * Creates: Tenant → Pipeline + Stages → Catalog → TenantSettings → TenantBranding → admin User → Membership
  * Idempotent: exits cleanly if the slug already exists.
@@ -172,7 +174,7 @@ async function main() {
 
   if (!tenantName || !tenantSlug) {
     console.error(
-      'Usage: pnpm tsx scripts/seed-tenant.ts --name "Client Name" --slug "client-slug" [--prefix "XXX"]'
+      'Usage: pnpm tsx scripts/seed-tenant.ts --name "Client Name" --slug "client-slug" [--prefix "XXX"] [--admin-name "Admin"] [--admin-email "a@b.com"] [--admin-password "secret"]'
     );
     process.exit(1);
   }
@@ -190,14 +192,23 @@ async function main() {
     return;
   }
 
-  // Prompt for admin credentials
-  const rl = readline.createInterface({ input, output });
-  console.log(`\nCreating tenant: ${tenantName} (slug: ${tenantSlug})\n`);
+  let adminName =
+    getArg("--admin-name") ?? process.env.SEED_ADMIN_NAME?.trim();
+  let adminEmail =
+    getArg("--admin-email") ?? process.env.SEED_ADMIN_EMAIL?.trim();
+  let adminPw =
+    getArg("--admin-password") ?? process.env.SEED_ADMIN_PASSWORD?.trim();
 
-  const adminName = await prompt(rl, "Admin full name:  ");
-  const adminEmail = await prompt(rl, "Admin email:      ");
-  const adminPw = await prompt(rl, "Admin password (min 8 chars): ");
-  rl.close();
+  if (!adminName || !adminEmail || !adminPw) {
+    const rl = readline.createInterface({ input, output });
+    console.log(`\nCreating tenant: ${tenantName} (slug: ${tenantSlug})\n`);
+    adminName = adminName ?? (await prompt(rl, "Admin full name:  "));
+    adminEmail = adminEmail ?? (await prompt(rl, "Admin email:      "));
+    adminPw = adminPw ?? (await prompt(rl, "Admin password (min 8 chars): "));
+    rl.close();
+  } else {
+    console.log(`\nCreating tenant: ${tenantName} (slug: ${tenantSlug})\n`);
+  }
 
   if (!adminName || !adminEmail || adminPw.length < 8) {
     console.error(
@@ -210,7 +221,7 @@ async function main() {
 
   // ── 1. Tenant
   const tenant = await prisma.tenant.create({
-    data: { slug: tenantSlug, name: tenantName },
+    data: { slug: tenantSlug, name: tenantName, subscriptionValidated: true },
   });
 
   // ── 2. Pipeline + Stages
@@ -262,7 +273,7 @@ async function main() {
 
   // ── 7. OWNER membership
   await prisma.membership.create({
-    data: { tenantId: tenant.id, userId: admin.id, role: "OWNER" },
+    data: { tenantId: tenant.id, userId: admin.id, role: "OWNER", status: "ACTIVE" },
   });
 
   console.log(`✓ Tenant created successfully

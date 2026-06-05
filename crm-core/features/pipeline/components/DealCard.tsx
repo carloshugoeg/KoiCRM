@@ -28,6 +28,7 @@ export interface DealCardData {
   hasOverdueFollowUp: boolean
   hasQuoteAlert: boolean
   hasPaymentAlert: boolean
+  hasPaymentWithFile?: boolean
   stageKey: string
   quoteCount: number
   paymentCount: number
@@ -38,6 +39,7 @@ export interface DealCardData {
 interface DealCardProps {
   deal: DealCardData
   settings: IntlSettings
+  equipmentLabels?: Record<string, string>
   onClick: () => void
   stageColor?: string
   isCompact?: boolean       // column-driven compact mode; undefined = legacy internal-toggle
@@ -74,7 +76,23 @@ function hex2rgba(hex: string, alpha = 0.15) {
   return `rgba(${isNaN(r) ? 0 : r},${isNaN(g) ? 0 : g},${isNaN(b) ? 0 : b},${alpha})`
 }
 
-export function DealCard({ deal, settings, onClick, stageColor, isCompact, isHighlighted, onOpenDetail }: DealCardProps) {
+function equipmentLabel(
+  key: string,
+  labels?: Record<string, string>,
+): string {
+  return labels?.[key] ?? key
+}
+
+export function DealCard({
+  deal,
+  settings,
+  equipmentLabels,
+  onClick,
+  stageColor,
+  isCompact,
+  isHighlighted,
+  onOpenDetail,
+}: DealCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id })
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -196,7 +214,7 @@ export function DealCard({ deal, settings, onClick, stageColor, isCompact, isHig
                       key={e.equipmentKey}
                       className="text-[10px] font-medium text-slate-500 truncate max-w-[80px]"
                     >
-                      {e.equipmentKey}
+                      {equipmentLabel(e.equipmentKey, equipmentLabels)}
                     </span>
                   ))}
                   {customEq && (

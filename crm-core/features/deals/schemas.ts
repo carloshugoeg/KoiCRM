@@ -73,6 +73,19 @@ export const archiveDealSchema = z.object({
   dealId: z.string().min(1),
 })
 
+export const transferDealSchema = z.object({
+  tenantId: z.string().min(1),
+  tenantSlug: z.string().min(1),
+  dealId: z.string().min(1),
+  toUserId: z.string().min(1, "Selecciona un asesor."),
+})
+
+export const deleteDealSchema = z.object({
+  tenantId: z.string().min(1),
+  tenantSlug: z.string().min(1),
+  dealId: z.string().min(1),
+})
+
 export const updateDealFieldSchema = z
   .object({
     tenantId: z.string().min(1),

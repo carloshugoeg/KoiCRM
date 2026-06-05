@@ -1,2 +1,5 @@
 # Git worktrees
 .worktrees/
+
+# Historical fake demo — local reference only, never push to remote
+hardcoded-demo/

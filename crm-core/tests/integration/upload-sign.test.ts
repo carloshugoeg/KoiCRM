@@ -31,8 +31,7 @@ const mockSignUploadUrl = vi.mocked(signUploadUrl);
 
 let tenantId: string;
 let userId: string;
-// A valid CUID-like value for dealId (just needs to pass zod cuid())
-const fakeDealId = "clxxxxxxxxxxxxxxxxxx01";
+const fakeDealId = "DEAL-0001-RO-26";
 
 function makeRequest(body: Record<string, unknown>) {
   return new NextRequest("http://localhost/api/upload/sign", {
@@ -68,6 +67,36 @@ beforeAll(async () => {
 
   await prismaAdmin.membership.create({
     data: { userId, tenantId, role: "MEMBER" },
+  });
+
+  const pipeline = await prismaAdmin.pipeline.create({
+    data: {
+      tenantId,
+      name: "Default",
+      isDefault: true,
+      stages: {
+        create: [
+          { tenantId, key: "prospecto", label: "Prospecto", color: "#6366f1", iconKey: "circle", order: 0 },
+        ],
+      },
+    },
+    include: { stages: true },
+  });
+  const pipelineId = pipeline.id;
+  const stageId = pipeline.stages[0]!.id;
+
+  await prismaAdmin.deal.create({
+    data: {
+      id: fakeDealId,
+      tenantId,
+      pipelineId,
+      stageId,
+      ownerId: userId,
+      channelKey: "web",
+      statusKey: "active",
+      name: "Test Deal",
+      value: 1000,
+    },
   });
 });
 

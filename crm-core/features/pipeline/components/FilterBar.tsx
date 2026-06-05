@@ -62,10 +62,10 @@ export function FilterBar({ members, channels, equipment, currentFilters, tenant
 
       <Select value={currentFilters.channel ?? ALL} onValueChange={(v) => update("channel", v)}>
         <SelectTrigger className={`w-40 ${triggerClasses}${isPending ? " opacity-50" : ""}`} disabled={isPending}>
-          <div className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 opacity-60" /><SelectValue placeholder="Canal" /></div>
+          <div className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 opacity-60" /><SelectValue placeholder="Origen" /></div>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={ALL}>Todos los canales</SelectItem>
+          <SelectItem value={ALL}>Todos los orígenes</SelectItem>
           {channels.map((c) => (
             <SelectItem key={c.key} value={c.key}>
               {c.label}

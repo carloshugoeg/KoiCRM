@@ -28,7 +28,7 @@ test.describe("AUDIT-09: Security & Data Integrity", () => {
     await page.locator("input#phone").fill("1234-5678")
     const chips = page.locator('[type="button"]').filter({ hasText: /bomba|jacuzzi|sauna|calentador|filtro|hidrojet/i })
     if (await chips.count() > 0) await chips.first().click()
-    await page.getByRole("button", { name: /guardar/i }).click()
+    await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
     await page.waitForTimeout(3_000)
 
@@ -88,7 +88,7 @@ test.describe("AUDIT-09: Security & Data Integrity", () => {
     if (await chips.count() > 0) await chips.first().click()
 
     await page.locator("input#value").fill(String(Number.MAX_SAFE_INTEGER))
-    await page.getByRole("button", { name: /guardar/i }).click()
+    await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
     await page.waitForTimeout(3_000)
     const success = await page.getByText(/oportunidad creada/i).count()

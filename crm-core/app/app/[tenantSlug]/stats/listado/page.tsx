@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
+import { canSeeAllDeals } from "@/lib/auth/rbac"
 import { getPipelineDeals } from "@/features/deals/queries"
 import { prisma } from "@/lib/db/client"
 import { formatCurrency, parseDate } from "@/lib/intl/format"
@@ -18,14 +19,15 @@ export default async function ListadoPage({ params, searchParams }: Props) {
   const resolved = await resolveTenant(params.tenantSlug, session)
   if (!resolved) notFound()
 
-  const { tenant } = resolved
+  const { tenant, membership } = resolved
   const tenantId = tenant.id
+  const canSeeAll = canSeeAllDeals(membership.role)
 
   const from = parseDate(searchParams.from)
   const to = parseDate(searchParams.to)
 
   const [deals, settings] = await Promise.all([
-    getPipelineDeals(tenantId, { from, to }),
+    getPipelineDeals(tenantId, { from, to, visibleToUserId: canSeeAll ? undefined : session.user.id }),
     prisma.tenantSettings.findUnique({ where: { tenantId } }),
   ])
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
+import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 import { Phone, MessageCircle, Mail, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -48,10 +49,11 @@ interface ClientProfileProps {
   deals: ClientDeal[]
   kpis: ClientKpis
   stages: PipelineStage[]
-  members: { id: string; name: string | null; email: string }[]
+  members: { id: string; name: string | null; email: string; image?: string | null }[]
   channels: CatalogItem[]
   equipment: CatalogItem[]
   statuses: CatalogItem[]
+  followUpReasons: CatalogItem[]
   settings: IntlSettings
   canEdit: boolean
 }
@@ -67,6 +69,7 @@ export function ClientProfile({
   channels,
   equipment,
   statuses,
+  followUpReasons,
   settings,
   canEdit,
 }: ClientProfileProps) {
@@ -86,9 +89,9 @@ export function ClientProfile({
       whatsapp: field === "whatsapp" ? value || null : client.whatsapp,
       email: field === "email" ? value || null : client.email,
     })
-    if (!result.ok) toast.error(result.error ?? "Error al guardar.")
+    if (!result.ok) toast.error(toastErrorFromResult(result.error, toastMessages.client.errorSave))
     else {
-      toast.success("Guardado.")
+      toast.success(toastMessages.client.saved)
       setEditField(null)
     }
   }
@@ -238,7 +241,14 @@ export function ClientProfile({
           channels={channels}
           equipment={equipment}
           statuses={statuses}
-          prefill={{ name: client.name, company: client.company, phone: client.phone, whatsapp: client.whatsapp, email: client.email }}
+          followUpReasons={followUpReasons}
+          prefill={{
+            name: client.name,
+            company: client.company,
+            phone: client.phone,
+            whatsapp: client.whatsapp,
+            email: client.email,
+          }}
         />
       )}
     </div>
