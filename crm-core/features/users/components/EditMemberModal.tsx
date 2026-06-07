@@ -23,7 +23,7 @@ import {
   reactivateMemberAction,
 } from "@/features/users/actions"
 import type { Role, MembershipStatus } from "@prisma/client"
-import { ROLE_LABELS, ASSIGNABLE_ROLES } from "@/lib/auth/rbac"
+import { ROLE_LABELS, ASSIGNABLE_ROLES } from "@/lib/auth/permissions"
 import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 
 type AssignableRole = "ADMIN" | "SUPERVISOR" | "MEMBER" | "VIEWER"

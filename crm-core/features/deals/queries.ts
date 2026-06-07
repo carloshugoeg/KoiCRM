@@ -1,5 +1,4 @@
-import { prisma } from "@/lib/db/client"
-import { withTenant } from "@/lib/db/rls"
+import { withTenant, type PrismaTx } from "@/lib/db/rls"
 import type { Prisma } from "@prisma/client"
 
 export interface PipelineFilters {
@@ -43,7 +42,7 @@ const dealWithRelations = {
 
 export type DealWithRelations = Awaited<ReturnType<typeof getPipelineDeals>>[number]
 
-export async function getPipelineDeals(tenantId: string, filters: PipelineFilters = {}) {
+function buildPipelineDealsWhere(tenantId: string, filters: PipelineFilters): Prisma.DealWhereInput {
   const where: Prisma.DealWhereInput = {
     tenantId,
     ...(filters.includeArchived ? {} : { isArchived: false }),
@@ -62,36 +61,13 @@ export async function getPipelineDeals(tenantId: string, filters: PipelineFilter
     where.equipment = { some: { equipmentKey: filters.equipmentKey } }
   }
 
-  const now = new Date()
+  return where
+}
 
-  const deals = await withTenant(tenantId, (tx) =>
-    tx.deal.findMany({
-      where,
-      include: {
-        stage: true,
-        owner: { select: { id: true, name: true, email: true } },
-        client: true,
-        equipment: true,
-        quotes: { where: { isVoid: false }, take: 1, orderBy: { createdAt: "desc" }, select: { number: true } },
-        payments: {
-          where: { isVoid: false },
-          orderBy: { createdAt: "desc" },
-          select: { number: true, fileUrl: true },
-        },
-        notes: { take: 1, orderBy: { createdAt: "desc" }, select: { text: true } },
-        _count: {
-          select: {
-            quotes: { where: { isVoid: false } },
-            payments: { where: { isVoid: false } },
-            followUps: { where: { completed: false, date: { lt: now } } },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    })
-  )
-
-  // Map alert flags and counts
+export function mapPipelineDeals(
+  deals: Awaited<ReturnType<typeof fetchPipelineDealsInTx>>,
+  filters: PipelineFilters,
+) {
   const mapped = deals.map((d) => ({
     ...d,
     hasActiveQuote: d._count.quotes > 0,
@@ -104,10 +80,9 @@ export async function getPipelineDeals(tenantId: string, filters: PipelineFilter
     hasPaymentWithFile: d.payments.some((p) => !!p.fileUrl),
   }))
 
-  // Apply alert filter after fetch (simpler than SQL subquery)
   if (filters.alerts === "missingQuote") {
     return mapped.filter(
-      (d) => !d.hasActiveQuote && d.stage.key !== "prospecto" && d.stage.key !== "perdido"
+      (d) => !d.hasActiveQuote && d.stage.key !== "prospecto" && d.stage.key !== "perdido",
     )
   }
   if (filters.alerts === "missingPayment") {
@@ -118,6 +93,44 @@ export async function getPipelineDeals(tenantId: string, filters: PipelineFilter
   }
 
   return mapped
+}
+
+/** Fetch pipeline deals inside an existing tenant transaction (one pool connection). */
+export async function fetchPipelineDealsInTx(
+  tx: PrismaTx,
+  tenantId: string,
+  filters: PipelineFilters = {},
+) {
+  const now = new Date()
+  return tx.deal.findMany({
+    where: buildPipelineDealsWhere(tenantId, filters),
+    include: {
+      stage: true,
+      owner: { select: { id: true, name: true, email: true } },
+      client: true,
+      equipment: true,
+      quotes: { where: { isVoid: false }, take: 1, orderBy: { createdAt: "desc" }, select: { number: true } },
+      payments: {
+        where: { isVoid: false },
+        orderBy: { createdAt: "desc" },
+        select: { number: true, fileUrl: true },
+      },
+      notes: { take: 1, orderBy: { createdAt: "desc" }, select: { text: true } },
+      _count: {
+        select: {
+          quotes: { where: { isVoid: false } },
+          payments: { where: { isVoid: false } },
+          followUps: { where: { completed: false, date: { lt: now } } },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  })
+}
+
+export async function getPipelineDeals(tenantId: string, filters: PipelineFilters = {}) {
+  const deals = await withTenant(tenantId, (tx) => fetchPipelineDealsInTx(tx, tenantId, filters))
+  return mapPipelineDeals(deals, filters)
 }
 
 export async function getDeal(tenantId: string, dealId: string, visibleToUserId?: string) {

@@ -74,11 +74,6 @@ export function SignInForm({ googleEnabled }: Props) {
         </Button>
       </form>
       <p className="text-sm text-muted-foreground">
-        <Link href="/forgot" className="underline">
-          ¿Olvidaste tu contraseña?
-        </Link>
-      </p>
-      <p className="text-sm text-muted-foreground">
         ¿No tienes cuenta?{" "}
         <Link href="/signup" className="underline">
           Regístrate

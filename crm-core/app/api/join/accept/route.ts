@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/auth"
 import { prisma } from "@/lib/db/client"
+import { withEstablishedAppRole } from "@/lib/db/rls"
 import { checkTenantEmbudoAccess } from "@/lib/tenant/access"
 import { isJoinLinkActive } from "@/lib/tenant/join-link"
 
@@ -72,12 +73,14 @@ export async function GET(req: NextRequest) {
   })
 
   if (!existing) {
-    await prisma.$transaction([
-      prisma.membership.create({
-        data: { userId: session.user.id, tenantId: invitation.tenantId, role: invitation.role },
-      }),
-      prisma.invitation.update({ where: { token }, data: { acceptedAt: new Date() } }),
-    ])
+    await withEstablishedAppRole(() =>
+      prisma.$transaction([
+        prisma.membership.create({
+          data: { userId: session.user.id, tenantId: invitation.tenantId, role: invitation.role },
+        }),
+        prisma.invitation.update({ where: { token }, data: { acceptedAt: new Date() } }),
+      ]),
+    )
   }
 
   const tenant = await prisma.tenant.findUniqueOrThrow({

@@ -19,6 +19,7 @@ END
 $$;
 
 ALTER ROLE admin_user BYPASSRLS;
+GRANT app_user TO postgres;
 
 GRANT CONNECT ON DATABASE postgres TO app_user;
 GRANT CONNECT ON DATABASE postgres TO admin_user;

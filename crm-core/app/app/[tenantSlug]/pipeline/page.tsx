@@ -3,16 +3,11 @@ import { cookies } from "next/headers"
 import { readShowArchivedFromCookieHeader } from "@/lib/settings/preferences"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
-import { getDefaultPipeline } from "@/features/pipeline/queries"
-import { withTenant } from "@/lib/db/rls"
-import { getPipelineDeals } from "@/features/deals/queries"
-import { getCatalogItems } from "@/features/catalogs/queries"
-import { getTenantMembers } from "@/features/tenants/queries"
+import { loadPipelineKanbanData } from "@/features/pipeline/queries"
 import { pipelineFiltersSchema } from "@/features/pipeline/schemas"
 import { canSeeAllDeals, canArchiveDeal, canDeleteDeal, canCreateDeal } from "@/lib/auth/rbac"
 import { PipelineClient } from "@/features/pipeline/components/PipelineClient"
 import { PrintReport } from "@/features/pipeline/components/PrintReport"
-import { prisma } from "@/lib/db/client"
 import type { IntlSettings } from "@/lib/intl/format"
 
 interface Props {
@@ -44,15 +39,17 @@ export default async function PipelinePage({ params, searchParams }: Props) {
   const cookieStore = cookies()
   const includeArchived = readShowArchivedFromCookieHeader(cookieStore.toString())
 
-  const [pipeline, members, channels, equipment, statuses, followUpReasons, settings] = await Promise.all([
-    withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
-    getTenantMembers(tenantId),
-    getCatalogItems(tenantId, "salesChannel", { activeOnly: true }),
-    getCatalogItems(tenantId, "equipment", { activeOnly: true }),
-    getCatalogItems(tenantId, "dealStatus", { activeOnly: true }),
-    getCatalogItems(tenantId, "followupReason", { activeOnly: true }),
-    prisma.tenantSettings.findUnique({ where: { tenantId } }),
-  ])
+  const { pipeline, members, channels, equipment, statuses, followUpReasons, settings, deals } =
+    await loadPipelineKanbanData(tenantId, {
+      visibleToUserId: canSeeAll ? undefined : session.user.id,
+      ownerId: canSeeAll ? filters.owner : undefined,
+      channelKey: filters.channel,
+      equipmentKey: filters.equipment,
+      alerts: filters.alerts,
+      from: filters.from ? new Date(filters.from) : undefined,
+      to: filters.to ? new Date(filters.to) : undefined,
+      includeArchived,
+    })
 
   if (!pipeline) {
     return (
@@ -61,19 +58,6 @@ export default async function PipelinePage({ params, searchParams }: Props) {
       </div>
     )
   }
-
-  const deals = await getPipelineDeals(tenantId, {
-    // Asesores only ever see their own deals (and deals ceded to them); the owner filter
-    // is reserved for supervisors/superadmins who can browse the whole team's pipeline.
-    visibleToUserId: canSeeAll ? undefined : session.user.id,
-    ownerId: canSeeAll ? filters.owner : undefined,
-    channelKey: filters.channel,
-    equipmentKey: filters.equipment,
-    alerts: filters.alerts,
-    from: filters.from ? new Date(filters.from) : undefined,
-    to: filters.to ? new Date(filters.to) : undefined,
-    includeArchived,
-  })
 
   const intlSettings: IntlSettings = {
     locale: settings?.locale ?? "es-GT",

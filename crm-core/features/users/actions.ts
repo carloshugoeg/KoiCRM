@@ -1,26 +1,14 @@
 "use server"
 
-import crypto from "crypto"
 import { z } from "zod"
 import { headers } from "next/headers"
 import { prisma } from "@/lib/db/client"
+import { withPrismaTransaction } from "@/lib/db/rls"
 import { withTenant } from "@/lib/db/rls"
 import { recordActivity } from "@/features/activity/queries"
 import { hashPassword } from "@/lib/auth/password"
-import { sendEmail, buildVerificationEmail, buildPasswordResetEmail, buildInvitationEmail } from "@/lib/email/resend"
 import { rateLimit } from "@/lib/auth/rate-limit"
 import { auth } from "@/lib/auth/auth"
-
-const VERIFY_WINDOW_MS = 24 * 60 * 60 * 1000
-const RESET_WINDOW_MS = 60 * 60 * 1000
-
-function baseUrl(): string {
-  return process.env.AUTH_URL ?? "http://localhost:3000"
-}
-
-function randomToken(): string {
-  return crypto.randomBytes(32).toString("hex")
-}
 
 function getClientIp(): string {
   const h = headers()
@@ -50,148 +38,8 @@ export async function signupAction(raw: unknown): Promise<{ ok: boolean; error?:
   if (existing) return { ok: true }
 
   const hashed = await hashPassword(password)
-  await prisma.user.create({ data: { name, email, password: hashed } })
-
-  const token = randomToken()
-  await prisma.verificationToken.create({
-    data: {
-      identifier: email,
-      token,
-      expires: new Date(Date.now() + VERIFY_WINDOW_MS),
-    },
-  })
-
-  const url = `${baseUrl()}/api/auth/verify?token=${token}&email=${encodeURIComponent(email)}`
-  await sendEmail({
-    to: email,
-    subject: "Verifica tu correo — Koi CRM",
-    html: buildVerificationEmail(url),
-  })
-
-  return { ok: true }
-}
-
-// ─── Forgot password ─────────────────────────────────────────────────────────
-
-const forgotSchema = z.object({ email: z.string().email() })
-
-export async function forgotPasswordAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  const ip = getClientIp()
-  if (!await rateLimit(`forgot:ip:${ip}`, 5, 60_000)) {
-    return { ok: false, error: "Demasiados intentos. Intenta más tarde." }
-  }
-
-  const parsed = forgotSchema.safeParse(raw)
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
-
-  const { email } = parsed.data
-  const user = await prisma.user.findUnique({ where: { email } })
-  // Always return ok to avoid email enumeration
-  if (!user) return { ok: true }
-
-  await prisma.verificationToken.deleteMany({ where: { identifier: `reset:${email}` } })
-
-  const token = randomToken()
-  await prisma.verificationToken.create({
-    data: {
-      identifier: `reset:${email}`,
-      token,
-      expires: new Date(Date.now() + RESET_WINDOW_MS),
-    },
-  })
-
-  const url = `${baseUrl()}/reset?token=${token}&email=${encodeURIComponent(email)}`
-  await sendEmail({
-    to: email,
-    subject: "Restablece tu contraseña — Koi CRM",
-    html: buildPasswordResetEmail(url),
-  })
-
-  return { ok: true }
-}
-
-// ─── Reset password ──────────────────────────────────────────────────────────
-
-const resetSchema = z.object({
-  email: z.string().email(),
-  token: z.string().min(1),
-  password: z.string().min(8).max(100),
-})
-
-export async function resetPasswordAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  const parsed = resetSchema.safeParse(raw)
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
-
-  const { email, token, password } = parsed.data
-
-  const record = await prisma.verificationToken.findUnique({ where: { token } })
-  if (!record || record.identifier !== `reset:${email}` || record.expires < new Date()) {
-    return { ok: false, error: "Enlace inválido o expirado." }
-  }
-
-  const hashed = await hashPassword(password)
-  await prisma.$transaction([
-    prisma.user.update({ where: { email }, data: { password: hashed } }),
-    prisma.verificationToken.delete({ where: { token } }),
-  ])
-
-  return { ok: true }
-}
-
-// ─── Invite user ─────────────────────────────────────────────────────────────
-
-const inviteSchema = z.object({
-  tenantId: z.string().cuid(),
-  email: z.string().email(),
-  role: z.enum(["ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"]),
-})
-
-export async function inviteUserAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
-
-  const parsed = inviteSchema.safeParse(raw)
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
-
-  const { tenantId, email, role } = parsed.data
-
-  const caller = await prisma.membership.findUnique({
-    where: { userId_tenantId: { userId: session.user.id, tenantId } },
-    select: { role: true },
-  })
-  if (!caller || !["OWNER", "ADMIN"].includes(caller.role)) {
-    return { ok: false, error: "Sin permisos para invitar." }
-  }
-
-  const token = randomToken()
-  try {
-    await prisma.$transaction(async (tx) => {
-      const targetUser = await tx.user.findUnique({ where: { email } })
-      if (targetUser) {
-        const existing = await tx.membership.findUnique({
-          where: { userId_tenantId: { userId: targetUser.id, tenantId } },
-        })
-        if (existing) throw new Error("ALREADY_MEMBER")
-      }
-      await tx.invitation.upsert({
-        where: { tenantId_email: { tenantId, email } },
-        create: { tenantId, email, role, token, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
-        update: { role, token, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), acceptedAt: null },
-      })
-    })
-  } catch (e) {
-    if (e instanceof Error && e.message === "ALREADY_MEMBER") {
-      return { ok: false, error: "El usuario ya es miembro." }
-    }
-    throw e
-  }
-
-  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { name: true } })
-  await sendEmail({
-    to: email,
-    subject: `Invitación a ${tenant.name} — Koi CRM`,
-    html: buildInvitationEmail(`${baseUrl()}/api/invite/accept?token=${token}`, tenant.name),
-  })
+  // No email verification: the account is active immediately and can sign in with email+password.
+  await prisma.user.create({ data: { name, email, password: hashed, emailVerified: new Date() } })
 
   return { ok: true }
 }
@@ -316,7 +164,7 @@ export async function updateMemberAction(raw: unknown): Promise<{ ok: boolean; e
   if (name !== undefined) userData.name = name
   if (image !== undefined) userData.image = image
 
-  await prisma.$transaction(async (tx) => {
+  await withPrismaTransaction(async (tx) => {
     if (Object.keys(userData).length > 0) {
       await tx.user.update({ where: { id: targetUserId }, data: userData })
     }
@@ -340,8 +188,8 @@ const adminResetPasswordSchema = z.object({
 })
 
 /**
- * Superadmin-only password reset. Users cannot recover their own password beyond the
- * email self-service flow; a superadmin sets a temporary password directly.
+ * Superadmin-only password reset — the only recovery path (there is no email self-service
+ * flow). A superadmin sets a temporary password directly.
  */
 export async function adminResetPasswordAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
   const session = await auth()

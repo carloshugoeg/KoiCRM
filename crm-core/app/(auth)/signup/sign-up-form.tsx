@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
@@ -34,7 +35,17 @@ export function SignUpForm({ googleEnabled }: Props) {
       setError(result.error ?? "Error al registrarse.")
       return
     }
-    router.push("/signup/verify")
+    // No verification step: sign the new account straight in.
+    const signInRes = await signIn("credentials", {
+      email: fd.get("email"),
+      password: fd.get("password"),
+      redirect: false,
+    })
+    if (signInRes?.error) {
+      router.push("/signin")
+      return
+    }
+    window.location.assign("/app")
   }
 
   return (

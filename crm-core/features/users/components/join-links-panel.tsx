@@ -18,7 +18,7 @@ import {
 } from "@/features/users/join-link-actions"
 import { buildJoinLinkUrl } from "@/lib/tenant/join-link-url"
 import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
-import { ROLE_LABELS, ASSIGNABLE_ROLES } from "@/lib/auth/rbac"
+import { ROLE_LABELS, ASSIGNABLE_ROLES } from "@/lib/auth/permissions"
 import type { JoinLink, Tenant } from "@prisma/client"
 
 type AssignableRole = "ADMIN" | "SUPERVISOR" | "MEMBER" | "VIEWER"

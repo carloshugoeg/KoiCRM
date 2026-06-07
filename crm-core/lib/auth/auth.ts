@@ -24,7 +24,6 @@ const providers: Provider[] = [
       const { email, password } = parsed.data
       const user = await prisma.user.findUnique({ where: { email } })
       if (!user?.password) return null
-      if (!user.emailVerified) return null
       const valid = await verifyPassword(password, user.password)
       if (!valid) return null
       return { id: user.id, email: user.email, name: user.name, image: user.image }

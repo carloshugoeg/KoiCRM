@@ -39,3 +39,4 @@ tests/e2e/.auth/
 
 # Vercel local link (use dashboard Root Directory = crm-core for Git deploys)
 .vercel/
+.vercel

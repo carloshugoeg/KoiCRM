@@ -7,7 +7,7 @@ import { JoinLinksPanel } from "@/features/users/components/join-links-panel"
 import { SettingsRowCard, SettingsSectionTitle } from "@/components/settings/settings-section"
 import { avatarColor } from "@/lib/utils/avatar-color"
 import { UserAvatar } from "@/components/ui/user-avatar"
-import { ROLE_LABELS } from "@/lib/auth/rbac"
+import { ROLE_LABELS } from "@/lib/auth/permissions"
 import { Badge } from "@/components/ui/badge"
 import type { Membership, Tenant, User, JoinLink } from "@prisma/client"
 

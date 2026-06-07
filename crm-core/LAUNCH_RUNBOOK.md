@@ -9,7 +9,7 @@ One-command bootstrap for **Supabase Postgres + Vercel** (no Sentry required).
 - Node.js 20+, pnpm, `jq`, `curl`, `openssl` (`psql` optional — bootstrap uses Prisma if missing)
 - Vercel token: [vercel.com/account/tokens](https://vercel.com/account/tokens)
 - Supabase access token: [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens)
-- R2 bucket + API keys, Resend API key (app fails startup without them)
+- R2 bucket + API keys (app fails startup without them)
 - Optional: `vercel` and `supabase` CLIs (script falls back to `npx vercel` and Supabase HTTP API)
 
 ### Steps
@@ -17,8 +17,8 @@ One-command bootstrap for **Supabase Postgres + Vercel** (no Sentry required).
 ```bash
 cd crm-core
 cp .env.deploy.example .env.deploy.local
-pnpm ops:sync-deploy-env   # copies R2/Resend/Google from .env.local + org IDs (MCP/defaults)
-# Still required manually: SUPABASE_DB_PASSWORD, real RESEND key for prod, vercel login OR VERCEL_TOKEN
+pnpm ops:sync-deploy-env   # copies R2/Google from .env.local + org IDs (MCP/defaults)
+# Still required manually: SUPABASE_DB_PASSWORD, vercel login OR VERCEL_TOKEN
 pnpm ops:check-deploy
 pnpm ops:bootstrap
 ```
@@ -39,7 +39,6 @@ Progress is stored in `bootstrap-state.json` (gitignored). Re-run `pnpm ops:boot
 ### After bootstrap (manual once)
 
 - **R2 CORS** — [`docs/ops/r2-production.md`](docs/ops/r2-production.md) (include your Vercel URL and `https://*.vercel.app`)
-- **Resend** — verify sending domain DNS at [resend.com/domains](https://resend.com/domains)
 
 ### Deploy from GitHub (Vercel dashboard)
 
@@ -111,16 +110,7 @@ Choose one of:
 
 ---
 
-## Step 3 — Create a Resend account
-
-1. Go to [resend.com](https://resend.com) → Sign up
-2. **Verify your sending domain** (DNS records, required before launch — emails from unverified domains go to spam)
-3. Go to API Keys → Create API Key with **Full access**
-4. Save: `RESEND_API_KEY`
-
----
-
-## Step 4 — Generate AUTH_SECRET
+## Step 3 — Generate AUTH_SECRET
 
 Run this in your terminal and save the output:
 
@@ -132,7 +122,7 @@ Save the result as `AUTH_SECRET`.
 
 ---
 
-## Step 5 — Create a Sentry project
+## Step 4 — Create a Sentry project
 
 1. Go to [sentry.io](https://sentry.io) → Projects → New Project
 2. Select **Next.js** as the platform
@@ -143,7 +133,7 @@ Save the result as `AUTH_SECRET`.
 
 ---
 
-## Step 6 — Deploy to Vercel
+## Step 5 — Deploy to Vercel
 
 1. Go to [vercel.com](https://vercel.com) → New Project → Import from GitHub
 2. Select the `KoiCRM` repo, set **Root Directory** to `crm-core`
@@ -156,7 +146,7 @@ Save the result as `AUTH_SECRET`.
 
 ---
 
-## Step 7 — Run database migrations
+## Step 6 — Run database migrations
 
 From your local machine, with `DATABASE_ADMIN_URL` pointing to production:
 
@@ -171,7 +161,7 @@ This applies all 10 migrations in order, including the RLS policies.
 
 ---
 
-## Step 8 — Create the first tenant and admin user
+## Step 7 — Create the first tenant and admin user
 
 ```bash
 cd crm-core
