@@ -8,7 +8,6 @@ import { DealCard, type DealCardData } from "@/features/pipeline/components/Deal
 import { formatCurrency } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
 import type { PipelineStage } from "@prisma/client"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   lockedStageColumnHint,
   lockedStageHeaderTitle,
@@ -86,7 +85,7 @@ export function KanbanColumn({
   return (
     <div
       ref={columnRef}
-      className="flex min-w-0 flex-1 basis-0 flex-col rounded-2xl transition-all duration-300 ring-1 ring-black/5"
+      className="flex min-w-0 flex-1 basis-0 flex-col overflow-hidden rounded-2xl transition-all duration-300 ring-1 ring-black/5"
       style={{
         background: isOver ? hex2rgba(stage.color, 0.1) : "#ffffff",
         border: `1px solid ${hex2rgba(stage.color, 0.25)}`,
@@ -152,7 +151,7 @@ export function KanbanColumn({
         role="region"
         aria-label={stage.label}
         className={cn(
-          "flex-1 p-3 min-h-[200px] transition-colors",
+          "flex min-w-0 flex-1 flex-col overflow-hidden p-3 min-h-[200px] transition-colors",
           isOver && stage.locked && "ring-2 ring-inset ring-destructive/30"
         )}
         style={{
@@ -164,12 +163,12 @@ export function KanbanColumn({
             {dropHint}
           </div>
         )}
-        <ScrollArea className="h-[calc(100vh-280px)] pr-3">
-          <div className="flex flex-col gap-3 pb-4 pt-1">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-280px)]">
+          <div className="flex w-full min-w-0 flex-col gap-3 pb-4 pt-1">
             {deals.map((deal) => (
               <div
                 key={deal.id}
-                className={cn("w-full min-w-0 px-1", deal.id === movingDealId ? "opacity-40 pointer-events-none scale-95 transition-opacity" : "transition-opacity")}
+                className={cn("w-full min-w-0 max-w-full", deal.id === movingDealId ? "opacity-40 pointer-events-none scale-95 transition-opacity" : "transition-opacity")}
               >
                 <DealCard
                   deal={deal}
@@ -184,7 +183,7 @@ export function KanbanColumn({
               </div>
             ))}
           </div>
-        </ScrollArea>
+        </div>
       </div>
     </div>
   )

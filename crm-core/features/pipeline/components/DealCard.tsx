@@ -141,9 +141,7 @@ export function DealCard({
       }}
       {...listeners}
       {...attributes}
-      className={`relative rounded-xl border cursor-grab active:cursor-grabbing select-none overflow-hidden
-                 focus-visible:outline-none transition-transform duration-300 hover:-translate-y-0.5
-                 ${isHighlighted ? "scale-[1.02]" : ""}`}
+      className="relative w-full max-w-full min-w-0 box-border rounded-xl border cursor-grab active:cursor-grabbing select-none overflow-hidden focus-visible:outline-none transition-shadow duration-300 hover:-translate-y-0.5"
       onMouseEnter={(e) => {
         if (!isDragging && !isHighlighted) {
           (e.currentTarget as HTMLDivElement).style.boxShadow =
@@ -202,11 +200,11 @@ export function DealCard({
         </div>
 
         {/* Value and Equipment */}
-        <div className="flex items-center justify-between mt-1 gap-2">
-          <p className="text-[13px] font-black truncate min-w-0" style={{ color: sc }}>
+        <div className="flex min-w-0 items-center justify-between mt-1 gap-2">
+          <p className="text-[13px] font-black truncate min-w-0 shrink" style={{ color: sc }}>
             {formatCurrency(deal.value, settings)}
           </p>
-          <div className="flex gap-1 shrink-0 min-w-0 justify-end">
+          <div className="flex min-w-0 shrink gap-1 justify-end overflow-hidden">
              {(chips.length > 0 || customEq) && (
                 <div className="flex gap-1 items-center flex-wrap justify-end">
                   {chips.map((e) => (
@@ -233,10 +231,10 @@ export function DealCard({
         </div>
 
         {/* Footer: Status Pill and Days */}
-        <div className="flex items-center justify-between pt-1">
-          <div className="flex gap-1.5">
+        <div className="flex min-w-0 items-center justify-between gap-1 pt-1">
+          <div className="flex min-w-0 shrink gap-1.5 overflow-hidden">
             <span
-              className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+              className="max-w-full truncate px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink"
               style={{
                 background: hex2rgba(statusColor, 0.15),
                 color: statusColor,
@@ -252,7 +250,7 @@ export function DealCard({
                </span>
             )}
           </div>
-          <span className="text-[10px] font-medium text-slate-400 flex items-center gap-1">
+          <span className="shrink-0 text-[10px] font-medium text-slate-400 flex items-center gap-1">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
             {daysTotal}d
           </span>
