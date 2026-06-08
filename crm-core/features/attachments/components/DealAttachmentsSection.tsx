@@ -68,8 +68,8 @@ export function DealAttachmentsSection({ dealId, tenantId, canEdit = false, excl
 
   return (
     <>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
+      <div className="min-w-0 space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Archivos e imágenes
           </h4>
@@ -86,7 +86,7 @@ export function DealAttachmentsSection({ dealId, tenantId, canEdit = false, excl
         {loading ? (
           <p className="text-xs text-muted-foreground">Cargando…</p>
         ) : visible.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Sin archivos. Sube capturas, fotos de productos, etc.</p>
+          <p className="text-xs text-muted-foreground break-words">Sin archivos. Sube capturas, fotos de productos, etc.</p>
         ) : (
           <div className="grid grid-cols-3 gap-2">
             {visible.map((a) => {

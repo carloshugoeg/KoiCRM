@@ -286,9 +286,10 @@ export function DealDetailModal({
         )}
 
         {/* Three-panel body */}
-        <div className="flex flex-1 overflow-hidden divide-x">
+        <div className="flex flex-1 min-h-0 flex-col overflow-hidden divide-y md:flex-row md:divide-x md:divide-y-0">
           {/* LEFT PANEL – Deal data */}
-          <ScrollArea className="w-72 shrink-0 p-4 space-y-4">
+          <ScrollArea className="h-auto max-h-[45vh] w-full shrink-0 md:h-full md:max-h-none md:w-80">
+            <div className="min-w-0 w-full max-w-full space-y-4 p-4">
             {/* Owner */}
             <div className="flex items-center gap-2 mb-4">
               <div
@@ -435,10 +436,12 @@ export function DealDetailModal({
                 )}
               />
             </div>
+            </div>
           </ScrollArea>
 
           {/* CENTER PANEL – Operations */}
-          <ScrollArea className="flex-1 p-4">
+          <ScrollArea className="min-h-0 min-w-0 flex-1">
+            <div className="min-w-0 w-full p-4">
             {/* Action buttons */}
             {wonStage && deal.stageKey !== "ganado" && !hasPaymentDoc && (
               <div
@@ -621,16 +624,19 @@ export function DealDetailModal({
                 canEdit={canEdit}
               />
             </div>
+            </div>
           </ScrollArea>
 
           {/* RIGHT PANEL – History */}
-          <ScrollArea className="w-64 shrink-0 p-4">
+          <ScrollArea className="h-auto max-h-[35vh] w-full shrink-0 md:h-full md:max-h-none md:w-64">
+            <div className="min-w-0 w-full p-4">
             <h3 className="text-sm font-semibold mb-3">Historial</h3>
             {loadingAct ? (
               <p className="text-xs text-muted-foreground">Cargando...</p>
             ) : (
               <HistoryPanel activities={activities} settings={settings} />
             )}
+            </div>
           </ScrollArea>
         </div>
         </DialogPrimitive.Content>

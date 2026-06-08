@@ -88,7 +88,7 @@ export function PaymentSection({ dealId, tenantId, payments, canEdit, canDelete,
 
   return (
     <TooltipProvider delayDuration={100}>
-      <div className="space-y-2">
+      <div className="min-w-0 space-y-2">
         <div className="flex items-center justify-between">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Comprobantes de Pago
@@ -115,14 +115,17 @@ export function PaymentSection({ dealId, tenantId, payments, canEdit, canDelete,
           {payments.map((p) => (
             <div
               key={p.id}
-              className={`flex items-center gap-2 rounded-md px-2 py-1 text-sm bg-muted/40 ${p.isVoid ? "opacity-50" : ""}`}
+              className={`rounded-md px-2 py-1.5 text-sm bg-muted/40 ${p.isVoid ? "opacity-50" : ""}`}
             >
-              <span className={`flex-1 font-medium ${p.isVoid ? "line-through" : ""}`}>
-                {p.number}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {format(new Date(p.date), "dd MMM yyyy", { locale: es })}
-              </span>
+              <div className="flex min-w-0 items-center justify-between gap-2">
+                <span className={`min-w-0 truncate font-medium ${p.isVoid ? "line-through" : ""}`}>
+                  {p.number}
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {format(new Date(p.date), "dd MMM yyyy", { locale: es })}
+                </span>
+              </div>
+              <div className="mt-1 flex items-center gap-1">
               {p.isVoid && (
                 <Badge variant="outline" className="text-xs py-0 h-4">
                   Anulado
@@ -190,49 +193,50 @@ export function PaymentSection({ dealId, tenantId, payments, canEdit, canDelete,
                   </TooltipContent>
                 </Tooltip>
               )}
+              </div>
             </div>
           ))}
         </div>
 
         {showForm && (
-          <form onSubmit={handleSubmit} className="space-y-2 rounded-md border p-2">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Número (ej. FAC-001, REC-105)"
-                value={number}
-                onChange={(e) => setNumber(e.target.value)}
-                className="h-7 text-xs"
-                required
-              />
-              <DatePicker
-                value={date}
-                onChange={setDate}
-                className="shrink-0"
-                placeholder="dd/mm/aaaa"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <FileUploadButton
-                dealId={dealId}
-                tenantId={tenantId}
-                onUpload={(result) => setPending(result)}
-                onError={(msg) => toast.error(msg)}
-                onCompressed={(pct) =>
-                  toast.info(`Imagen optimizada (~${pct}% menos peso).`)
-                }
-                disabled={submitting}
-              />
-              {pending ? (
-                <span className="text-xs text-green-600">Archivo listo ✓</span>
-              ) : (
-                <span className="text-xs text-muted-foreground">PDF o foto obligatorio</span>
-              )}
-              <div className="ml-auto flex gap-2">
+          <form onSubmit={handleSubmit} className="min-w-0 space-y-2 rounded-md border p-2">
+            <Input
+              placeholder="Número (ej. FAC-001, REC-105)"
+              value={number}
+              onChange={(e) => setNumber(e.target.value)}
+              className="h-7 w-full text-xs"
+              required
+            />
+            <DatePicker
+              value={date}
+              onChange={setDate}
+              className="w-full"
+              placeholder="dd/mm/aaaa"
+            />
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <FileUploadButton
+                  dealId={dealId}
+                  tenantId={tenantId}
+                  onUpload={(result) => setPending(result)}
+                  onError={(msg) => toast.error(msg)}
+                  onCompressed={(pct) =>
+                    toast.info(`Imagen optimizada (~${pct}% menos peso).`)
+                  }
+                  disabled={submitting}
+                />
+                {pending ? (
+                  <span className="text-xs text-green-600">Archivo listo ✓</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">PDF o foto obligatorio</span>
+                )}
+              </div>
+              <div className="flex gap-2">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs"
+                  className="h-7 flex-1 text-xs"
                   onClick={resetForm}
                 >
                   Cancelar
@@ -240,7 +244,7 @@ export function PaymentSection({ dealId, tenantId, payments, canEdit, canDelete,
                 <Button
                   type="submit"
                   size="sm"
-                  className="h-7 text-xs"
+                  className="h-7 flex-1 text-xs"
                   disabled={submitting || !pending}
                 >
                   Guardar
