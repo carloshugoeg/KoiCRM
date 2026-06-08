@@ -31,8 +31,6 @@ interface PipelineClientProps {
   followUpReasons: CatalogItem[]
   currentFilters: PipelineFiltersParams
   intlSettings: IntlSettings
-  logoUrl: string | null
-  productName: string
   currentUserId: string
   canCreate: boolean
   canSeeAll: boolean
@@ -74,8 +72,6 @@ export function PipelineClient({
   followUpReasons,
   currentFilters,
   intlSettings,
-  logoUrl,
-  productName,
   currentUserId,
   canCreate,
   canSeeAll,

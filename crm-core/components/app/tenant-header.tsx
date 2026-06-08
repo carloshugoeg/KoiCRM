@@ -11,6 +11,7 @@ import {
   Calendar,
   Archive,
   BarChart2,
+  Droplets,
   type LucideIcon,
 } from "lucide-react"
 import { useTenant } from "@/lib/tenant/context"
@@ -37,6 +38,9 @@ export function TenantHeader({ memberships, clientsCount, canViewStats }: Props)
   }
 
   const base = `/app/${tenant.slug}`
+  const productName = tenant.branding?.productName ?? tenant.name
+  const logoUrl = tenant.branding?.logoUrl ?? null
+
   const navItems: { href: string; label: string; icon: LucideIcon; badge?: number }[] = [
     { href: `${base}/pipeline`, label: "Embudo", icon: LayoutDashboard },
     { href: `${base}/clients`, label: "Clientes", icon: Users, badge: clientsCount },
@@ -52,7 +56,27 @@ export function TenantHeader({ memberships, clientsCount, canViewStats }: Props)
       className="print:hidden sticky top-0 z-40 flex h-14 shrink-0 items-center gap-4 px-4 backdrop-blur-sm"
       style={{ background: "var(--header-bg)", borderBottom: "1px solid var(--header-border)" }}
     >
-      <span className="font-semibold">{tenant.branding?.productName ?? tenant.name}</span>
+      <Link
+        href={`${base}/pipeline`}
+        className="flex shrink-0 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        title={productName}
+      >
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logoUrl}
+            alt={productName}
+            className="h-8 max-w-[160px] object-contain object-left"
+          />
+        ) : (
+          <>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-sky-400 to-blue-700">
+              <Droplets className="h-4 w-4 text-white" aria-hidden />
+            </span>
+            <span className="font-semibold">{productName}</span>
+          </>
+        )}
+      </Link>
       {memberships.length > 1 && (
         <nav className="flex gap-2 text-sm">
           {memberships.map((m) => (

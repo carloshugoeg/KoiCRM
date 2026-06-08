@@ -143,8 +143,6 @@ export default async function PipelinePage({ params, searchParams }: Props) {
           statuses={statuses}
           currentFilters={filters}
           intlSettings={intlSettings}
-          logoUrl={logoUrl}
-          productName={productName}
           currentUserId={session.user.id}
           canCreate={canCreateDeal(membership.role)}
           canSeeAll={canSeeAll}
