@@ -12,6 +12,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { FileUploadButton } from "@/features/attachments/components/FileUploadButton";
 import { confirmUpload } from "@/features/attachments/actions";
+import { resolveDealFileUrl } from "@/lib/storage/media-url";
 import { createPayment, voidPayment, deletePayment } from "@/features/payments/actions";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import type { Payment } from "@prisma/client";
@@ -129,7 +130,7 @@ export function PaymentSection({ dealId, tenantId, payments, canEdit, canDelete,
               )}
               {p.fileUrl && (
                 <a
-                  href={p.fileUrl}
+                  href={resolveDealFileUrl(p.fileUrl) ?? p.fileUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-muted-foreground hover:text-foreground transition-colors"

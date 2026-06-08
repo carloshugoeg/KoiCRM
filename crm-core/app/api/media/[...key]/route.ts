@@ -2,14 +2,14 @@ import { type NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth/auth"
 import { prisma } from "@/lib/db/client"
 import { getObject } from "@/lib/storage/s3"
-import { isAvatarObjectKey } from "@/lib/storage/media-url"
+import { isTenantMediaObjectKey } from "@/lib/storage/media-url"
 
 type Props = { params: { key: string[] } }
 
 export async function GET(_req: NextRequest, { params }: Props) {
   const key = params.key.map((s) => decodeURIComponent(s)).join("/")
 
-  if (!isAvatarObjectKey(key)) {
+  if (!isTenantMediaObjectKey(key)) {
     return NextResponse.json({ error: "not_found" }, { status: 404 })
   }
 

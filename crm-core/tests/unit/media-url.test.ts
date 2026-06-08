@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildMediaUrl, resolveUserImageSrc, isAvatarObjectKey } from "@/lib/storage/media-url"
+import { buildMediaUrl, resolveUserImageSrc, resolveDealFileUrl, isAvatarObjectKey } from "@/lib/storage/media-url"
 
 describe("media-url", () => {
   it("isAvatarObjectKey validates tenant avatar paths", () => {
@@ -17,6 +17,14 @@ describe("media-url", () => {
       "https://pub.example.com/tenant1/avatars/user1/abc.jpg",
     )
     expect(src).toBe("/api/media/tenant1/avatars/user1/abc.jpg")
+  })
+
+  it("resolveDealFileUrl proxies R2 deal attachment URLs", () => {
+    process.env.S3_PUBLIC_URL = "https://pub.example.com"
+    const src = resolveDealFileUrl(
+      "https://pub.example.com/tenant1/deals/deal1/abc.pdf",
+    )
+    expect(src).toBe("/api/media/tenant1/deals/deal1/abc.pdf")
   })
 
   it("resolveUserImageSrc keeps Google profile URLs", () => {

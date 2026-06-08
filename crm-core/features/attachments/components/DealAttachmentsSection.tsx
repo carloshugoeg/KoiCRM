@@ -10,6 +10,7 @@ import {
   getDealAttachmentsAction,
   type DealAttachmentDTO,
 } from "@/features/attachments/actions"
+import { resolveDealFileUrl } from "@/lib/storage/media-url"
 import { AlertDialog } from "@/components/ui/alert-dialog"
 
 interface Props {
@@ -90,12 +91,13 @@ export function DealAttachmentsSection({ dealId, tenantId, canEdit = false, excl
           <div className="grid grid-cols-3 gap-2">
             {visible.map((a) => {
               const isImage = a.mimeType.startsWith("image/")
+              const mediaUrl = resolveDealFileUrl(a.url) ?? a.url
               return (
                 <div key={a.id} className="group relative aspect-square overflow-hidden rounded-md border bg-muted/40">
-                  <a href={a.url} target="_blank" rel="noreferrer" className="block h-full w-full">
+                  <a href={mediaUrl} target="_blank" rel="noreferrer" className="block h-full w-full">
                     {isImage ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={a.url} alt="" className="h-full w-full object-cover" />
+                      <img src={mediaUrl} alt="" className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground">
                         <FileText className="h-6 w-6" />

@@ -12,6 +12,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { FileUploadButton } from "@/features/attachments/components/FileUploadButton";
 import { confirmUpload } from "@/features/attachments/actions";
+import { resolveDealFileUrl } from "@/lib/storage/media-url";
 import { createQuote, voidQuote, deleteQuote } from "@/features/quotes/actions";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import type { Quote } from "@prisma/client";
@@ -129,7 +130,7 @@ export function QuoteSection({ dealId, tenantId, quotes, canEdit, canDelete, onR
               )}
               {q.fileUrl && (
                 <a
-                  href={q.fileUrl}
+                  href={resolveDealFileUrl(q.fileUrl) ?? q.fileUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-muted-foreground hover:text-foreground transition-colors"

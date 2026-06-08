@@ -55,41 +55,30 @@ export function FileUploadButton({
         if (savedPercent >= 5) onCompressed?.(savedPercent);
       }
 
-      const signRes = await fetch("/api/upload/sign", {
+      const body = new FormData();
+      body.append("file", uploadFile);
+      body.append("tenantId", tenantId);
+      body.append("dealId", dealId);
+      body.append("contentType", mimeType);
+
+      const uploadRes = await fetch("/api/upload/deal", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contentType: mimeType,
-          size: uploadFile.size,
-          dealId,
-          tenantId,
-        }),
+        body,
       });
 
-      if (!signRes.ok) {
-        const err = await signRes.json().catch(() => ({}));
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => ({}));
         if (err.code === "storage_limit_exceeded") {
           onError?.(err.error);
         } else if (err.code === "file_too_large") {
           onError?.(err.error ?? "El archivo supera el tamaño máximo permitido.");
         } else {
-          onError?.("Error al iniciar la subida. Intenta de nuevo.");
+          onError?.("Error al subir el archivo. Intenta de nuevo.");
         }
         return;
       }
 
-      const { signedUrl, key, publicUrl } = await signRes.json();
-
-      const uploadRes = await fetch(signedUrl, {
-        method: "PUT",
-        body: uploadFile,
-        headers: { "Content-Type": mimeType },
-      });
-
-      if (!uploadRes.ok) {
-        onError?.("Error al subir el archivo. Intenta de nuevo.");
-        return;
-      }
+      const { key, publicUrl } = await uploadRes.json();
 
       setReadyLabel(uploadFile.name);
       onUpload({ url: publicUrl, key, mimeType, size: uploadFile.size });

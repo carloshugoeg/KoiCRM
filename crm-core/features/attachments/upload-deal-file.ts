@@ -17,32 +17,27 @@ export async function uploadDealFile(
 
   const { file: uploadFile, mimeType } = prepared
 
-  const signRes = await fetch("/api/upload/sign", {
+  const body = new FormData()
+  body.append("file", uploadFile)
+  body.append("tenantId", tenantId)
+  body.append("dealId", dealId)
+  body.append("contentType", mimeType)
+
+  const uploadRes = await fetch("/api/upload/deal", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contentType: mimeType,
-      size: uploadFile.size,
-      dealId,
-      tenantId,
-    }),
-  })
-
-  if (!signRes.ok) {
-    const err = await signRes.json().catch(() => ({}))
-    return { error: (err as { error?: string }).error ?? "Error al subir el archivo." }
-  }
-
-  const { signedUrl, key, publicUrl } = await signRes.json()
-  const uploadRes = await fetch(signedUrl, {
-    method: "PUT",
-    body: uploadFile,
-    headers: { "Content-Type": mimeType },
+    body,
   })
 
   if (!uploadRes.ok) {
-    return { error: "Error al subir el archivo al almacenamiento." }
+    const err = await uploadRes.json().catch(() => ({}))
+    const code = (err as { code?: string }).code
+    if (code === "storage_limit_exceeded" || code === "file_too_large") {
+      return { error: (err as { error?: string }).error ?? "Error al subir el archivo." }
+    }
+    return { error: (err as { error?: string }).error ?? "Error al subir el archivo." }
   }
+
+  const { key, publicUrl } = await uploadRes.json()
 
   return {
     url: publicUrl as string,

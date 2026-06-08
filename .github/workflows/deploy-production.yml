@@ -38,7 +38,10 @@ jobs:
 
       - name: Apply database migrations
         env:
+          # schema.prisma declares both url and directUrl; migrations use directUrl.
+          # Use the direct Postgres URL (Supabase :5432 / admin_user), not the pooler.
           DATABASE_URL: ${{ secrets.DATABASE_ADMIN_URL }}
+          DATABASE_ADMIN_URL: ${{ secrets.DATABASE_ADMIN_URL }}
         run: pnpm exec prisma migrate deploy
 
       - name: Deploy to Vercel (production)

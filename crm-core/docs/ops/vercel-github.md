@@ -82,3 +82,6 @@ Sentry (`SENTRY_*`) is optional; builds work without `SENTRY_AUTH_TOKEN`.
 | `500` on `/app/.../pipeline` — `EMAXCONNSESSION max clients reached` | Production is on Supabase **session pooler** (`:5432`, 15 conn limit). Use **transaction pooler** `:6543?pgbouncer=true&connection_limit=1` in `DATABASE_URL`, redeploy, and keep `DATABASE_SET_ROLE=app_user`. Pipeline page loads data in one transaction to reduce pool usage |
 | `P2024` — `Timed out fetching a new connection from the connection pool` (`connection_limit: 1`) | Caused by `ensureAppRole()` opening a 2nd connection inside `withTenant` transactions. Fixed in `lib/db/role-context.ts` — redeploy latest. Also add `pool_timeout=30` to `DATABASE_URL` |
 | `P2028` — `Transaction already closed` (5s timeout) | Heavy pages (pipeline) on Supabase pooler — fixed via higher `withTenant` timeout in `lib/db/rls.ts`; redeploy latest |
+| Adjuntos / cotizaciones no suben tras dominio custom | R2 CORS debe incluir `https://koicrm.aquaxela.com` — ver [`r2-production.md`](./r2-production.md) y `pnpm ops:configure-r2-cors` |
+| `/api/health` → `storage:"error"` | Revisa `S3_ENDPOINT`, `S3_BUCKET` (`aqua-crm`), credenciales R2 en Vercel; endpoint **sin** `/aqua-crm` al final |
+| `koicrm.aquaxela.com` no resuelve | DNS: CNAME `koicrm` → Vercel; dominio añadido en Vercel project settings |
