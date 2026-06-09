@@ -7,6 +7,13 @@ import { TenantProvider } from "@/lib/tenant/context"
 import { TenantHeader } from "@/components/app/tenant-header"
 import { buildCssVars } from "@/lib/branding/css-vars"
 import { countClients } from "@/features/clients/queries"
+import { getCatalogItems } from "@/features/catalogs/queries"
+import { getFollowUpAlerts } from "@/features/follow-ups/queries"
+import {
+  countFollowUpBannerItems,
+  toFollowUpBannerItems,
+} from "@/features/follow-ups/banner-items"
+import { FollowUpBanners } from "@/features/follow-ups/components/follow-up-banners"
 
 interface Props {
   children: React.ReactNode
@@ -31,7 +38,19 @@ export default async function TenantLayout({ children, params }: Props) {
     redirect(`/app/access?reason=${embudoAccess.reason}`)
   }
 
-  const clientsCount = await countClients(resolved.tenant.id)
+  const tenantId = resolved.tenant.id
+  const canSeeAll = canSeeAllDeals(resolved.membership.role)
+  const ownerFilter = canSeeAll ? undefined : session.user.id
+
+  const [clientsCount, followUpAlerts, followUpReasons] = await Promise.all([
+    countClients(tenantId),
+    getFollowUpAlerts(tenantId, ownerFilter),
+    getCatalogItems(tenantId, "followupReason", { activeOnly: true }),
+  ])
+
+  const reasonLabels = Object.fromEntries(followUpReasons.map((r) => [r.key, r.label]))
+  const followUpBannerItems = toFollowUpBannerItems(followUpAlerts, reasonLabels)
+  const followUpBannerTotal = countFollowUpBannerItems(followUpAlerts)
 
   const cssVars = buildCssVars(resolved.tenant.branding)
 
@@ -50,6 +69,11 @@ export default async function TenantLayout({ children, params }: Props) {
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-14 print:min-h-0 print:overflow-visible print:pb-0">
           {children}
         </main>
+        <FollowUpBanners
+          tenantSlug={params.tenantSlug}
+          items={followUpBannerItems}
+          totalCount={followUpBannerTotal}
+        />
         <footer className="print:hidden fixed inset-x-0 bottom-0 z-40 w-full border-t border-slate-200/50 bg-[#f8faff] py-4 text-center text-[11px] font-medium text-slate-400">
           Diseñado por Vértice y Desarrollado por Koi Software 2026
         </footer>

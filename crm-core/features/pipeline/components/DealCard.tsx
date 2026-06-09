@@ -5,6 +5,7 @@ import { useState } from "react"
 import { useDraggable } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
 import { avatarColor } from "@/lib/utils/avatar-color"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { formatCurrency } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
 
@@ -18,6 +19,10 @@ export interface DealCardData {
   value: number
   ownerId: string
   ownerName: string | null
+  ownerImage?: string | null
+  createdById?: string | null
+  createdByName?: string | null
+  createdByImage?: string | null
   stageId: string
   statusKey: string
   createdAt: Date
@@ -250,10 +255,19 @@ export function DealCard({
                </span>
             )}
           </div>
-          <span className="shrink-0 text-[10px] font-medium text-slate-400 flex items-center gap-1">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-            {daysTotal}d
-          </span>
+          <div className="shrink-0 flex items-center gap-2">
+            <span className="text-[10px] font-medium text-slate-400 flex items-center gap-1">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              {daysTotal}d
+            </span>
+            <UserAvatar
+              userId={deal.ownerId}
+              name={deal.ownerName}
+              imageUrl={deal.ownerImage}
+              size={18}
+              className="border-white shadow-sm"
+            />
+          </div>
         </div>
 
         {showExpanded && (

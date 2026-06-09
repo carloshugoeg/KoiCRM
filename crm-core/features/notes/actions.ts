@@ -3,31 +3,23 @@
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
-import { requireRole } from "@/lib/auth/rbac"
-import { userCanEditDeal } from "@/lib/auth/deal-access"
+import { requireRole, canEditDeal } from "@/lib/auth/rbac"
+import { resolveActionActor } from "@/lib/auth/action-pin"
 import { prisma } from "@/lib/db/client"
 import { recordActivity } from "@/features/activity/queries"
 import { addNoteSchema, deleteNoteSchema } from "@/features/notes/schemas"
 import { getDealNotes, getClientNotes } from "@/features/notes/queries"
 
-export async function addNoteAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
-
+export async function addNoteAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
   const parsed = addNoteSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
-  const { tenantId, tenantSlug, body, dealId, clientId } = parsed.data
+  const { tenantId, tenantSlug, body, dealId, clientId, pin } = parsed.data
 
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
-  } catch {
-    return { ok: false, error: "Acceso denegado." }
-  }
-
-  if (dealId && !(await userCanEditDeal(session, tenantId, dealId))) {
-    return { ok: false, error: "Acceso denegado." }
-  }
+  const actor = await resolveActionActor({ tenantId, pin })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  const { actorUserId, actorRole } = actor.actor
+  if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
 
   await withTenant(tenantId, async (tx) => {
     await tx.note.create({
@@ -36,7 +28,7 @@ export async function addNoteAction(raw: unknown): Promise<{ ok: boolean; error?
         text: body,
         dealId: dealId ?? null,
         clientId: clientId ?? null,
-        createdById: session.user!.id,
+        createdById: actorUserId,
       },
     })
     if (dealId) {
@@ -46,7 +38,7 @@ export async function addNoteAction(raw: unknown): Promise<{ ok: boolean; error?
         entityId: dealId,
         type: "noteAdded",
         payload: { preview: body.slice(0, 80) },
-        userId: session.user!.id,
+        userId: actorUserId,
       })
     }
   })
@@ -56,20 +48,15 @@ export async function addNoteAction(raw: unknown): Promise<{ ok: boolean; error?
   return { ok: true }
 }
 
-export async function deleteNoteAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
-
+export async function deleteNoteAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
   const parsed = deleteNoteSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
-  const { tenantId, tenantSlug, noteId } = parsed.data
+  const { tenantId, tenantSlug, noteId, pin } = parsed.data
 
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
-  } catch {
-    return { ok: false, error: "Acceso denegado." }
-  }
+  const actor = await resolveActionActor({ tenantId, pin })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  if (!canEditDeal(actor.actor.actorRole)) return { ok: false, error: "Acceso denegado." }
 
   const note = await prisma.note.findUnique({ where: { id: noteId } })
   if (!note || note.tenantId !== tenantId) return { ok: false, error: "Nota no encontrada." }

@@ -7,6 +7,7 @@ import { Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { addNoteAction, deleteNoteAction, getDealNotesAction, getClientNotesAction } from "@/features/notes/actions"
+import { useActionPin } from "@/features/auth/pin-gate"
 import type { NoteEntry } from "@/features/notes/queries"
 import { formatDateTime } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
@@ -21,6 +22,7 @@ interface NotesSectionProps {
 }
 
 export function NotesSection({ tenantId, tenantSlug, dealId, clientId, settings, canEdit = true }: NotesSectionProps) {
+  const { guard } = useActionPin()
   const [notes, setNotes] = useState<NoteEntry[]>([])
   const [body, setBody] = useState("")
   const [loading, setLoading] = useState(false)
@@ -37,10 +39,10 @@ export function NotesSection({ tenantId, tenantSlug, dealId, clientId, settings,
   async function handleAdd() {
     if (!body.trim()) return
     setLoading(true)
-    const result = await addNoteAction({ tenantId, tenantSlug, body: body.trim(), dealId, clientId })
+    const result = await guard((pin) => addNoteAction({ tenantId, tenantSlug, body: body.trim(), dealId, clientId, pin }))
     setLoading(false)
     if (!result.ok) {
-      toast.error(toastErrorFromResult(result.error, toastMessages.note.errorSave))
+      if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.note.errorSave))
       return
     }
     toast.success(toastMessages.note.saved)
@@ -55,9 +57,9 @@ export function NotesSection({ tenantId, tenantSlug, dealId, clientId, settings,
 
   async function handleDelete(noteId: string) {
     if (!confirm("¿Eliminar esta nota?")) return
-    const result = await deleteNoteAction({ tenantId, tenantSlug, noteId })
+    const result = await guard((pin) => deleteNoteAction({ tenantId, tenantSlug, noteId, pin }))
     if (!result.ok) {
-      toast.error(toastErrorFromResult(result.error, toastMessages.note.errorRemove))
+      if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.note.errorRemove))
       return
     }
     toast.success(toastMessages.note.removed)

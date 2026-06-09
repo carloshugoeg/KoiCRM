@@ -21,6 +21,8 @@ import {
   adminResetPasswordAction,
   deactivateMemberAction,
   reactivateMemberAction,
+  setMemberPinAction,
+  clearMemberPinAction,
 } from "@/features/users/actions"
 import type { Role, MembershipStatus } from "@prisma/client"
 import { ROLE_LABELS, ASSIGNABLE_ROLES } from "@/lib/auth/permissions"
@@ -79,6 +81,8 @@ export function EditMemberModal({
   const [reassignTo, setReassignTo] = useState("")
   const [deactivating, setDeactivating] = useState(false)
   const [deactivateConfirmOpen, setDeactivateConfirmOpen] = useState(false)
+  const [actionPin, setActionPin] = useState("")
+  const [settingPin, setSettingPin] = useState(false)
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -227,6 +231,40 @@ export function EditMemberModal({
     router.refresh()
   }
 
+  async function handleSetPin() {
+    if (!/^\d{4}$/.test(actionPin)) {
+      setError("El PIN debe tener 4 dígitos.")
+      return
+    }
+    setSettingPin(true)
+    setError(null)
+    const result = await setMemberPinAction({ tenantId, targetUserId: member.userId, pin: actionPin })
+    setSettingPin(false)
+    if (!result.ok) {
+      const msg = result.error ?? "No se pudo asignar el PIN."
+      setError(msg)
+      toast.error(msg)
+      return
+    }
+    toast.success("PIN asignado.")
+    setActionPin("")
+  }
+
+  async function handleClearPin() {
+    setSettingPin(true)
+    setError(null)
+    const result = await clearMemberPinAction({ tenantId, targetUserId: member.userId })
+    setSettingPin(false)
+    if (!result.ok) {
+      const msg = result.error ?? "No se pudo quitar el PIN."
+      setError(msg)
+      toast.error(msg)
+      return
+    }
+    toast.success("PIN eliminado.")
+    setActionPin("")
+  }
+
   async function handleReactivate() {
     setDeactivating(true)
     setError(null)
@@ -356,6 +394,36 @@ export function EditMemberModal({
                   </div>
                   <p className="text-xs text-muted-foreground">
                     El usuario podrá iniciar sesión con esta contraseña.
+                  </p>
+                </div>
+
+                <div className="space-y-1 border-t pt-3">
+                  <Label htmlFor="member-pin">PIN de acciones (4 dígitos)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="member-pin"
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={4}
+                      value={actionPin}
+                      onChange={(e) => setActionPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                      placeholder="••••"
+                      autoComplete="off"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={settingPin || actionPin.length !== 4}
+                      onClick={handleSetPin}
+                    >
+                      {settingPin ? "…" : "Asignar"}
+                    </Button>
+                    <Button type="button" variant="ghost" disabled={settingPin} onClick={handleClearPin}>
+                      Quitar
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Identifica al usuario al confirmar cambios. Debe ser único por equipo.
                   </p>
                 </div>
 

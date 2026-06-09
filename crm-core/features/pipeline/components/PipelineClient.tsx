@@ -11,6 +11,7 @@ import { KpiBar } from "@/features/pipeline/components/KpiBar"
 import { ClientFormModal } from "@/features/deals/components/ClientFormModal"
 import { DealDetailModal } from "@/features/deals/components/DealDetailModal"
 import { getDealSummaryAction } from "@/features/deals/actions"
+import { PinProvider } from "@/features/auth/pin-gate"
 import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 import type { PipelineStage, CatalogItem } from "@prisma/client"
 import type { PipelineFiltersParams } from "@/features/pipeline/schemas"
@@ -33,7 +34,7 @@ interface PipelineClientProps {
   intlSettings: IntlSettings
   currentUserId: string
   canCreate: boolean
-  canSeeAll: boolean
+  canEdit: boolean
   canArchive: boolean
   canDelete: boolean
 }
@@ -54,6 +55,10 @@ function cardToModalDeal(deal: DealCardData): DealSummary {
     stageEnteredAt: deal.stageEnteredAt.toISOString(),
     ownerId: deal.ownerId,
     ownerName: deal.ownerName,
+    ownerImage: deal.ownerImage ?? null,
+    createdById: deal.createdById ?? null,
+    createdByName: deal.createdByName ?? null,
+    createdByImage: deal.createdByImage ?? null,
     equipment: deal.equipment,
     quoteCount: deal.quoteCount,
     paymentCount: deal.paymentCount,
@@ -74,7 +79,7 @@ export function PipelineClient({
   intlSettings,
   currentUserId,
   canCreate,
-  canSeeAll,
+  canEdit,
   canArchive,
   canDelete,
 }: PipelineClientProps) {
@@ -164,6 +169,7 @@ export function PipelineClient({
     .reduce((sum, d) => sum + d.value, 0)
 
   return (
+    <PinProvider>
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-[#f8faff]">
       <div className="flex items-center gap-5 px-6 py-4 border-b border-indigo-500/10 bg-white/80 backdrop-blur-sm sticky top-0 z-10 flex-wrap">
         <div className="flex items-center gap-3">
@@ -229,7 +235,7 @@ export function PipelineClient({
           equipment={equipment}
           statuses={statuses}
           followUpReasons={followUpReasons}
-          canChooseOwner={canSeeAll}
+          canChooseOwner={canEdit}
           currentUserId={currentUserId}
         />
       )}
@@ -242,7 +248,7 @@ export function PipelineClient({
           tenantId={tenantId}
           tenantSlug={tenantSlug}
           settings={intlSettings}
-          canEdit={canSeeAll || modalDeal.ownerId === currentUserId}
+          canEdit={canEdit}
           canArchive={canArchive}
           canDelete={canDelete}
           members={members}
@@ -254,5 +260,6 @@ export function PipelineClient({
         />
       )}
     </div>
+    </PinProvider>
   )
 }

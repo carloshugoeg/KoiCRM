@@ -3,26 +3,26 @@
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
-import { requireRole } from "@/lib/auth/rbac"
-import { userCanEditDeal } from "@/lib/auth/deal-access"
+import { requireRole, canEditDeal, canDeleteDeal } from "@/lib/auth/rbac"
+import { resolveActionActor } from "@/lib/auth/action-pin"
 import { recordActivity } from "@/features/activity/queries"
 import { CreateQuoteSchema, UpdateQuoteSchema } from "./schemas"
 
 export async function createQuote(tenantId: string, input: unknown) {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false as const, error: "Unauthorized", code: "unauthorized" }
-
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
-  } catch {
-    return { ok: false as const, error: "Unauthorized", code: "unauthorized" }
-  }
-
   const parsed = CreateQuoteSchema.safeParse(input)
   if (!parsed.success) return { ok: false as const, error: "Invalid input", code: "invalid_input" }
   const data = parsed.data
 
-  if (!(await userCanEditDeal(session, tenantId, data.dealId))) {
+  const actor = await resolveActionActor({ tenantId, pin: data.pin })
+  if (!actor.ok) {
+    return {
+      ok: false as const,
+      error: actor.error ?? "Se requiere PIN.",
+      code: actor.requiresPin ? "pin_required" : "unauthorized",
+      requiresPin: actor.requiresPin,
+    }
+  }
+  if (!canEditDeal(actor.actor.actorRole)) {
     return { ok: false as const, error: "Unauthorized", code: "unauthorized" }
   }
 
@@ -42,7 +42,7 @@ export async function createQuote(tenantId: string, input: unknown) {
       entityId: data.dealId,
       type: "quoteAdded",
       payload: { number: data.number },
-      userId: session.user!.id,
+      userId: actor.actor.actorUserId,
     })
     return q
   })
@@ -73,13 +73,17 @@ export async function updateQuote(tenantId: string, input: unknown) {
   return { ok: true as const, data: quote }
 }
 
-export async function voidQuote(tenantId: string, quoteId: string) {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false as const, error: "Unauthorized", code: "unauthorized" }
-
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
-  } catch {
+export async function voidQuote(tenantId: string, quoteId: string, pin?: string) {
+  const actor = await resolveActionActor({ tenantId, pin })
+  if (!actor.ok) {
+    return {
+      ok: false as const,
+      error: actor.error ?? "Se requiere PIN.",
+      code: actor.requiresPin ? "pin_required" : "unauthorized",
+      requiresPin: actor.requiresPin,
+    }
+  }
+  if (!canEditDeal(actor.actor.actorRole)) {
     return { ok: false as const, error: "Unauthorized", code: "unauthorized" }
   }
 
@@ -91,13 +95,17 @@ export async function voidQuote(tenantId: string, quoteId: string) {
   return { ok: true as const, data: quote }
 }
 
-export async function deleteQuote(tenantId: string, quoteId: string) {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false as const, error: "Unauthorized", code: "unauthorized" }
-
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN"])
-  } catch {
+export async function deleteQuote(tenantId: string, quoteId: string, pin?: string) {
+  const actor = await resolveActionActor({ tenantId, pin })
+  if (!actor.ok) {
+    return {
+      ok: false as const,
+      error: actor.error ?? "Se requiere PIN.",
+      code: actor.requiresPin ? "pin_required" : "unauthorized",
+      requiresPin: actor.requiresPin,
+    }
+  }
+  if (!canDeleteDeal(actor.actor.actorRole)) {
     return { ok: false as const, error: "Unauthorized", code: "unauthorized" }
   }
 

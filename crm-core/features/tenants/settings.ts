@@ -16,6 +16,8 @@ const updateSettingsSchema = z.object({
   whatsappCountryCode: z.string().max(10),
   dealIdPrefix: z.string().min(1).max(10).toUpperCase(),
   dealIdYearDigits: z.union([z.literal(2), z.literal(4)]),
+  pinEnabled: z.boolean(),
+  pinUnlockWindowSeconds: z.coerce.number().int().min(30).max(3600),
 })
 
 export async function updateTenantSettingsAction(

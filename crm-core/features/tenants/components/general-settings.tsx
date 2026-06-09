@@ -45,6 +45,8 @@ const defaultSettings = {
   whatsappCountryCode: "+502",
   dealIdPrefix: "DEAL",
   dealIdYearDigits: 2,
+  pinEnabled: false,
+  pinUnlockWindowSeconds: 300,
 }
 
 export function GeneralSettings({ tenant, settings, canManage }: Props) {
@@ -57,6 +59,10 @@ export function GeneralSettings({ tenant, settings, canManage }: Props) {
   const [whatsappCountryCode, setWhatsappCountryCode] = useState(s.whatsappCountryCode)
   const [dealIdPrefix, setDealIdPrefix] = useState(s.dealIdPrefix)
   const [dealIdYearDigits, setDealIdYearDigits] = useState(s.dealIdYearDigits)
+  const [pinEnabled, setPinEnabled] = useState<boolean>(s.pinEnabled ?? false)
+  const [pinUnlockMinutes, setPinUnlockMinutes] = useState<number>(
+    Math.round((s.pinUnlockWindowSeconds ?? 300) / 60),
+  )
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -75,6 +81,8 @@ export function GeneralSettings({ tenant, settings, canManage }: Props) {
       whatsappCountryCode,
       dealIdPrefix,
       dealIdYearDigits: Number(dealIdYearDigits),
+      pinEnabled,
+      pinUnlockWindowSeconds: Math.max(30, Number(pinUnlockMinutes) * 60),
     })
     setSaving(false)
     if (!result.ok) {
@@ -155,6 +163,38 @@ export function GeneralSettings({ tenant, settings, canManage }: Props) {
               <option value={2}>2 (ej. 25)</option>
               <option value={4}>4 (ej. 2025)</option>
             </select>
+          </div>
+        </div>
+        <div className="space-y-3 border-t pt-5">
+          <div className="flex items-center gap-2">
+            <input
+              id="pinEnabled"
+              type="checkbox"
+              checked={pinEnabled}
+              onChange={(e) => setPinEnabled(e.target.checked)}
+              disabled={!canManage}
+              className="h-4 w-4"
+            />
+            <Label htmlFor="pinEnabled">Exigir PIN de 4 dígitos en cada cambio</Label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Cada cambio en una oportunidad pedirá un PIN que identifica al autor en el historial.
+            Asigna primero un PIN a cada usuario en Configuración → Usuarios.
+          </p>
+          <div className="space-y-2 max-w-[220px]">
+            <Label htmlFor="pinWindow">Ventana de desbloqueo (minutos)</Label>
+            <Input
+              id="pinWindow"
+              type="number"
+              min={1}
+              max={60}
+              value={pinUnlockMinutes}
+              onChange={(e) => setPinUnlockMinutes(Number(e.target.value))}
+              disabled={!canManage || !pinEnabled}
+            />
+            <p className="text-xs text-muted-foreground">
+              Tras ingresar el PIN no se vuelve a pedir durante este tiempo en el mismo dispositivo.
+            </p>
           </div>
         </div>
         {canManage && (

@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
 import { loadPipelineKanbanData } from "@/features/pipeline/queries"
 import { pipelineFiltersSchema } from "@/features/pipeline/schemas"
-import { canSeeAllDeals, canArchiveDeal, canDeleteDeal, canCreateDeal } from "@/lib/auth/rbac"
+import { canEditDeal, canArchiveDeal, canDeleteDeal, canCreateDeal } from "@/lib/auth/rbac"
 import { PipelineClient } from "@/features/pipeline/components/PipelineClient"
 import { PrintReport } from "@/features/pipeline/components/PrintReport"
 import type { IntlSettings } from "@/lib/intl/format"
@@ -25,7 +25,8 @@ export default async function PipelinePage({ params, searchParams }: Props) {
   const { tenant, membership } = resolved
   const tenantId = tenant.id
   const tenantSlug = params.tenantSlug
-  const canSeeAll = canSeeAllDeals(membership.role)
+  // Embudo abierto: every member sees and edits all deals (MEMBER+); VIEWER stays read-only.
+  const canEdit = canEditDeal(membership.role)
 
   const rawParams = {
     owner: searchParams.owner as string | undefined,
@@ -41,8 +42,7 @@ export default async function PipelinePage({ params, searchParams }: Props) {
 
   const { pipeline, members, channels, equipment, statuses, followUpReasons, settings, deals } =
     await loadPipelineKanbanData(tenantId, {
-      visibleToUserId: canSeeAll ? undefined : session.user.id,
-      ownerId: canSeeAll ? filters.owner : undefined,
+      ownerId: filters.owner,
       channelKey: filters.channel,
       equipmentKey: filters.equipment,
       alerts: filters.alerts,
@@ -95,6 +95,10 @@ export default async function PipelinePage({ params, searchParams }: Props) {
     value: Number(d.value),
     ownerId: d.ownerId,
     ownerName: d.owner.name,
+    ownerImage: d.owner.image,
+    createdById: d.createdById ?? null,
+    createdByName: d.createdBy?.name ?? null,
+    createdByImage: d.createdBy?.image ?? null,
     stageId: d.stageId,
     stageKey: d.stage.key,
     stageLabel: d.stage.label,
@@ -145,7 +149,7 @@ export default async function PipelinePage({ params, searchParams }: Props) {
           intlSettings={intlSettings}
           currentUserId={session.user.id}
           canCreate={canCreateDeal(membership.role)}
-          canSeeAll={canSeeAll}
+          canEdit={canEdit}
           canArchive={canArchiveDeal(membership.role)}
           canDelete={canDeleteDeal(membership.role)}
           followUpReasons={followUpReasons}

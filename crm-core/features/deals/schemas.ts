@@ -3,6 +3,9 @@ import { z } from "zod"
 const PHONE_RE = /^\d{4}-\d{4}$/
 const WA_RE = /^\+502 \d{4}-\d{4}$/
 
+/** Optional 4-digit action PIN sent on retry to identify the author of a sensitive write. */
+const pinField = z.string().regex(/^\d{4}$/, "El PIN debe tener 4 dígitos.").optional()
+
 export const createDealSchema = z
   .object({
     tenantId: z.string().min(1),
@@ -25,6 +28,7 @@ export const createDealSchema = z
     statusKey: z.string().min(1).default("activo"),
     customData: z.record(z.string(), z.unknown()).optional(),
     clientId: z.string().optional(),
+    pin: pinField,
   })
   .refine(
     (d) => d.equipment.length > 0 || (d.equipmentCustom?.trim() ?? "").length > 0,
@@ -57,6 +61,7 @@ export const updateDealSchema = z.object({
   value: z.coerce.number().min(0).optional(),
   statusKey: z.string().min(1).optional(),
   customData: z.record(z.string(), z.unknown()).optional(),
+  pin: pinField,
 })
 
 export const moveDealSchema = z.object({
@@ -65,12 +70,14 @@ export const moveDealSchema = z.object({
   dealId: z.string().min(1),
   toStageId: z.string().min(1),
   force: z.boolean().default(false),
+  pin: pinField,
 })
 
 export const archiveDealSchema = z.object({
   tenantId: z.string().min(1),
   tenantSlug: z.string().min(1),
   dealId: z.string().min(1),
+  pin: pinField,
 })
 
 export const transferDealSchema = z.object({
@@ -78,12 +85,14 @@ export const transferDealSchema = z.object({
   tenantSlug: z.string().min(1),
   dealId: z.string().min(1),
   toUserId: z.string().min(1, "Selecciona un asesor."),
+  pin: pinField,
 })
 
 export const deleteDealSchema = z.object({
   tenantId: z.string().min(1),
   tenantSlug: z.string().min(1),
   dealId: z.string().min(1),
+  pin: pinField,
 })
 
 export const updateDealFieldSchema = z
@@ -93,6 +102,7 @@ export const updateDealFieldSchema = z
     dealId: z.string().min(1),
     field: z.enum(["value", "statusKey", "phone", "whatsapp", "email", "name", "company"]),
     value: z.union([z.string(), z.coerce.number()]),
+    pin: pinField,
   })
   .superRefine((data, ctx) => {
     const { field, value } = data

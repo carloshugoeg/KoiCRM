@@ -1,8 +1,10 @@
 "use server"
 
 import { z } from "zod"
+import { Prisma } from "@prisma/client"
 import { headers } from "next/headers"
 import { prisma } from "@/lib/db/client"
+import { hashActionPin } from "@/lib/auth/action-pin-token"
 import { withPrismaTransaction } from "@/lib/db/rls"
 import { withTenant } from "@/lib/db/rls"
 import { recordActivity } from "@/features/activity/queries"
@@ -310,6 +312,75 @@ export async function reactivateMemberAction(raw: unknown): Promise<{ ok: boolea
   await prisma.membership.update({
     where: { userId_tenantId: { userId: targetUserId, tenantId } },
     data: { status: "ACTIVE" },
+  })
+
+  return { ok: true }
+}
+
+// ─── Action PIN (per-member 4-digit identifier) ─────────────────────────────────
+
+const setMemberPinSchema = z.object({
+  tenantId: z.string().cuid(),
+  targetUserId: z.string().cuid(),
+  pin: z.string().regex(/^\d{4}$/, "El PIN debe tener 4 dígitos."),
+})
+
+/** Admin assigns/changes a member's 4-digit action PIN. PINs must be unique per workspace. */
+export async function setMemberPinAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
+  const session = await auth()
+  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
+
+  const parsed = setMemberPinSchema.safeParse(raw)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
+
+  const { tenantId, targetUserId, pin } = parsed.data
+
+  const [caller, target] = await Promise.all([
+    prisma.membership.findUnique({ where: { userId_tenantId: { userId: session.user.id, tenantId } }, select: { role: true } }),
+    prisma.membership.findUnique({ where: { userId_tenantId: { userId: targetUserId, tenantId } }, select: { id: true } }),
+  ])
+  if (!caller || !["OWNER", "ADMIN"].includes(caller.role)) return { ok: false, error: "Sin permisos." }
+  if (!target) return { ok: false, error: "El usuario no es miembro." }
+
+  try {
+    await prisma.membership.update({
+      where: { userId_tenantId: { userId: targetUserId, tenantId } },
+      data: { actionPinHash: hashActionPin(pin) },
+    })
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return { ok: false, error: "Ese PIN ya está en uso por otro usuario." }
+    }
+    throw e
+  }
+
+  return { ok: true }
+}
+
+const clearMemberPinSchema = z.object({
+  tenantId: z.string().cuid(),
+  targetUserId: z.string().cuid(),
+})
+
+/** Admin removes a member's PIN (they can no longer confirm sensitive actions until reassigned). */
+export async function clearMemberPinAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
+  const session = await auth()
+  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
+
+  const parsed = clearMemberPinSchema.safeParse(raw)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
+
+  const { tenantId, targetUserId } = parsed.data
+
+  const caller = await prisma.membership.findUnique({
+    where: { userId_tenantId: { userId: session.user.id, tenantId } },
+    select: { role: true },
+  })
+  if (!caller || !["OWNER", "ADMIN"].includes(caller.role)) return { ok: false, error: "Sin permisos." }
+
+  await prisma.membership.update({
+    where: { userId_tenantId: { userId: targetUserId, tenantId } },
+    data: { actionPinHash: null },
   })
 
   return { ok: true }

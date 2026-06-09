@@ -4,13 +4,12 @@ import { revalidatePath } from "next/cache"
 import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
+import { resolveActionActor } from "@/lib/auth/action-pin"
 import {
   requireRole,
   getUserRole,
   canCreateDeal,
   canEditDeal,
-  canEditDealRow,
-  canSeeAllDeals,
   canArchiveDeal,
   canDeleteDeal,
 } from "@/lib/auth/rbac"
@@ -37,20 +36,19 @@ import { getDeal } from "@/features/deals/queries"
 
 export async function createDealAction(
   raw: unknown
-): Promise<{ ok: boolean; error?: string; dealId?: string }> {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
-
+): Promise<{ ok: boolean; error?: string; requiresPin?: boolean; dealId?: string }> {
   const parsed = createDealSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
-  const { tenantId, tenantSlug, ...fields } = parsed.data
+  const { tenantId, tenantSlug, pin, ...fields } = parsed.data
 
-  const role = await getUserRole(session, tenantId)
-  if (!role || !canCreateDeal(role)) return { ok: false, error: "Acceso denegado." }
+  const actor = await resolveActionActor({ tenantId, pin })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  const { actorUserId, actorRole } = actor.actor
+  if (!canCreateDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
 
-  // Asesores can only create deals they own; supervisors/superadmins choose the owner.
-  const ownerId = canSeeAllDeals(role) ? fields.ownerId : session.user.id
+  // Embudo abierto: anyone may create a deal and assign any owner.
+  const ownerId = fields.ownerId
 
   let dealId: string | undefined
   let createError: string | undefined
@@ -96,7 +94,7 @@ export async function createDealAction(
           stageId: firstStage.id,
           clientId: client.id,
           ownerId,
-          createdById: session.user.id,
+          createdById: actorUserId,
           channelKey: fields.channelKey,
           statusKey: fields.statusKey,
           name: fields.name.trim(),
@@ -128,7 +126,7 @@ export async function createDealAction(
         entityId: id,
         type: "created",
         payload: { name: fields.name, ownerId },
-        userId: session.user!.id,
+        userId: actorUserId,
       })
 
       dealId = id
@@ -146,25 +144,22 @@ export async function createDealAction(
   return { ok: true, dealId }
 }
 
-export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
-
+export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
   const parsed = updateDealSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
-  const { tenantId, tenantSlug, dealId, ...fields } = parsed.data
+  const { tenantId, tenantSlug, dealId, pin, ...fields } = parsed.data
 
-  const role = await getUserRole(session, tenantId)
-  if (!role || !canEditDeal(role)) return { ok: false, error: "Acceso denegado." }
+  const actor = await resolveActionActor({ tenantId, pin })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  const { actorUserId, actorRole } = actor.actor
+  if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
 
   let notFound = false
-  let permissionError = false
   let validationError: string | undefined
   await withTenant(tenantId, async (tx) => {
     const existing = await tx.deal.findUnique({ where: { id: dealId, tenantId } })
     if (!existing) { notFound = true; return }
-    if (!canEditDealRow(role, existing.ownerId, session.user!.id)) { permissionError = true; return }
 
     if (fields.ownerId && fields.ownerId !== existing.ownerId) {
       const ownerMembership = await tx.membership.findUnique({
@@ -209,13 +204,12 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
     }
 
     if (fields.ownerId && fields.ownerId !== existing.ownerId) {
-      await recordActivity(tx, { tenantId, entity: "Deal", entityId: dealId, type: "ownerChanged", payload: { from: existing.ownerId, to: fields.ownerId }, userId: session.user!.id })
+      await recordActivity(tx, { tenantId, entity: "Deal", entityId: dealId, type: "ownerChanged", payload: { from: existing.ownerId, to: fields.ownerId }, userId: actorUserId })
     }
     if (fields.value !== undefined && Number(fields.value) !== Number(existing.value)) {
-      await recordActivity(tx, { tenantId, entity: "Deal", entityId: dealId, type: "valueChanged", payload: { old: Number(existing.value), new: fields.value }, userId: session.user!.id })
+      await recordActivity(tx, { tenantId, entity: "Deal", entityId: dealId, type: "valueChanged", payload: { old: Number(existing.value), new: fields.value }, userId: actorUserId })
     }
   })
-  if (permissionError) return { ok: false, error: "Acceso denegado." }
   if (validationError) return { ok: false, error: validationError }
   if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
 
@@ -223,17 +217,16 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
   return { ok: true }
 }
 
-export async function moveDealAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
-
+export async function moveDealAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
   const parsed = moveDealSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
-  const { tenantId, tenantSlug, dealId, toStageId, force } = parsed.data
+  const { tenantId, tenantSlug, dealId, toStageId, force, pin } = parsed.data
 
-  const role = await getUserRole(session, tenantId)
-  if (!role || !canEditDeal(role)) return { ok: false, error: "Acceso denegado." }
+  const actor = await resolveActionActor({ tenantId, pin })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  const { actorUserId, actorRole } = actor.actor
+  if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
 
   let moveError: string | undefined
 
@@ -244,7 +237,6 @@ export async function moveDealAction(raw: unknown): Promise<{ ok: boolean; error
     ])
 
     if (!deal) { moveError = "Oportunidad no encontrada."; return }
-    if (!canEditDealRow(role, deal.ownerId, session.user!.id)) { moveError = "Acceso denegado."; return }
     if (!targetStage) { moveError = "Etapa no encontrada."; return }
     if (targetStage.locked && !force) {
       if (targetStage.key === "ganado") {
@@ -285,7 +277,7 @@ export async function moveDealAction(raw: unknown): Promise<{ ok: boolean; error
       entityId: dealId,
       type: "stageChanged",
       payload: { from: deal.stageId, to: toStageId, toLabel: targetStage.label },
-      userId: session.user!.id,
+      userId: actorUserId,
     })
   })
 
@@ -296,17 +288,16 @@ export async function moveDealAction(raw: unknown): Promise<{ ok: boolean; error
   return { ok: true }
 }
 
-export async function archiveDealAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
-
+export async function archiveDealAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
   const parsed = archiveDealSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
-  const { tenantId, tenantSlug, dealId } = parsed.data
+  const { tenantId, tenantSlug, dealId, pin } = parsed.data
 
-  const role = await getUserRole(session, tenantId)
-  if (!role || !canArchiveDeal(role)) return { ok: false, error: "Acceso denegado." }
+  const actor = await resolveActionActor({ tenantId, pin })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  const { actorUserId, actorRole } = actor.actor
+  if (!canArchiveDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
 
   let notFound = false
   await withTenant(tenantId, async (tx) => {
@@ -319,7 +310,7 @@ export async function archiveDealAction(raw: unknown): Promise<{ ok: boolean; er
       entityId: dealId,
       type: "archived",
       payload: {},
-      userId: session.user!.id,
+      userId: actorUserId,
     })
   })
   if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
@@ -329,27 +320,24 @@ export async function archiveDealAction(raw: unknown): Promise<{ ok: boolean; er
   return { ok: true }
 }
 
-export async function updateDealFieldAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
-
+export async function updateDealFieldAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
   const parsed = updateDealFieldSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
-  const { tenantId, tenantSlug, dealId, field, value } = parsed.data
+  const { tenantId, tenantSlug, dealId, field, value, pin } = parsed.data
 
-  const role = await getUserRole(session, tenantId)
-  if (!role || !canEditDeal(role)) return { ok: false, error: "Acceso denegado." }
+  const actor = await resolveActionActor({ tenantId, pin })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  const { actorUserId, actorRole } = actor.actor
+  if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
 
   let notFound = false
-  let permissionError = false
   await withTenant(tenantId, async (tx) => {
     const deal = await tx.deal.findUnique({
       where: { id: dealId, tenantId },
-      select: { ownerId: true, value: true, statusKey: true, phone: true, whatsapp: true, email: true, name: true, company: true },
+      select: { value: true, statusKey: true, phone: true, whatsapp: true, email: true, name: true, company: true },
     })
     if (!deal) { notFound = true; return }
-    if (!canEditDealRow(role, deal.ownerId, session.user!.id)) { permissionError = true; return }
     await tx.deal.update({ where: { id: dealId, tenantId }, data: { [field]: value } })
     if (field === "value") {
       await recordActivity(tx, {
@@ -358,37 +346,32 @@ export async function updateDealFieldAction(raw: unknown): Promise<{ ok: boolean
         entityId: dealId,
         type: "valueChanged",
         payload: { old: Number(deal.value), new: value },
-        userId: session.user!.id,
+        userId: actorUserId,
       })
     }
   })
-  if (permissionError) return { ok: false, error: "Acceso denegado." }
   if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
 
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
   return { ok: true }
 }
 
-export async function transferDealAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
-
+export async function transferDealAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
   const parsed = transferDealSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
-  const { tenantId, tenantSlug, dealId, toUserId } = parsed.data
+  const { tenantId, tenantSlug, dealId, toUserId, pin } = parsed.data
 
-  const role = await getUserRole(session, tenantId)
-  if (!role || !canEditDeal(role)) return { ok: false, error: "Acceso denegado." }
+  const actor = await resolveActionActor({ tenantId, pin })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  const { actorUserId, actorRole } = actor.actor
+  if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
 
   let notFound = false
-  let permissionError = false
   let validationError: string | undefined
   await withTenant(tenantId, async (tx) => {
     const existing = await tx.deal.findUnique({ where: { id: dealId, tenantId }, select: { ownerId: true } })
     if (!existing) { notFound = true; return }
-    // Only the current owner (cesión) or a supervisor+ (reasignación) can transfer.
-    if (!canEditDealRow(role, existing.ownerId, session.user!.id)) { permissionError = true; return }
     if (existing.ownerId === toUserId) { validationError = "La oportunidad ya pertenece a ese asesor."; return }
 
     const targetMembership = await tx.membership.findUnique({
@@ -398,25 +381,15 @@ export async function transferDealAction(raw: unknown): Promise<{ ok: boolean; e
 
     await tx.deal.update({ where: { id: dealId, tenantId }, data: { ownerId: toUserId } })
 
-    // The previous owner keeps read-only access (cesión); the new owner regains full edit
-    // (returning the deal simply removes their viewer grant).
-    await tx.dealViewer.deleteMany({ where: { dealId, userId: toUserId } })
-    await tx.dealViewer.upsert({
-      where: { dealId_userId: { dealId, userId: existing.ownerId } },
-      create: { tenantId, dealId, userId: existing.ownerId },
-      update: {},
-    })
-
     await recordActivity(tx, {
       tenantId,
       entity: "Deal",
       entityId: dealId,
       type: "ownerChanged",
       payload: { from: existing.ownerId, to: toUserId },
-      userId: session.user!.id,
+      userId: actorUserId,
     })
   })
-  if (permissionError) return { ok: false, error: "Acceso denegado." }
   if (validationError) return { ok: false, error: validationError }
   if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
 
@@ -424,18 +397,17 @@ export async function transferDealAction(raw: unknown): Promise<{ ok: boolean; e
   return { ok: true }
 }
 
-export async function deleteDealAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
-
+export async function deleteDealAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
   const parsed = deleteDealSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
-  const { tenantId, tenantSlug, dealId } = parsed.data
+  const { tenantId, tenantSlug, dealId, pin } = parsed.data
 
   // Only superadmins (OWNER/ADMIN) may permanently delete an opportunity.
-  const role = await getUserRole(session, tenantId)
-  if (!role || !canDeleteDeal(role)) return { ok: false, error: "Acceso denegado." }
+  const actor = await resolveActionActor({ tenantId, pin })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  const { actorUserId, actorRole } = actor.actor
+  if (!canDeleteDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
 
   let notFound = false
   await withTenant(tenantId, async (tx) => {
@@ -448,7 +420,7 @@ export async function deleteDealAction(raw: unknown): Promise<{ ok: boolean; err
       entityId: dealId,
       type: "deleted",
       payload: { name: existing.name },
-      userId: session.user!.id,
+      userId: actorUserId,
     })
   })
   if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
@@ -465,7 +437,8 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
     id: string; name: string; company: string | null; phone: string | null
     whatsapp: string | null; email: string | null; value: number; statusKey: string
     stageId: string; stageKey: string; createdAt: string; stageEnteredAt: string
-    ownerId: string; ownerName: string | null
+    ownerId: string; ownerName: string | null; ownerImage: string | null
+    createdById: string | null; createdByName: string | null; createdByImage: string | null
     equipment: { equipmentKey: string; customLabel: string | null }[]
     quoteCount: number; paymentCount: number
   }
@@ -481,7 +454,8 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
   const role = await getUserRole(session, tenantId)
   if (!role) return { ok: false, error: "Acceso denegado." }
 
-  const d = await getDeal(tenantId, dealId, canSeeAllDeals(role) ? undefined : session.user.id)
+  // Embudo abierto: every member can view any deal.
+  const d = await getDeal(tenantId, dealId)
   if (!d) return { ok: false, error: "Oportunidad no encontrada." }
 
   return {
@@ -501,6 +475,10 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
       stageEnteredAt: d.stageEnteredAt.toISOString(),
       ownerId: d.ownerId,
       ownerName: d.owner.name,
+      ownerImage: d.owner.image,
+      createdById: d.createdById,
+      createdByName: d.createdBy?.name ?? null,
+      createdByImage: d.createdBy?.image ?? null,
       equipment: d.equipment,
       quoteCount: d._count.quotes,
       paymentCount: d._count.payments,

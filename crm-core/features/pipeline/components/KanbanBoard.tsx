@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useEffect } from "react"
+import { useState, useEffect } from "react"
 import {
   DndContext,
   DragEndEvent,
@@ -16,6 +16,7 @@ import { toast } from "sonner"
 import { KanbanColumn } from "@/features/pipeline/components/KanbanColumn"
 import { DealCard, type DealCardData } from "@/features/pipeline/components/DealCard"
 import { moveDealAction } from "@/features/deals/actions"
+import { useActionPin } from "@/features/auth/pin-gate"
 import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 import { lockedStageDropMessage } from "@/lib/pipeline/stage-block-message"
 import type { PipelineStage } from "@prisma/client"
@@ -40,9 +41,9 @@ export function KanbanBoard({
   equipmentLabels,
   onDealClick,
 }: KanbanBoardProps) {
+  const { guard } = useActionPin()
   const [deals, setDeals] = useState(initialDeals)
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
   const [movingDealId, setMovingDealId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -95,16 +96,19 @@ export function KanbanBoard({
     )
 
     setMovingDealId(dealId)
-    startTransition(async () => {
-      const result = await moveDealAction({ tenantId, tenantSlug, dealId, toStageId, force: false })
+    void (async () => {
+      const result = await guard((pin) =>
+        moveDealAction({ tenantId, tenantSlug, dealId, toStageId, force: false, pin }),
+      )
       if (!result.ok) {
+        // Revert the optimistic move on failure or when the user cancels the PIN prompt.
         setDeals(previous)
-        toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorMove))
+        if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorMove))
       } else {
         toast.success(toastMessages.deal.moved)
       }
       setMovingDealId(null)
-    })
+    })()
   }
 
   const activeDeal = activeId ? deals.find((d) => d.id === activeId) : null

@@ -1,32 +1,23 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
-import { requireRole } from "@/lib/auth/rbac"
-import { userCanEditDeal } from "@/lib/auth/deal-access"
+import { canEditDeal } from "@/lib/auth/rbac"
+import { resolveActionActor } from "@/lib/auth/action-pin"
 import { prisma } from "@/lib/db/client"
 import { recordActivity } from "@/features/activity/queries"
 import { addFollowUpSchema, completeFollowUpSchema, deleteFollowUpSchema } from "@/features/follow-ups/schemas"
 
-export async function addFollowUpAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
-
+export async function addFollowUpAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
   const parsed = addFollowUpSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
-  const { tenantId, tenantSlug, dealId, date, reasonKey } = parsed.data
+  const { tenantId, tenantSlug, dealId, date, reasonKey, pin } = parsed.data
 
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
-  } catch {
-    return { ok: false, error: "Acceso denegado." }
-  }
-
-  if (!(await userCanEditDeal(session, tenantId, dealId))) {
-    return { ok: false, error: "Acceso denegado." }
-  }
+  const actor = await resolveActionActor({ tenantId, pin })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  const { actorUserId, actorRole } = actor.actor
+  if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
 
   const deal = await prisma.deal.findUnique({ where: { id: dealId, tenantId } })
   if (!deal) return { ok: false, error: "Oportunidad no encontrada." }
@@ -38,7 +29,7 @@ export async function addFollowUpAction(raw: unknown): Promise<{ ok: boolean; er
         dealId,
         date: new Date(date + "T12:00:00"),
         reasonKey,
-        createdById: session.user!.id,
+        createdById: actorUserId,
       },
     })
     await recordActivity(tx, {
@@ -47,7 +38,7 @@ export async function addFollowUpAction(raw: unknown): Promise<{ ok: boolean; er
       entityId: dealId,
       type: "followUpAdded",
       payload: { date, reasonKey },
-      userId: session.user!.id,
+      userId: actorUserId,
     })
   })
 
@@ -55,20 +46,16 @@ export async function addFollowUpAction(raw: unknown): Promise<{ ok: boolean; er
   return { ok: true }
 }
 
-export async function completeFollowUpAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
-
+export async function completeFollowUpAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
   const parsed = completeFollowUpSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
-  const { tenantId, tenantSlug, followUpId, result } = parsed.data
+  const { tenantId, tenantSlug, followUpId, result, pin } = parsed.data
 
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
-  } catch {
-    return { ok: false, error: "Acceso denegado." }
-  }
+  const actor = await resolveActionActor({ tenantId, pin })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  const { actorUserId, actorRole } = actor.actor
+  if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
 
   const fu = await prisma.followUp.findUnique({ where: { id: followUpId, tenantId } })
   if (!fu) return { ok: false, error: "Seguimiento no encontrado." }
@@ -84,7 +71,7 @@ export async function completeFollowUpAction(raw: unknown): Promise<{ ok: boolea
       entityId: fu.dealId,
       type: "followUpCompleted",
       payload: { result: result ?? null },
-      userId: session.user!.id,
+      userId: actorUserId,
     })
   })
 
@@ -92,20 +79,15 @@ export async function completeFollowUpAction(raw: unknown): Promise<{ ok: boolea
   return { ok: true }
 }
 
-export async function deleteFollowUpAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
-  const session = await auth()
-  if (!session?.user?.id) return { ok: false, error: "No autenticado." }
-
+export async function deleteFollowUpAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
   const parsed = deleteFollowUpSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
-  const { tenantId, tenantSlug, followUpId } = parsed.data
+  const { tenantId, tenantSlug, followUpId, pin } = parsed.data
 
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"])
-  } catch {
-    return { ok: false, error: "Acceso denegado." }
-  }
+  const actor = await resolveActionActor({ tenantId, pin })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  if (!canEditDeal(actor.actor.actorRole)) return { ok: false, error: "Acceso denegado." }
 
   const fu = await prisma.followUp.findUnique({ where: { id: followUpId, tenantId } })
   if (!fu) return { ok: false, error: "Seguimiento no encontrado." }

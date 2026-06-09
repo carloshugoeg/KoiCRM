@@ -31,16 +31,16 @@ describe("RBAC policy matrix", () => {
   )
 })
 
-describe("canEditDealRow (per-deal ownership)", () => {
+describe("canEditDealRow (embudo abierto)", () => {
   it("lets supervisors and above edit any deal regardless of owner", () => {
     expect(canEditDealRow("SUPERVISOR", "owner-1", "other-2")).toBe(true)
     expect(canEditDealRow("ADMIN", "owner-1", "other-2")).toBe(true)
     expect(canEditDealRow("OWNER", "owner-1", "other-2")).toBe(true)
   })
 
-  it("lets an asesor edit only their own deals", () => {
+  it("lets an asesor edit any deal, not only their own (ownership no longer gates edits)", () => {
     expect(canEditDealRow("MEMBER", "user-1", "user-1")).toBe(true)
-    expect(canEditDealRow("MEMBER", "owner-1", "user-2")).toBe(false)
+    expect(canEditDealRow("MEMBER", "owner-1", "user-2")).toBe(true)
   })
 
   it("never lets a viewer edit", () => {

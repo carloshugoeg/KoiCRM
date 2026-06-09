@@ -41,13 +41,25 @@ export async function recordActivity(tx: PrismaTx, input: RecordActivityInput): 
 }
 
 export async function getDealActivity(tenantId: string, dealId: string, limit = 50) {
-  return withTenant(tenantId, (tx) =>
-    tx.activity.findMany({
+  return withTenant(tenantId, async (tx) => {
+    const rows = await tx.activity.findMany({
       where: { tenantId, entity: "Deal", entityId: dealId },
       orderBy: { createdAt: "desc" },
       take: limit,
     })
-  )
+    // Resolve the author of each entry — with the PIN feature this is the PIN owner,
+    // so the timeline shows who actually performed each change.
+    const userIds = [...new Set(rows.map((r) => r.userId).filter((id): id is string => !!id))]
+    const users = userIds.length
+      ? await tx.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, image: true } })
+      : []
+    const byId = new Map(users.map((u) => [u.id, u]))
+    return rows.map((r) => ({
+      ...r,
+      actorName: r.userId ? byId.get(r.userId)?.name ?? null : null,
+      actorImage: r.userId ? byId.get(r.userId)?.image ?? null : null,
+    }))
+  })
 }
 
 export async function getClientActivity(tenantId: string, clientId: string, limit = 50) {

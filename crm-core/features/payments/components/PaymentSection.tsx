@@ -14,6 +14,7 @@ import { FileUploadButton } from "@/features/attachments/components/FileUploadBu
 import { confirmUpload } from "@/features/attachments/actions";
 import { resolveDealFileUrl } from "@/lib/storage/media-url";
 import { createPayment, voidPayment, deletePayment } from "@/features/payments/actions";
+import { useActionPin } from "@/features/auth/pin-gate";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import type { Payment } from "@prisma/client";
 
@@ -34,6 +35,7 @@ interface PendingUpload {
 }
 
 export function PaymentSection({ dealId, tenantId, payments, canEdit, canDelete, onRefresh }: PaymentSectionProps) {
+  const { guard } = useActionPin();
   const [showForm, setShowForm] = useState(false);
   const [number, setNumber] = useState("");
   const [date, setDate] = useState("");
@@ -69,15 +71,16 @@ export function PaymentSection({ dealId, tenantId, payments, canEdit, canDelete,
       return;
     }
 
-    const result = await createPayment(tenantId, {
+    const result = await guard((pin) => createPayment(tenantId, {
       dealId,
       number: number.trim(),
       date: new Date(date),
       fileUrl: pending.url,
-    });
+      pin,
+    }));
 
     if (!result.ok) {
-      toast.error(toastMessages.payment.errorSave);
+      if (!result.requiresPin) toast.error(toastMessages.payment.errorSave);
     } else {
       toast.success(toastMessages.payment.added);
       resetForm();
@@ -150,9 +153,10 @@ export function PaymentSection({ dealId, tenantId, payments, canEdit, canDelete,
                       size="icon"
                       className="h-5 w-5"
                       onClick={() =>
-                        voidPayment(tenantId, p.id).then((r) => {
-                          if (!r.ok) toast.error(toastMessages.payment.errorVoid);
-                          else {
+                        guard((pin) => voidPayment(tenantId, p.id, pin)).then((r) => {
+                          if (!r.ok) {
+                            if (!r.requiresPin) toast.error(toastMessages.payment.errorVoid);
+                          } else {
                             toast.success(toastMessages.payment.voided);
                             onRefresh?.();
                           }
@@ -176,9 +180,10 @@ export function PaymentSection({ dealId, tenantId, payments, canEdit, canDelete,
                       size="icon"
                       className="h-5 w-5 text-destructive hover:text-destructive"
                       onClick={() =>
-                        deletePayment(tenantId, p.id).then((r) => {
-                          if (!r.ok) toast.error(toastMessages.payment.errorRemove);
-                          else {
+                        guard((pin) => deletePayment(tenantId, p.id, pin)).then((r) => {
+                          if (!r.ok) {
+                            if (!r.requiresPin) toast.error(toastMessages.payment.errorRemove);
+                          } else {
                             toast.success(toastMessages.payment.removed);
                             onRefresh?.();
                           }

@@ -98,17 +98,21 @@ model VerificationToken {
 }
 
 model Membership {
-  id        String           @id @default(cuid())
-  userId    String
-  tenantId  String
-  role      Role
-  status    MembershipStatus @default(ACTIVE)
-  createdAt DateTime         @default(now())
+  id            String           @id @default(cuid())
+  userId        String
+  tenantId      String
+  role          Role
+  status        MembershipStatus @default(ACTIVE)
+  // HMAC(pin, AUTH_SECRET) of the member's 4-digit action PIN. Deterministic so it is
+  // both indexable (resolve the author from the PIN) and unique per workspace. Null = no PIN.
+  actionPinHash String?
+  createdAt     DateTime         @default(now())
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([userId, tenantId])
+  @@unique([tenantId, actionPinHash])
   @@index([tenantId])
 }
 
@@ -172,6 +176,10 @@ model TenantSettings {
   storageMaxBytes     BigInt  @default(8589934592)
   storageUsedBytes    BigInt  @default(0)
   fileSizeMaxBytes    BigInt  @default(104857600)  // 100 MiB per file
+  // When true, sensitive deal writes require a 4-digit action PIN that identifies the author.
+  pinEnabled             Boolean @default(false)
+  // Seconds a verified PIN stays unlocked on a device before it is asked again.
+  pinUnlockWindowSeconds Int     @default(300)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }

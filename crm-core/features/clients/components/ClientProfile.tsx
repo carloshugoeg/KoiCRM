@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { NotesSection } from "@/features/notes/components/NotesSection"
 import { ClientFormModal } from "@/features/deals/components/ClientFormModal"
+import { PinProvider } from "@/features/auth/pin-gate"
 import { updateClientAction } from "@/features/clients/actions"
 import { avatarColor, avatarInitials } from "@/lib/utils/avatar-color"
 import { formatCurrency } from "@/lib/intl/format"
@@ -120,6 +121,7 @@ export function ClientProfile({
   }
 
   return (
+    <PinProvider>
     <div className="flex-1 overflow-y-auto p-6">
       {/* Header */}
       <div className="flex items-start gap-4 mb-6">
@@ -252,5 +254,6 @@ export function ClientProfile({
         />
       )}
     </div>
+    </PinProvider>
   )
 }

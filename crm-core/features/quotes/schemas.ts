@@ -6,6 +6,7 @@ export const CreateQuoteSchema = z.object({
   number: z.string().min(1).max(50),
   date: z.coerce.date(),
   fileUrl: z.string().url(),
+  pin: z.string().regex(/^\d{4}$/, "El PIN debe tener 4 dígitos.").optional(),
 })
 
 export const UpdateQuoteSchema = z.object({

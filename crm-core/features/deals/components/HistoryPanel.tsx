@@ -4,6 +4,7 @@ import { formatDateTime } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
 import { ACTIVITY_LABELS } from "@/features/activity/constants"
 import type { ActivityType, ActivityEntry } from "@/features/activity/queries"
+import { UserAvatar } from "@/components/ui/user-avatar"
 
 interface HistoryPanelProps {
   activities: ActivityEntry[]
@@ -42,11 +43,15 @@ export function HistoryPanel({ activities, settings }: HistoryPanelProps) {
             <span className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
             {i < activities.length - 1 && <span className="w-px flex-1 bg-border mt-1" />}
           </div>
-          <div className="pb-3">
+          <div className="pb-3 min-w-0">
             <p className="font-medium leading-snug">{activityDescription(a.type, a.payload)}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {formatDateTime(a.createdAt, settings)}
-            </p>
+            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+              {a.userId && (
+                <UserAvatar userId={a.userId} name={a.actorName} imageUrl={a.actorImage} size={16} />
+              )}
+              {a.actorName && <span className="font-medium text-foreground/70 truncate">{a.actorName}</span>}
+              <span className="shrink-0">{formatDateTime(a.createdAt, settings)}</span>
+            </div>
           </div>
         </li>
       ))}

@@ -14,9 +14,11 @@ export const canSeeAllDeals = (r: Role) => atLeast(r, "SUPERVISOR")
 export const canManageMembers = (r: Role) => atLeast(r, "ADMIN")
 export const canManageSettings = (r: Role) => atLeast(r, "ADMIN")
 
-export function canEditDealRow(role: Role, dealOwnerId: string, userId: string): boolean {
-  if (!canEditDeal(role)) return false
-  return canSeeAllDeals(role) || dealOwnerId === userId
+// Embudo abierto: any editor (MEMBER+) may edit any deal, regardless of ownership.
+// The 4-digit action PIN — not ownership — provides per-person accountability.
+// Signature kept stable for existing callers; ownership args are intentionally unused.
+export function canEditDealRow(role: Role, _dealOwnerId: string, _userId: string): boolean {
+  return canEditDeal(role)
 }
 
 export const ROLE_LABELS: Record<Role, string> = {

@@ -23,8 +23,9 @@ import { DealAttachmentsSection } from "@/features/attachments/components/DealAt
 import { updateDealFieldAction, moveDealAction, archiveDealAction, transferDealAction, deleteDealAction } from "@/features/deals/actions"
 import { addFollowUpAction, completeFollowUpAction, deleteFollowUpAction } from "@/features/follow-ups/actions"
 import { getDealActivityAction, getDealFollowUpsAction, getQuotesForDealAction, getPaymentsForDealAction } from "@/features/deals/actions"
+import { useActionPin } from "@/features/auth/pin-gate"
 import type { ActivityEntry } from "@/features/activity/queries"
-import { avatarColor, avatarInitials } from "@/lib/utils/avatar-color"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { formatCurrency, formatDate } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
 import type { PipelineStage, CatalogItem, FollowUp, Quote, Payment } from "@prisma/client"
@@ -44,6 +45,10 @@ interface DealDetailData {
   stageEnteredAt: string
   ownerId: string
   ownerName: string | null
+  ownerImage?: string | null
+  createdById?: string | null
+  createdByName?: string | null
+  createdByImage?: string | null
   equipment: { equipmentKey: string; customLabel: string | null }[]
   quoteCount: number
   paymentCount: number
@@ -87,6 +92,7 @@ export function DealDetailModal({
   onAction,
 }: DealDetailModalProps) {
   const router = useRouter()
+  const { guard } = useActionPin()
   const [activities, setActivities] = useState<ActivityEntry[]>([])
   const [followUps, setFollowUps] = useState<FollowUp[]>([])
   const [quotes, setQuotes] = useState<Quote[]>([])
@@ -137,9 +143,10 @@ export function DealDetailModal({
   }
 
   async function saveField(field: string, value: string | number) {
-    const result = await updateDealFieldAction({ tenantId, tenantSlug, dealId: deal.id, field, value })
-    if (!result.ok) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorSave))
-    else {
+    const result = await guard((pin) => updateDealFieldAction({ tenantId, tenantSlug, dealId: deal.id, field, value, pin }))
+    if (!result.ok) {
+      if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorSave))
+    } else {
       toast.success(toastMessages.deal.saved, { onAutoClose: () => onAction?.() })
       setEditField(null)
     }
@@ -149,9 +156,10 @@ export function DealDetailModal({
     if (moving) return
     setMoving(true)
     try {
-      const result = await moveDealAction({ tenantId, tenantSlug, dealId: deal.id, toStageId, force })
-      if (!result.ok) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorMove))
-      else {
+      const result = await guard((pin) => moveDealAction({ tenantId, tenantSlug, dealId: deal.id, toStageId, force, pin }))
+      if (!result.ok) {
+        if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorMove))
+      } else {
         toast.success(toastMessages.deal.stageUpdated, { onAutoClose: () => onAction?.() })
         onClose()
       }
@@ -164,9 +172,10 @@ export function DealDetailModal({
     if (moving) return
     setMoving(true)
     try {
-      const result = await archiveDealAction({ tenantId, tenantSlug, dealId: deal.id })
-      if (!result.ok) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorArchive))
-      else {
+      const result = await guard((pin) => archiveDealAction({ tenantId, tenantSlug, dealId: deal.id, pin }))
+      if (!result.ok) {
+        if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorArchive))
+      } else {
         toast.success(toastMessages.deal.archived, { onAutoClose: () => onAction?.() })
         onClose()
       }
@@ -179,9 +188,10 @@ export function DealDetailModal({
     if (transferring) return
     setTransferring(true)
     try {
-      const result = await transferDealAction({ tenantId, tenantSlug, dealId: deal.id, toUserId })
-      if (!result.ok) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorSave))
-      else {
+      const result = await guard((pin) => transferDealAction({ tenantId, tenantSlug, dealId: deal.id, toUserId, pin }))
+      if (!result.ok) {
+        if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorSave))
+      } else {
         toast.success(toastMessages.deal.transferred, { onAutoClose: () => onAction?.() })
         onClose()
       }
@@ -194,9 +204,10 @@ export function DealDetailModal({
     if (moving) return
     setMoving(true)
     try {
-      const result = await deleteDealAction({ tenantId, tenantSlug, dealId: deal.id })
-      if (!result.ok) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorDelete))
-      else {
+      const result = await guard((pin) => deleteDealAction({ tenantId, tenantSlug, dealId: deal.id, pin }))
+      if (!result.ok) {
+        if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorDelete))
+      } else {
         toast.success(toastMessages.deal.deleted, { onAutoClose: () => onAction?.() })
         onClose()
       }
@@ -208,10 +219,11 @@ export function DealDetailModal({
   async function handleAddFollowUp() {
     if (!fuDate || !fuReason) return
     setFuLoading(true)
-    const result = await addFollowUpAction({ tenantId, tenantSlug, dealId: deal.id, date: fuDate, reasonKey: fuReason })
+    const result = await guard((pin) => addFollowUpAction({ tenantId, tenantSlug, dealId: deal.id, date: fuDate, reasonKey: fuReason, pin }))
     setFuLoading(false)
-    if (!result.ok) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorFollowUp))
-    else {
+    if (!result.ok) {
+      if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorFollowUp))
+    } else {
       toast.success(toastMessages.deal.followUpAdded)
       const updated = await getDealFollowUpsAction(tenantId, deal.id)
       setFollowUps(updated)
@@ -220,9 +232,10 @@ export function DealDetailModal({
   }
 
   async function handleCompleteFollowUp(followUpId: string, result: string) {
-    const res = await completeFollowUpAction({ tenantId, tenantSlug, followUpId, result: result || undefined })
-    if (!res.ok) toast.error(toastErrorFromResult(res.error, toastMessages.deal.errorFollowUp))
-    else {
+    const res = await guard((pin) => completeFollowUpAction({ tenantId, tenantSlug, followUpId, result: result || undefined, pin }))
+    if (!res.ok) {
+      if (!res.requiresPin) toast.error(toastErrorFromResult(res.error, toastMessages.deal.errorFollowUp))
+    } else {
       toast.success(toastMessages.deal.followUpCompleted)
       setCompletingId(null)
       setCompletingResult("")
@@ -232,9 +245,10 @@ export function DealDetailModal({
   }
 
   async function handleDeleteFollowUp(followUpId: string) {
-    const res = await deleteFollowUpAction({ tenantId, tenantSlug, followUpId })
-    if (!res.ok) toast.error(toastErrorFromResult(res.error, toastMessages.deal.errorFollowUp))
-    else {
+    const res = await guard((pin) => deleteFollowUpAction({ tenantId, tenantSlug, followUpId, pin }))
+    if (!res.ok) {
+      if (!res.requiresPin) toast.error(toastErrorFromResult(res.error, toastMessages.deal.errorFollowUp))
+    } else {
       toast.success(toastMessages.deal.followUpRemoved)
       const updated = await getDealFollowUpsAction(tenantId, deal.id)
       setFollowUps(updated)
@@ -244,7 +258,6 @@ export function DealDetailModal({
   const now = new Date()
   const daysTotal = diffDays(new Date(deal.createdAt), now)
   const daysStage = diffDays(new Date(deal.stageEnteredAt), now)
-  const color = avatarColor(deal.ownerId)
 
   const unlockedStages = stages.filter((s) => !s.locked && s.id !== deal.stageId)
   const wonStage = stages.find((s) => s.key === "ganado")
@@ -281,7 +294,7 @@ export function DealDetailModal({
         {!canEdit && (
           <div className="flex items-center gap-2 px-6 py-2 border-b bg-amber-50 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
             <Lock className="h-3 w-3 shrink-0" />
-            Solo lectura — esta oportunidad fue cedida. Pídela de vuelta para poder editarla.
+            Solo lectura — no tienes permisos para editar esta oportunidad.
           </div>
         )}
 
@@ -290,15 +303,24 @@ export function DealDetailModal({
           {/* LEFT PANEL – Deal data */}
           <ScrollArea className="h-auto max-h-[45vh] w-full shrink-0 md:h-full md:max-h-none md:w-80">
             <div className="min-w-0 w-full max-w-full space-y-4 p-4">
-            {/* Owner */}
-            <div className="flex items-center gap-2 mb-4">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                style={{ backgroundColor: color }}
-              >
-                {avatarInitials(deal.ownerName)}
+            {/* Asignado a / Creado por */}
+            <div className="mb-4 space-y-2.5">
+              <div className="flex items-center gap-2">
+                <UserAvatar userId={deal.ownerId} name={deal.ownerName} imageUrl={deal.ownerImage} size={32} />
+                <div className="min-w-0">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground leading-none">Asignado a</p>
+                  <p className="text-sm font-medium truncate">{deal.ownerName ?? "Sin asesor"}</p>
+                </div>
               </div>
-              <span className="text-sm font-medium">{deal.ownerName ?? "Sin asesor"}</span>
+              {deal.createdById && (
+                <div className="flex items-center gap-2">
+                  <UserAvatar userId={deal.createdById} name={deal.createdByName} imageUrl={deal.createdByImage} size={32} />
+                  <div className="min-w-0">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground leading-none">Creado por</p>
+                    <p className="text-sm font-medium truncate">{deal.createdByName ?? "—"}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Cesión / reasignación */}

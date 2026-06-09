@@ -14,6 +14,7 @@ import { FileUploadButton } from "@/features/attachments/components/FileUploadBu
 import { confirmUpload } from "@/features/attachments/actions";
 import { resolveDealFileUrl } from "@/lib/storage/media-url";
 import { createQuote, voidQuote, deleteQuote } from "@/features/quotes/actions";
+import { useActionPin } from "@/features/auth/pin-gate";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import type { Quote } from "@prisma/client";
 
@@ -34,6 +35,7 @@ interface PendingUpload {
 }
 
 export function QuoteSection({ dealId, tenantId, quotes, canEdit, canDelete, onRefresh }: QuoteSectionProps) {
+  const { guard } = useActionPin();
   const [showForm, setShowForm] = useState(false);
   const [number, setNumber] = useState("");
   const [date, setDate] = useState("");
@@ -69,15 +71,16 @@ export function QuoteSection({ dealId, tenantId, quotes, canEdit, canDelete, onR
       return;
     }
 
-    const result = await createQuote(tenantId, {
+    const result = await guard((pin) => createQuote(tenantId, {
       dealId,
       number: number.trim(),
       date: new Date(date),
       fileUrl: pending.url,
-    });
+      pin,
+    }));
 
     if (!result.ok) {
-      toast.error(toastMessages.quote.errorSave);
+      if (!result.requiresPin) toast.error(toastMessages.quote.errorSave);
     } else {
       toast.success(toastMessages.quote.added);
       resetForm();
@@ -150,9 +153,10 @@ export function QuoteSection({ dealId, tenantId, quotes, canEdit, canDelete, onR
                       size="icon"
                       className="h-5 w-5"
                       onClick={() =>
-                        voidQuote(tenantId, q.id).then((r) => {
-                          if (!r.ok) toast.error(toastMessages.quote.errorVoid);
-                          else {
+                        guard((pin) => voidQuote(tenantId, q.id, pin)).then((r) => {
+                          if (!r.ok) {
+                            if (!r.requiresPin) toast.error(toastMessages.quote.errorVoid);
+                          } else {
                             toast.success(toastMessages.quote.voided);
                             onRefresh?.();
                           }
@@ -176,9 +180,10 @@ export function QuoteSection({ dealId, tenantId, quotes, canEdit, canDelete, onR
                       size="icon"
                       className="h-5 w-5 text-destructive hover:text-destructive"
                       onClick={() =>
-                        deleteQuote(tenantId, q.id).then((r) => {
-                          if (!r.ok) toast.error(toastMessages.quote.errorRemove);
-                          else {
+                        guard((pin) => deleteQuote(tenantId, q.id, pin)).then((r) => {
+                          if (!r.ok) {
+                            if (!r.requiresPin) toast.error(toastMessages.quote.errorRemove);
+                          } else {
                             toast.success(toastMessages.quote.removed);
                             onRefresh?.();
                           }

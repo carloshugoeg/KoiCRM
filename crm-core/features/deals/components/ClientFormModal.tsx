@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { createDealAction } from "@/features/deals/actions"
+import { useActionPin } from "@/features/auth/pin-gate"
 import { addNoteAction } from "@/features/notes/actions"
 import { addFollowUpAction } from "@/features/follow-ups/actions"
 import { createQuote } from "@/features/quotes/actions"
@@ -101,6 +102,7 @@ export function ClientFormModal({
   currentUserId,
   prefill,
 }: ClientFormModalProps) {
+  const { guard } = useActionPin()
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<FormErrors>({})
 
@@ -267,7 +269,8 @@ export function ClientFormModal({
     }
 
     setLoading(true)
-    const result = await createDealAction({
+    // The PIN entered here opens the unlock window, so the follow-up/notes/docs below ride along.
+    const result = await guard((pin) => createDealAction({
       tenantId,
       tenantSlug,
       ownerId,
@@ -281,11 +284,12 @@ export function ClientFormModal({
       equipmentCustom: equipmentCustom || null,
       value,
       statusKey,
-    })
+      pin,
+    }))
     setLoading(false)
 
     if (!result.ok || !result.dealId) {
-      toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorCreate))
+      if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorCreate))
       return
     }
 

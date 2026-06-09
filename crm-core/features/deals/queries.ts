@@ -106,7 +106,8 @@ export async function fetchPipelineDealsInTx(
     where: buildPipelineDealsWhere(tenantId, filters),
     include: {
       stage: true,
-      owner: { select: { id: true, name: true, email: true } },
+      owner: { select: { id: true, name: true, email: true, image: true } },
+      createdBy: { select: { id: true, name: true, image: true } },
       client: true,
       equipment: true,
       quotes: { where: { isVoid: false }, take: 1, orderBy: { createdAt: "desc" }, select: { number: true } },
@@ -140,7 +141,8 @@ export async function getDeal(tenantId: string, dealId: string, visibleToUserId?
       where: { id: dealId, tenantId, ...(visibleToUserId ? dealVisibilityWhere(visibleToUserId) : {}) },
       include: {
         stage: true,
-        owner: { select: { id: true, name: true, email: true } },
+        owner: { select: { id: true, name: true, email: true, image: true } },
+        createdBy: { select: { id: true, name: true, image: true } },
         client: true,
         equipment: true,
         quotes: { orderBy: { createdAt: "desc" } },
