@@ -42,7 +42,10 @@ export async function addFollowUpAction(raw: unknown): Promise<{ ok: boolean; er
     })
   })
 
+  revalidatePath(`/app/${tenantSlug}`, "layout")
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
+  revalidatePath(`/app/${tenantSlug}/calendar`, "page")
+  revalidatePath(`/app/${tenantSlug}/stats/alerts`, "page")
   return { ok: true }
 }
 
@@ -75,7 +78,10 @@ export async function completeFollowUpAction(raw: unknown): Promise<{ ok: boolea
     })
   })
 
+  revalidatePath(`/app/${tenantSlug}`, "layout")
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
+  revalidatePath(`/app/${tenantSlug}/calendar`, "page")
+  revalidatePath(`/app/${tenantSlug}/stats/alerts`, "page")
   return { ok: true }
 }
 
@@ -96,6 +102,9 @@ export async function deleteFollowUpAction(raw: unknown): Promise<{ ok: boolean;
     await tx.followUp.delete({ where: { id: followUpId } })
   })
 
+  revalidatePath(`/app/${tenantSlug}`, "layout")
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
+  revalidatePath(`/app/${tenantSlug}/calendar`, "page")
+  revalidatePath(`/app/${tenantSlug}/stats/alerts`, "page")
   return { ok: true }
 }
