@@ -13,7 +13,7 @@ export async function createPayment(tenantId: string, input: unknown) {
   if (!parsed.success) return { ok: false as const, error: "Invalid input", code: "invalid_input" }
   const data = parsed.data
 
-  const actor = await resolveActionActor({ tenantId, pin: data.pin })
+  const actor = await resolveActionActor({ tenantId, pin: data.pin, dealId: data.dealId })
   if (!actor.ok) {
     return {
       ok: false as const,
@@ -74,7 +74,12 @@ export async function updatePayment(tenantId: string, input: unknown) {
 }
 
 export async function voidPayment(tenantId: string, paymentId: string, pin?: string) {
-  const actor = await resolveActionActor({ tenantId, pin })
+  const paymentRef = await withTenant(tenantId, (tx) =>
+    tx.payment.findUnique({ where: { id: paymentId, tenantId }, select: { dealId: true } }),
+  )
+  if (!paymentRef) return { ok: false as const, error: "Payment not found", code: "not_found" }
+
+  const actor = await resolveActionActor({ tenantId, pin, dealId: paymentRef.dealId })
   if (!actor.ok) {
     return {
       ok: false as const,
@@ -96,7 +101,12 @@ export async function voidPayment(tenantId: string, paymentId: string, pin?: str
 }
 
 export async function deletePayment(tenantId: string, paymentId: string, pin?: string) {
-  const actor = await resolveActionActor({ tenantId, pin })
+  const paymentRef = await withTenant(tenantId, (tx) =>
+    tx.payment.findUnique({ where: { id: paymentId, tenantId }, select: { dealId: true } }),
+  )
+  if (!paymentRef) return { ok: false as const, error: "Payment not found", code: "not_found" }
+
+  const actor = await resolveActionActor({ tenantId, pin, dealId: paymentRef.dealId })
   if (!actor.ok) {
     return {
       ok: false as const,

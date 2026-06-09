@@ -14,7 +14,7 @@ export async function addFollowUpAction(raw: unknown): Promise<{ ok: boolean; er
 
   const { tenantId, tenantSlug, dealId, date, reasonKey, pin } = parsed.data
 
-  const actor = await resolveActionActor({ tenantId, pin })
+  const actor = await resolveActionActor({ tenantId, pin, dealId })
   if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
   const { actorUserId, actorRole } = actor.actor
   if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
@@ -55,13 +55,13 @@ export async function completeFollowUpAction(raw: unknown): Promise<{ ok: boolea
 
   const { tenantId, tenantSlug, followUpId, result, pin } = parsed.data
 
-  const actor = await resolveActionActor({ tenantId, pin })
+  const fu = await prisma.followUp.findUnique({ where: { id: followUpId, tenantId } })
+  if (!fu) return { ok: false, error: "Seguimiento no encontrado." }
+
+  const actor = await resolveActionActor({ tenantId, pin, dealId: fu.dealId })
   if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
   const { actorUserId, actorRole } = actor.actor
   if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
-
-  const fu = await prisma.followUp.findUnique({ where: { id: followUpId, tenantId } })
-  if (!fu) return { ok: false, error: "Seguimiento no encontrado." }
 
   await withTenant(tenantId, async (tx) => {
     await tx.followUp.update({
@@ -91,12 +91,12 @@ export async function deleteFollowUpAction(raw: unknown): Promise<{ ok: boolean;
 
   const { tenantId, tenantSlug, followUpId, pin } = parsed.data
 
-  const actor = await resolveActionActor({ tenantId, pin })
-  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
-  if (!canEditDeal(actor.actor.actorRole)) return { ok: false, error: "Acceso denegado." }
-
   const fu = await prisma.followUp.findUnique({ where: { id: followUpId, tenantId } })
   if (!fu) return { ok: false, error: "Seguimiento no encontrado." }
+
+  const actor = await resolveActionActor({ tenantId, pin, dealId: fu.dealId })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  if (!canEditDeal(actor.actor.actorRole)) return { ok: false, error: "Acceso denegado." }
 
   await withTenant(tenantId, async (tx) => {
     await tx.followUp.delete({ where: { id: followUpId } })

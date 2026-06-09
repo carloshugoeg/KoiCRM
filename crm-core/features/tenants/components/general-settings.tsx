@@ -175,11 +175,12 @@ export function GeneralSettings({ tenant, settings, canManage }: Props) {
               disabled={!canManage}
               className="h-4 w-4"
             />
-            <Label htmlFor="pinEnabled">Exigir PIN de 4 dígitos en cada cambio</Label>
+            <Label htmlFor="pinEnabled">Exigir PIN al modificar leads de otros asesores</Label>
           </div>
           <p className="text-xs text-muted-foreground">
-            Obliga PIN en todo el workspace (todos los usuarios). También puedes activar protección
-            personal con el interruptor PIN en la barra superior al salir de tu puesto.
+            Con esta opción activa, cada usuario puede editar sus propios leads sin PIN. Para cambiar
+            leads asignados a otra persona se pide PIN. También puedes activar protección personal
+            con el interruptor PIN en la barra superior (exige PIN en todos tus cambios).
           </p>
           <div className="space-y-2 max-w-[220px]">
             <Label htmlFor="pinWindow">Ventana de desbloqueo (minutos)</Label>

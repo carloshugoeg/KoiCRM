@@ -42,13 +42,14 @@ export async function createDealAction(
 
   const { tenantId, tenantSlug, pin, ...fields } = parsed.data
 
-  const actor = await resolveActionActor({ tenantId, pin })
+  const ownerId = fields.ownerId
+
+  const actor = await resolveActionActor({ tenantId, pin, targetOwnerId: ownerId })
   if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
   const { actorUserId, actorRole } = actor.actor
   if (!canCreateDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
 
   // Embudo abierto: anyone may create a deal and assign any owner.
-  const ownerId = fields.ownerId
 
   let dealId: string | undefined
   let createError: string | undefined
@@ -150,7 +151,7 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
 
   const { tenantId, tenantSlug, dealId, pin, ...fields } = parsed.data
 
-  const actor = await resolveActionActor({ tenantId, pin })
+  const actor = await resolveActionActor({ tenantId, pin, dealId })
   if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
   const { actorUserId, actorRole } = actor.actor
   if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
@@ -223,7 +224,7 @@ export async function moveDealAction(raw: unknown): Promise<{ ok: boolean; error
 
   const { tenantId, tenantSlug, dealId, toStageId, force, pin } = parsed.data
 
-  const actor = await resolveActionActor({ tenantId, pin })
+  const actor = await resolveActionActor({ tenantId, pin, dealId })
   if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
   const { actorUserId, actorRole } = actor.actor
   if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
@@ -294,7 +295,7 @@ export async function archiveDealAction(raw: unknown): Promise<{ ok: boolean; er
 
   const { tenantId, tenantSlug, dealId, pin } = parsed.data
 
-  const actor = await resolveActionActor({ tenantId, pin })
+  const actor = await resolveActionActor({ tenantId, pin, dealId })
   if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
   const { actorUserId, actorRole } = actor.actor
   if (!canArchiveDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
@@ -326,7 +327,7 @@ export async function updateDealFieldAction(raw: unknown): Promise<{ ok: boolean
 
   const { tenantId, tenantSlug, dealId, field, value, pin } = parsed.data
 
-  const actor = await resolveActionActor({ tenantId, pin })
+  const actor = await resolveActionActor({ tenantId, pin, dealId })
   if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
   const { actorUserId, actorRole } = actor.actor
   if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
@@ -362,7 +363,7 @@ export async function transferDealAction(raw: unknown): Promise<{ ok: boolean; e
 
   const { tenantId, tenantSlug, dealId, toUserId, pin } = parsed.data
 
-  const actor = await resolveActionActor({ tenantId, pin })
+  const actor = await resolveActionActor({ tenantId, pin, dealId })
   if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
   const { actorUserId, actorRole } = actor.actor
   if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
@@ -404,7 +405,7 @@ export async function deleteDealAction(raw: unknown): Promise<{ ok: boolean; err
   const { tenantId, tenantSlug, dealId, pin } = parsed.data
 
   // Only superadmins (OWNER/ADMIN) may permanently delete an opportunity.
-  const actor = await resolveActionActor({ tenantId, pin })
+  const actor = await resolveActionActor({ tenantId, pin, dealId })
   if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
   const { actorUserId, actorRole } = actor.actor
   if (!canDeleteDeal(actorRole)) return { ok: false, error: "Acceso denegado." }

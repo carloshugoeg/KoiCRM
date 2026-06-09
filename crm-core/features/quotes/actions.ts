@@ -13,7 +13,7 @@ export async function createQuote(tenantId: string, input: unknown) {
   if (!parsed.success) return { ok: false as const, error: "Invalid input", code: "invalid_input" }
   const data = parsed.data
 
-  const actor = await resolveActionActor({ tenantId, pin: data.pin })
+  const actor = await resolveActionActor({ tenantId, pin: data.pin, dealId: data.dealId })
   if (!actor.ok) {
     return {
       ok: false as const,
@@ -74,7 +74,12 @@ export async function updateQuote(tenantId: string, input: unknown) {
 }
 
 export async function voidQuote(tenantId: string, quoteId: string, pin?: string) {
-  const actor = await resolveActionActor({ tenantId, pin })
+  const quoteRef = await withTenant(tenantId, (tx) =>
+    tx.quote.findUnique({ where: { id: quoteId, tenantId }, select: { dealId: true } }),
+  )
+  if (!quoteRef) return { ok: false as const, error: "Quote not found", code: "not_found" }
+
+  const actor = await resolveActionActor({ tenantId, pin, dealId: quoteRef.dealId })
   if (!actor.ok) {
     return {
       ok: false as const,
@@ -96,7 +101,12 @@ export async function voidQuote(tenantId: string, quoteId: string, pin?: string)
 }
 
 export async function deleteQuote(tenantId: string, quoteId: string, pin?: string) {
-  const actor = await resolveActionActor({ tenantId, pin })
+  const quoteRef = await withTenant(tenantId, (tx) =>
+    tx.quote.findUnique({ where: { id: quoteId, tenantId }, select: { dealId: true } }),
+  )
+  if (!quoteRef) return { ok: false as const, error: "Quote not found", code: "not_found" }
+
+  const actor = await resolveActionActor({ tenantId, pin, dealId: quoteRef.dealId })
   if (!actor.ok) {
     return {
       ok: false as const,

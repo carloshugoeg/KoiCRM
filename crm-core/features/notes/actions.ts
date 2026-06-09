@@ -16,7 +16,7 @@ export async function addNoteAction(raw: unknown): Promise<{ ok: boolean; error?
 
   const { tenantId, tenantSlug, body, dealId, clientId, pin } = parsed.data
 
-  const actor = await resolveActionActor({ tenantId, pin })
+  const actor = await resolveActionActor({ tenantId, pin, dealId: dealId ?? null })
   if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
   const { actorUserId, actorRole } = actor.actor
   if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
@@ -54,12 +54,12 @@ export async function deleteNoteAction(raw: unknown): Promise<{ ok: boolean; err
 
   const { tenantId, tenantSlug, noteId, pin } = parsed.data
 
-  const actor = await resolveActionActor({ tenantId, pin })
-  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
-  if (!canEditDeal(actor.actor.actorRole)) return { ok: false, error: "Acceso denegado." }
-
   const note = await prisma.note.findUnique({ where: { id: noteId } })
   if (!note || note.tenantId !== tenantId) return { ok: false, error: "Nota no encontrada." }
+
+  const actor = await resolveActionActor({ tenantId, pin, dealId: note.dealId })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  if (!canEditDeal(actor.actor.actorRole)) return { ok: false, error: "Acceso denegado." }
 
   await withTenant(tenantId, (tx) => tx.note.delete({ where: { id: noteId } }))
 

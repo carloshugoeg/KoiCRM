@@ -12,6 +12,9 @@ import {
   readActorToken,
   actorTokenIsFresh,
 } from "@/lib/auth/action-pin-token"
+import { isPinRequiredForDealAction } from "@/lib/auth/action-pin-policy"
+
+export { isPinRequiredForDealAction } from "@/lib/auth/action-pin-policy"
 
 const COOKIE_NAME = "koi_pin_actor"
 
@@ -36,10 +39,26 @@ function setUnlockCookie(actorUserId: string, tenantId: string, windowSeconds: n
   })
 }
 
+async function resolveDealOwnerId(
+  tenantId: string,
+  dealId?: string | null,
+  targetOwnerId?: string | null,
+): Promise<string | null | undefined> {
+  if (targetOwnerId) return targetOwnerId
+  if (!dealId) return null
+  const deal = await prisma.deal.findUnique({
+    where: { id: dealId, tenantId },
+    select: { ownerId: true },
+  })
+  return deal?.ownerId ?? null
+}
+
 /**
- * Resolve WHO is performing a sensitive deal write. With the PIN feature enabled the
- * author is whoever owns the entered PIN (or an unexpired unlock cookie) — NOT necessarily
- * the logged-in account — so shared devices/accounts stay individually accountable.
+ * Resolve WHO is performing a sensitive deal write. When PIN is required the author is
+ * whoever owns the entered PIN (or an unexpired unlock cookie) — NOT necessarily the
+ * logged-in account — so shared devices/accounts stay individually accountable.
+ *
+ * Pass `dealId` for mutations on an existing deal, or `targetOwnerId` when creating one.
  *
  * Returns `requiresPin: true` when the client must collect a PIN before retrying.
  * Capability checks (edit/archive/delete) must use the returned `actorRole`, not the session.
@@ -47,8 +66,10 @@ function setUnlockCookie(actorUserId: string, tenantId: string, windowSeconds: n
 export async function resolveActionActor(params: {
   tenantId: string
   pin?: string | null
+  dealId?: string | null
+  targetOwnerId?: string | null
 }): Promise<ResolveActorResult> {
-  const { tenantId } = params
+  const { tenantId, dealId, targetOwnerId } = params
   const session = await auth()
   if (!session?.user?.id) return { ok: false, error: "No autenticado." }
 
@@ -57,8 +78,15 @@ export async function resolveActionActor(params: {
     select: { pinEnabled: true, pinUnlockWindowSeconds: true },
   })
 
+  const pinEnabled = settings?.pinEnabled ?? false
   const sessionLocked = isSessionPinLocked(session.user.id, tenantId)
-  const pinRequired = settings?.pinEnabled || sessionLocked
+  const dealOwnerId = await resolveDealOwnerId(tenantId, dealId, targetOwnerId)
+  const pinRequired = isPinRequiredForDealAction({
+    pinEnabled,
+    sessionLocked,
+    sessionUserId: session.user.id,
+    dealOwnerId,
+  })
 
   // No PIN required — the logged-in user is the author and accountable for changes.
   if (!pinRequired) {
