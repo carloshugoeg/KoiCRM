@@ -4,6 +4,7 @@ import type { Role } from "@prisma/client"
 import { prisma } from "@/lib/db/client"
 import { auth } from "@/lib/auth/auth"
 import { getUserRole } from "@/lib/auth/rbac"
+import { isSessionPinLocked } from "@/lib/auth/session-pin-lock"
 import {
   hashActionPin,
   isValidPinFormat,
@@ -56,8 +57,11 @@ export async function resolveActionActor(params: {
     select: { pinEnabled: true, pinUnlockWindowSeconds: true },
   })
 
-  // Feature off → the logged-in user is the author (legacy behaviour, safe rollout).
-  if (!settings?.pinEnabled) {
+  const sessionLocked = isSessionPinLocked(session.user.id, tenantId)
+  const pinRequired = settings?.pinEnabled || sessionLocked
+
+  // No PIN required — the logged-in user is the author and accountable for changes.
+  if (!pinRequired) {
     const role = await getUserRole(session, tenantId)
     if (!role) return { ok: false, error: "Acceso denegado." }
     return {
@@ -65,6 +69,8 @@ export async function resolveActionActor(params: {
       actor: { actorUserId: session.user.id, actorName: session.user.name ?? null, actorRole: role },
     }
   }
+
+  const unlockWindowSeconds = settings?.pinUnlockWindowSeconds ?? 300
 
   // 1) A freshly entered PIN identifies the author and (re)opens the unlock window.
   const pin = params.pin?.trim()
@@ -76,7 +82,7 @@ export async function resolveActionActor(params: {
       select: { userId: true, role: true, user: { select: { name: true } } },
     })
     if (!membership) return { ok: false, requiresPin: true, error: "PIN inválido." }
-    setUnlockCookie(membership.userId, tenantId, settings.pinUnlockWindowSeconds)
+    setUnlockCookie(membership.userId, tenantId, unlockWindowSeconds)
     return {
       ok: true,
       actor: { actorUserId: membership.userId, actorName: membership.user.name, actorRole: membership.role },

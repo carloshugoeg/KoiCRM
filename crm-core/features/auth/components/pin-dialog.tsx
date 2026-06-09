@@ -8,12 +8,22 @@ interface PinDialogProps {
   open: boolean
   error?: string
   submitting?: boolean
+  title?: string
+  description?: string
   onSubmit: (pin: string) => void
   onCancel: () => void
 }
 
 /** 4-digit PIN entry shown before a sensitive deal write. The PIN identifies the author. */
-export function PinDialog({ open, error, submitting, onSubmit, onCancel }: PinDialogProps) {
+export function PinDialog({
+  open,
+  error,
+  submitting,
+  title = "Confirma con tu PIN",
+  description = "Ingresa tu PIN de 4 dígitos. Se verificará automáticamente al completarlo.",
+  onSubmit,
+  onCancel,
+}: PinDialogProps) {
   const [pin, setPin] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -44,10 +54,8 @@ export function PinDialog({ open, error, submitting, onSubmit, onCancel }: PinDi
     <Dialog open={open} onOpenChange={(o) => { if (!o && !submitting) onCancel() }}>
       <DialogContent className="max-w-xs">
         <DialogHeader>
-          <DialogTitle>Confirma con tu PIN</DialogTitle>
-          <DialogDescription>
-            Ingresa tu PIN de 4 dígitos. Se verificará automáticamente al completarlo.
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <input
           ref={inputRef}

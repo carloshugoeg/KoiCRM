@@ -18,15 +18,19 @@ import { useTenant } from "@/lib/tenant/context"
 import { Button } from "@/components/ui/button"
 import { CommandMenu, openCommandMenu } from "@/components/CommandMenu"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { SessionPinToggle } from "@/features/auth/components/session-pin-toggle"
 import type { Membership, Tenant } from "@prisma/client"
 
 type MembershipWithTenant = Membership & { tenant: Pick<Tenant, "slug" | "name"> }
 
 interface Props {
+  tenantId: string
   memberships: MembershipWithTenant[]
   clientsCount: number
   /** Stats are a supervisory view — hidden from asesores. */
   canViewStats: boolean
+  sessionPinLocked: boolean
+  hasActionPin: boolean
   currentUser: {
     id: string
     name: string | null
@@ -35,7 +39,15 @@ interface Props {
   }
 }
 
-export function TenantHeader({ memberships, clientsCount, canViewStats, currentUser }: Props) {
+export function TenantHeader({
+  tenantId,
+  memberships,
+  clientsCount,
+  canViewStats,
+  sessionPinLocked,
+  hasActionPin,
+  currentUser,
+}: Props) {
   const { tenant } = useTenant()
   const pathname = usePathname()
   function navClass(href: string) {
@@ -123,6 +135,11 @@ export function TenantHeader({ memberships, clientsCount, canViewStats, currentU
         ))}
       </nav>
       <div className="ml-auto flex items-center gap-2">
+        <SessionPinToggle
+          tenantId={tenantId}
+          initialLocked={sessionPinLocked}
+          hasPin={hasActionPin}
+        />
         <Link
           href={`${base}/settings/appearance`}
           className={navClass(`${base}/settings`)}

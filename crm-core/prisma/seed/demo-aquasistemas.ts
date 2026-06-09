@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs"
 import path from "path"
 import { readFileSync } from "fs"
 import { fileURLToPath } from "url"
+import { hashActionPin } from "../../lib/auth/action-pin-token"
 
 // Load .env manually (this script runs outside Next.js)
 try {
@@ -135,6 +136,19 @@ export async function seedDemo() {
       { tenantId: tenant.id, userId: leticia.id,   role: "MEMBER" },
     ],
   })
+
+  const demoPins: [string, string][] = [
+    [roberto.id, "1234"],
+    [emanuel.id, "2345"],
+    [jhonatan.id, "3456"],
+    [leticia.id, "4567"],
+  ]
+  for (const [userId, pin] of demoPins) {
+    await prisma.membership.update({
+      where: { userId_tenantId: { userId, tenantId: tenant.id } },
+      data: { actionPinHash: hashActionPin(pin) },
+    })
+  }
 
   const stageMap = Object.fromEntries(pipeline.stages.map((s) => [s.key, s.id]))
   const owners = [roberto, emanuel, jhonatan, leticia]
@@ -338,7 +352,7 @@ export async function seedDemo() {
   )
 
   console.log(`✓ Tenant: ${tenant.slug} (${tenant.id})`)
-  console.log(`✓ Users: roberto, emanuel, jhonatan, leticia`)
+  console.log(`✓ Users: roberto (PIN 1234), emanuel (2345), jhonatan (3456), leticia (4567)`)
   console.log(`✓ Deals: ${deals.length} total`)
   console.log(`✓ Quotes: 15 | Payments: 4 | FollowUps: ${followUpDefs.length}`)
 }

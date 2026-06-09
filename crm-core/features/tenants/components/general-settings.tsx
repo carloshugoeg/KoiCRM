@@ -178,8 +178,8 @@ export function GeneralSettings({ tenant, settings, canManage }: Props) {
             <Label htmlFor="pinEnabled">Exigir PIN de 4 dígitos en cada cambio</Label>
           </div>
           <p className="text-xs text-muted-foreground">
-            Cada cambio en una oportunidad pedirá un PIN que identifica al autor en el historial.
-            Asigna primero un PIN a cada usuario en Configuración → Usuarios.
+            Obliga PIN en todo el workspace (todos los usuarios). También puedes activar protección
+            personal con el interruptor PIN en la barra superior al salir de tu puesto.
           </p>
           <div className="space-y-2 max-w-[220px]">
             <Label htmlFor="pinWindow">Ventana de desbloqueo (minutos)</Label>

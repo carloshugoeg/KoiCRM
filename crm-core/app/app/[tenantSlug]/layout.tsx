@@ -14,6 +14,8 @@ import {
   toFollowUpBannerItems,
 } from "@/features/follow-ups/banner-items"
 import { FollowUpBanners } from "@/features/follow-ups/components/follow-up-banners"
+import { getSessionPinLockStatusAction } from "@/features/auth/session-pin-actions"
+import { PinProvider } from "@/features/auth/pin-gate"
 
 interface Props {
   children: React.ReactNode
@@ -42,10 +44,11 @@ export default async function TenantLayout({ children, params }: Props) {
   const canSeeAll = canSeeAllDeals(resolved.membership.role)
   const ownerFilter = canSeeAll ? undefined : session.user.id
 
-  const [clientsCount, followUpAlerts, followUpReasons] = await Promise.all([
+  const [clientsCount, followUpAlerts, followUpReasons, sessionPin] = await Promise.all([
     countClients(tenantId),
     getFollowUpAlerts(tenantId, ownerFilter),
     getCatalogItems(tenantId, "followupReason", { activeOnly: true }),
+    getSessionPinLockStatusAction(tenantId),
   ])
 
   const reasonLabels = Object.fromEntries(followUpReasons.map((r) => [r.key, r.label]))
@@ -57,14 +60,18 @@ export default async function TenantLayout({ children, params }: Props) {
   return (
     <TenantProvider value={resolved}>
       {cssVars && <style dangerouslySetInnerHTML={{ __html: cssVars }} />}
+      <PinProvider>
       <div
         className="flex h-dvh flex-col overflow-hidden print:h-auto print:min-h-screen print:overflow-visible"
         style={{ background: "var(--app-bg)" }}
       >
         <TenantHeader
+          tenantId={tenantId}
           memberships={memberships}
           clientsCount={clientsCount}
           canViewStats={canSeeAllDeals(resolved.membership.role)}
+          sessionPinLocked={sessionPin.locked}
+          hasActionPin={sessionPin.hasPin}
           currentUser={{
             id: session.user.id,
             name: session.user.name ?? null,
@@ -84,6 +91,7 @@ export default async function TenantLayout({ children, params }: Props) {
           Diseñado por Vértice y Desarrollado por Koi Software 2026
         </footer>
       </div>
+      </PinProvider>
     </TenantProvider>
   )
 }
