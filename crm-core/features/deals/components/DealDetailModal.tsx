@@ -23,7 +23,7 @@ import { DealAttachmentsSection } from "@/features/attachments/components/DealAt
 import { updateDealFieldAction, moveDealAction, archiveDealAction, transferDealAction, deleteDealAction } from "@/features/deals/actions"
 import { addFollowUpAction, completeFollowUpAction, deleteFollowUpAction } from "@/features/follow-ups/actions"
 import { getDealActivityAction, getDealFollowUpsAction, getQuotesForDealAction, getPaymentsForDealAction } from "@/features/deals/actions"
-import { useActionPin } from "@/features/auth/pin-gate"
+import { PinProvider, useActionPin } from "@/features/auth/pin-gate"
 import type { ActivityEntry } from "@/features/activity/queries"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { formatPhone } from "@/lib/deals/phone-format"
@@ -94,7 +94,14 @@ function FieldEditButton({ label, onClick }: { label: string; onClick: () => voi
   )
 }
 
-export function DealDetailModal({
+/** Follow-ups from server actions arrive with ISO date strings, not Date instances. */
+type FollowUpRow = Omit<FollowUp, "date" | "completedAt" | "createdAt"> & {
+  date: Date | string
+  completedAt: Date | string | null
+  createdAt: Date | string
+}
+
+function DealDetailModalContent({
   deal,
   stages,
   followUpReasons,
@@ -111,7 +118,7 @@ export function DealDetailModal({
   const router = useRouter()
   const { guard } = useActionPin()
   const [activities, setActivities] = useState<ActivityEntry[]>([])
-  const [followUps, setFollowUps] = useState<FollowUp[]>([])
+  const [followUps, setFollowUps] = useState<FollowUpRow[]>([])
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [loadingAct, setLoadingAct] = useState(true)
@@ -237,17 +244,30 @@ export function DealDetailModal({
   }
 
   async function handleAddFollowUp() {
-    if (!fuDate || !fuReason) return
+    if (!fuDate) {
+      toast.error("Selecciona una fecha para el seguimiento.")
+      return
+    }
+    if (!fuReason) {
+      toast.error("Selecciona un motivo de seguimiento.")
+      return
+    }
     setFuLoading(true)
-    const result = await guard((pin) => addFollowUpAction({ tenantId, tenantSlug, dealId: deal.id, date: fuDate, reasonKey: fuReason, pin }))
-    setFuLoading(false)
-    if (!result.ok) {
-      if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorFollowUp))
-    } else {
-      toast.success(toastMessages.deal.followUpAdded)
-      const updated = await getDealFollowUpsAction(tenantId, deal.id)
-      setFollowUps(updated)
-      setFuDate("")
+    try {
+      const result = await guard((pin) =>
+        addFollowUpAction({ tenantId, tenantSlug, dealId: deal.id, date: fuDate, reasonKey: fuReason, pin }),
+      )
+      if (!result.ok) {
+        if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorFollowUp))
+      } else {
+        toast.success(toastMessages.deal.followUpAdded)
+        const updated = await getDealFollowUpsAction(tenantId, deal.id)
+        setFollowUps(updated)
+        setFuDate("")
+        router.refresh()
+      }
+    } finally {
+      setFuLoading(false)
     }
   }
 
@@ -261,6 +281,7 @@ export function DealDetailModal({
       setCompletingResult("")
       const updated = await getDealFollowUpsAction(tenantId, deal.id)
       setFollowUps(updated)
+      router.refresh()
     }
   }
 
@@ -272,6 +293,7 @@ export function DealDetailModal({
       toast.success(toastMessages.deal.followUpRemoved)
       const updated = await getDealFollowUpsAction(tenantId, deal.id)
       setFollowUps(updated)
+      router.refresh()
     }
   }
 
@@ -607,7 +629,7 @@ export function DealDetailModal({
                       <div className="flex items-start gap-2">
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium">{reasonLabel}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(fu.date.toISOString(), settings)}</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(fu.date, settings)}</p>
                         </div>
                         {canEdit && (
                           <Button
@@ -671,7 +693,12 @@ export function DealDetailModal({
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button size="sm" className="h-7 text-xs" onClick={handleAddFollowUp} disabled={fuLoading || !fuDate}>
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={handleAddFollowUp}
+                    disabled={fuLoading || !fuDate || !fuReason || followUpReasons.length === 0}
+                  >
                     {fuLoading ? "..." : "Agregar"}
                   </Button>
                 </div>
@@ -758,5 +785,13 @@ export function DealDetailModal({
       onConfirm={() => { if (deleteFollowUpId) handleDeleteFollowUp(deleteFollowUpId) }}
     />
     </>
+  )
+}
+
+export function DealDetailModal(props: DealDetailModalProps) {
+  return (
+    <PinProvider>
+      <DealDetailModalContent {...props} />
+    </PinProvider>
   )
 }

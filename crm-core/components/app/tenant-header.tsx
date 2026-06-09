@@ -17,6 +17,7 @@ import {
 import { useTenant } from "@/lib/tenant/context"
 import { Button } from "@/components/ui/button"
 import { CommandMenu, openCommandMenu } from "@/components/CommandMenu"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import type { Membership, Tenant } from "@prisma/client"
 
 type MembershipWithTenant = Membership & { tenant: Pick<Tenant, "slug" | "name"> }
@@ -26,9 +27,15 @@ interface Props {
   clientsCount: number
   /** Stats are a supervisory view — hidden from asesores. */
   canViewStats: boolean
+  currentUser: {
+    id: string
+    name: string | null
+    email: string | null
+    image: string | null
+  }
 }
 
-export function TenantHeader({ memberships, clientsCount, canViewStats }: Props) {
+export function TenantHeader({ memberships, clientsCount, canViewStats, currentUser }: Props) {
   const { tenant } = useTenant()
   const pathname = usePathname()
   function navClass(href: string) {
@@ -56,6 +63,14 @@ export function TenantHeader({ memberships, clientsCount, canViewStats }: Props)
       className="print:hidden sticky top-0 z-40 flex h-14 shrink-0 items-center gap-4 px-4 backdrop-blur-sm"
       style={{ background: "var(--header-bg)", borderBottom: "1px solid var(--header-border)" }}
     >
+      <UserAvatar
+        userId={currentUser.id}
+        name={currentUser.name}
+        email={currentUser.email}
+        imageUrl={currentUser.image}
+        size={32}
+        className="shrink-0 shadow-sm"
+      />
       <Link
         href={`${base}/pipeline`}
         className="flex shrink-0 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

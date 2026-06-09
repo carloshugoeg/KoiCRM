@@ -65,6 +65,12 @@ export default async function TenantLayout({ children, params }: Props) {
           memberships={memberships}
           clientsCount={clientsCount}
           canViewStats={canSeeAllDeals(resolved.membership.role)}
+          currentUser={{
+            id: session.user.id,
+            name: session.user.name ?? null,
+            email: session.user.email ?? null,
+            image: session.user.image ?? null,
+          }}
         />
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-14 print:min-h-0 print:overflow-visible print:pb-0">
           {children}
