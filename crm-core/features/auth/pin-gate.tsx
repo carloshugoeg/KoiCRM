@@ -43,6 +43,7 @@ export function PinProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const handleSubmit = useCallback((pin: string) => {
+    setError(undefined)
     setSubmitting(true)
     resolverRef.current?.(pin)
     resolverRef.current = null

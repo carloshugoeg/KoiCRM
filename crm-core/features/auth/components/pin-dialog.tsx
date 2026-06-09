@@ -28,20 +28,25 @@ export function PinDialog({ open, error, submitting, onSubmit, onCancel }: PinDi
 
   // Clear the entry whenever a new error arrives (e.g. wrong PIN) so the user can retry.
   useEffect(() => {
-    if (error) setPin("")
+    if (error) {
+      setPin("")
+      inputRef.current?.focus()
+    }
   }, [error])
 
-  function submit() {
-    if (pin.length === 4 && !submitting) onSubmit(pin)
+  function handlePinChange(raw: string) {
+    const next = raw.replace(/\D/g, "").slice(0, 4)
+    setPin(next)
+    if (next.length === 4 && !submitting) onSubmit(next)
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel() }}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o && !submitting) onCancel() }}>
       <DialogContent className="max-w-xs">
         <DialogHeader>
           <DialogTitle>Confirma con tu PIN</DialogTitle>
           <DialogDescription>
-            Ingresa tu PIN de 4 dígitos. La acción quedará registrada a tu nombre.
+            Ingresa tu PIN de 4 dígitos. Se verificará automáticamente al completarlo.
           </DialogDescription>
         </DialogHeader>
         <input
@@ -51,19 +56,20 @@ export function PinDialog({ open, error, submitting, onSubmit, onCancel }: PinDi
           autoComplete="off"
           maxLength={4}
           value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-          onKeyDown={(e) => { if (e.key === "Enter") submit() }}
-          className="w-full text-center text-2xl tracking-[0.6em] font-bold rounded-md border py-3 outline-none focus:ring-2 focus:ring-indigo-500"
+          disabled={submitting}
+          onChange={(e) => handlePinChange(e.target.value)}
+          className="w-full text-center text-2xl tracking-[0.6em] font-bold rounded-md border py-3 outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
           placeholder="••••"
           aria-label="PIN de 4 dígitos"
+          aria-invalid={!!error}
         />
-        {error && <p className="text-sm text-red-600 text-center">{error}</p>}
-        <div className="flex gap-2 justify-end">
+        {submitting && (
+          <p className="text-sm text-muted-foreground text-center">Verificando PIN…</p>
+        )}
+        {error && !submitting && <p className="text-sm text-red-600 text-center">{error}</p>}
+        <div className="flex justify-end">
           <Button variant="ghost" onClick={onCancel} disabled={submitting}>
             Cancelar
-          </Button>
-          <Button onClick={submit} disabled={pin.length !== 4 || submitting}>
-            {submitting ? "Verificando…" : "Confirmar"}
           </Button>
         </div>
       </DialogContent>
