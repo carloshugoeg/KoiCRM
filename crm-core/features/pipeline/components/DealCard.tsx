@@ -4,7 +4,6 @@ import { useState } from "react"
 
 import { useDraggable } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
-import { avatarColor } from "@/lib/utils/avatar-color"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { formatCurrency } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
@@ -64,13 +63,6 @@ function diffDays(from: Date, to: Date): number {
   return Math.floor((to.getTime() - from.getTime()) / 86_400_000)
 }
 
-function getInitials(name: string) {
-  if (!name) return "U"
-  const parts = name.trim().split(" ")
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return name.substring(0, 2).toUpperCase()
-}
-
 // Convert hex to rgba for subdued backgrounds
 function hex2rgba(hex: string, alpha = 0.15) {
   let h = hex.replace("#", "")
@@ -102,9 +94,6 @@ export function DealCard({
   const [isExpanded, setIsExpanded] = useState(false)
 
   const sc = stageColor ?? "#6366f1"
-
-  const avatarInitials = getInitials(deal.name)
-  const avatarCol = avatarColor(deal.id)
 
   const now = new Date()
   const daysTotal = diffDays(deal.createdAt, now)
@@ -188,14 +177,15 @@ export function DealCard({
       )}
 
       <div className={`${isCompact ? "p-2.5 space-y-1.5" : "p-3.5 space-y-3"}`}>
-        {/* Header: Avatar + Client Name */}
+        {/* Header: Assigned user avatar + Client Name */}
         <div className="flex items-center gap-2.5">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-            style={{ backgroundColor: hex2rgba(avatarCol, 0.15), color: avatarCol, border: `1px solid ${hex2rgba(avatarCol, 0.4)}` }}
-          >
-            {avatarInitials}
-          </div>
+          <UserAvatar
+            userId={deal.ownerId}
+            name={deal.ownerName}
+            imageUrl={deal.ownerImage}
+            size={32}
+            className="shadow-sm"
+          />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold leading-tight truncate text-slate-900">{deal.name}</p>
             {deal.company && (

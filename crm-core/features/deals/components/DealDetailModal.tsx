@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 import { PAYMENT_DOC_REQUIRED_FOR_WON } from "@/lib/pipeline/stage-block-message"
-import { X, Phone, MessageCircle, Mail, Trash2, Lock } from "lucide-react"
+import { X, Phone, MessageCircle, Mail, Trash2, Lock, Pencil } from "lucide-react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { DialogPortal, DialogOverlay, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog } from "@/components/ui/alert-dialog"
@@ -26,6 +26,7 @@ import { getDealActivityAction, getDealFollowUpsAction, getQuotesForDealAction, 
 import { useActionPin } from "@/features/auth/pin-gate"
 import type { ActivityEntry } from "@/features/activity/queries"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { formatPhone } from "@/lib/deals/phone-format"
 import { formatCurrency, formatDate } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
 import type { PipelineStage, CatalogItem, FollowUp, Quote, Payment } from "@prisma/client"
@@ -75,6 +76,22 @@ interface DealDetailModalProps {
 
 function diffDays(from: Date, to: Date): number {
   return Math.floor((to.getTime() - from.getTime()) / 86_400_000)
+}
+
+function FieldEditButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="h-6 w-6 shrink-0 text-muted-foreground hover:text-primary"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+    >
+      <Pencil className="h-3 w-3" />
+    </Button>
+  )
 }
 
 export function DealDetailModal({
@@ -185,7 +202,10 @@ export function DealDetailModal({
   }
 
   async function handleTransfer(toUserId: string) {
-    if (transferring) return
+    if (transferring || toUserId === deal.ownerId) {
+      setEditField(null)
+      return
+    }
     setTransferring(true)
     try {
       const result = await guard((pin) => transferDealAction({ tenantId, tenantSlug, dealId: deal.id, toUserId, pin }))
@@ -193,7 +213,7 @@ export function DealDetailModal({
         if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorSave))
       } else {
         toast.success(toastMessages.deal.transferred, { onAutoClose: () => onAction?.() })
-        onClose()
+        setEditField(null)
       }
     } finally {
       setTransferring(false)
@@ -307,9 +327,44 @@ export function DealDetailModal({
             <div className="mb-4 space-y-2.5">
               <div className="flex items-center gap-2">
                 <UserAvatar userId={deal.ownerId} name={deal.ownerName} imageUrl={deal.ownerImage} size={32} />
-                <div className="min-w-0">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground leading-none">Asignado a</p>
-                  <p className="text-sm font-medium truncate">{deal.ownerName ?? "Sin asesor"}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground leading-none">Asignado a</p>
+                    {canEdit && members.length > 1 && editField !== "owner" && (
+                      <FieldEditButton
+                        label="Cambiar asesor asignado"
+                        onClick={() => setEditField("owner")}
+                      />
+                    )}
+                  </div>
+                  {editField === "owner" ? (
+                    <div className="mt-1 space-y-1">
+                      <Select
+                        value={deal.ownerId}
+                        onValueChange={handleTransfer}
+                        disabled={transferring}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Elegir asesor…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {members.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>{m.name ?? m.email}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setEditField(null)}
+                        disabled={transferring}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-sm font-medium truncate">{deal.ownerName ?? "Sin asesor"}</p>
+                  )}
                 </div>
               </div>
               {deal.createdById && (
@@ -323,50 +378,30 @@ export function DealDetailModal({
               )}
             </div>
 
-            {/* Cesión / reasignación */}
-            {canEdit && members.filter((m) => m.id !== deal.ownerId).length > 0 && (
-              <div className="mb-4">
-                <p className="text-xs text-muted-foreground mb-1">Ceder / reasignar a</p>
-                <Select onValueChange={handleTransfer} disabled={transferring}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Elegir asesor…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {members
-                      .filter((m) => m.id !== deal.ownerId)
-                      .map((m) => (
-                        <SelectItem key={m.id} value={m.id}>{m.name ?? m.email}</SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             {/* Value */}
             <div className="mb-3">
-              <p className="text-xs text-muted-foreground mb-1">Valor</p>
-              {editField === "value" ? (
-                <div className="flex gap-1">
-                  <Input
-                    autoFocus
-                    type="number"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    className="h-7 text-sm"
-                    onBlur={() => saveField("value", parseFloat(editValue) || 0)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") e.currentTarget.blur()
-                      if (e.key === "Escape") setEditField(null)
-                    }}
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <p className="text-xs text-muted-foreground">Valor</p>
+                {canEdit && editField !== "value" && (
+                  <FieldEditButton
+                    label="Editar valor"
+                    onClick={() => { setEditField("value"); setEditValue(String(deal.value)) }}
                   />
-                </div>
-              ) : canEdit ? (
-                <p
-                  className="text-base font-bold cursor-pointer hover:text-primary"
-                  onClick={() => { setEditField("value"); setEditValue(String(deal.value)) }}
-                >
-                  {formatCurrency(deal.value, settings)}
-                </p>
+                )}
+              </div>
+              {editField === "value" ? (
+                <Input
+                  autoFocus
+                  type="number"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  className="h-7 text-sm"
+                  onBlur={() => saveField("value", parseFloat(editValue) || 0)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur()
+                    if (e.key === "Escape") setEditField(null)
+                  }}
+                />
               ) : (
                 <p className="text-base font-bold">{formatCurrency(deal.value, settings)}</p>
               )}
@@ -388,11 +423,36 @@ export function DealDetailModal({
 
             {/* Contact info */}
             <div className="space-y-2 mb-3">
-              {deal.phone && (
-                <a href={`tel:${deal.phone}`} className="flex items-center gap-2 text-sm hover:text-primary">
-                  <Phone className="h-3 w-3" />
-                  {deal.phone}
-                </a>
+              {(deal.phone || canEdit) && (
+                <div className="flex items-center gap-2">
+                  <Phone className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  {editField === "phone" ? (
+                    <Input
+                      autoFocus
+                      value={editValue}
+                      onChange={(e) => setEditValue(formatPhone(e.target.value, false))}
+                      className="h-7 flex-1 text-sm"
+                      placeholder="XXXX-XXXX"
+                      onBlur={() => saveField("phone", editValue)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.currentTarget.blur()
+                        if (e.key === "Escape") setEditField(null)
+                      }}
+                    />
+                  ) : deal.phone ? (
+                    <a href={`tel:${deal.phone}`} className="flex-1 text-sm hover:text-primary truncate">
+                      {deal.phone}
+                    </a>
+                  ) : (
+                    <span className="flex-1 text-sm text-muted-foreground italic">Sin teléfono</span>
+                  )}
+                  {canEdit && editField !== "phone" && (
+                    <FieldEditButton
+                      label="Editar teléfono"
+                      onClick={() => { setEditField("phone"); setEditValue(deal.phone ?? "") }}
+                    />
+                  )}
+                </div>
               )}
               {deal.whatsapp && (
                 <a
