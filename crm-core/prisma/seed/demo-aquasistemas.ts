@@ -53,12 +53,6 @@ const CATALOG_ITEMS = [
   { catalogKey: "dealStatus",     key: "esperando",        label: "Esperando",        color: "#6366f1", order: 2 },
   { catalogKey: "dealStatus",     key: "frio",             label: "Frío",             color: "#6b7280", order: 3 },
   { catalogKey: "dealStatus",     key: "urgente",          label: "Urgente",          color: "#ef4444", order: 4 },
-  { catalogKey: "followupReason", key: "no_responde",        label: "No responde",          color: null, order: 0 },
-  { catalogKey: "followupReason", key: "pide_informacion",   label: "Pide más información", color: null, order: 1 },
-  { catalogKey: "followupReason", key: "necesita_tiempo",    label: "Necesita tiempo",      color: null, order: 2 },
-  { catalogKey: "followupReason", key: "revisar_cotizacion", label: "Revisar cotización",   color: null, order: 3 },
-  { catalogKey: "followupReason", key: "agendar_visita",     label: "Agendar visita",       color: null, order: 4 },
-  { catalogKey: "followupReason", key: "otro",               label: "Otro",                 color: null, order: 5 },
 ]
 
 export async function seedDemo() {
@@ -318,22 +312,22 @@ export async function seedDemo() {
   // Follow-ups: overdue (past, not completed), completed, future
   const followUpDefs: [number, string, boolean, Date | null][] = [
     // Overdue
-    [0,  "no_responde",        false, null],
-    [1,  "pide_informacion",   false, null],
-    [8,  "revisar_cotizacion", false, null],
+    [0,  "No responde, intentar por WhatsApp.", false, null],
+    [1,  "Pide más información sobre el alcance.", false, null],
+    [8,  "Revisar cotización enviada.", false, null],
     // Completed
-    [9,  "agendar_visita",     true,  daysAgo(3)],
-    [14, "revisar_cotizacion", true,  daysAgo(5)],
-    [20, "revisar_cotizacion", true,  daysAgo(2)],
+    [9,  "Agendar visita técnica.", true,  daysAgo(3)],
+    [14, "Revisar cotización con el cliente.", true,  daysAgo(5)],
+    [20, "Resolver dudas de cotización.", true,  daysAgo(2)],
     // Future
-    [4,  "necesita_tiempo",    false, null],
-    [10, "pide_informacion",   false, null],
-    [17, "agendar_visita",     false, null],
-    [21, "necesita_tiempo",    false, null],
+    [4,  "Cliente necesita tiempo para decidir.", false, null],
+    [10, "Enviar información complementaria.", false, null],
+    [17, "Coordinar visita técnica.", false, null],
+    [21, "Dar seguimiento a decisión pendiente.", false, null],
   ]
 
   await Promise.all(
-    followUpDefs.map(([dealIdx, reasonKey, completed, completedAt], j) => {
+    followUpDefs.map(([dealIdx, note, completed, completedAt], j) => {
       const isPast = j < 3
       const isFuture = j >= 6
       const date = isPast ? daysAgo(3 + j) : isFuture ? daysFromNow(3 + j) : daysAgo(j)
@@ -341,7 +335,7 @@ export async function seedDemo() {
         data: {
           tenantId: tenant.id,
           dealId: deals[dealIdx].id,
-          reasonKey,
+          note,
           date,
           completed,
           completedAt,

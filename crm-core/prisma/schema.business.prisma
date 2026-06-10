@@ -172,7 +172,7 @@ model FollowUp {
   tenantId    String
   dealId      String
   date        DateTime
-  reasonKey   String
+  note        String?
   result      String?
   completed   Boolean   @default(false)
   completedAt DateTime?

@@ -7,7 +7,6 @@ import { TenantProvider } from "@/lib/tenant/context"
 import { TenantHeader } from "@/components/app/tenant-header"
 import { buildCssVars } from "@/lib/branding/css-vars"
 import { countClients } from "@/features/clients/queries"
-import { getCatalogItems } from "@/features/catalogs/queries"
 import { getFollowUpAlerts } from "@/features/follow-ups/queries"
 import {
   countFollowUpBannerItems,
@@ -44,15 +43,13 @@ export default async function TenantLayout({ children, params }: Props) {
   const canSeeAll = canSeeAllDeals(resolved.membership.role)
   const ownerFilter = canSeeAll ? undefined : session.user.id
 
-  const [clientsCount, followUpAlerts, followUpReasons, sessionPin] = await Promise.all([
+  const [clientsCount, followUpAlerts, sessionPin] = await Promise.all([
     countClients(tenantId),
     getFollowUpAlerts(tenantId, ownerFilter),
-    getCatalogItems(tenantId, "followupReason", { activeOnly: true }),
     getSessionPinLockStatusAction(tenantId),
   ])
 
-  const reasonLabels = Object.fromEntries(followUpReasons.map((r) => [r.key, r.label]))
-  const followUpBannerItems = toFollowUpBannerItems(followUpAlerts, reasonLabels)
+  const followUpBannerItems = toFollowUpBannerItems(followUpAlerts)
   const followUpBannerTotal = countFollowUpBannerItems(followUpAlerts)
 
   const cssVars = buildCssVars(resolved.tenant.branding)

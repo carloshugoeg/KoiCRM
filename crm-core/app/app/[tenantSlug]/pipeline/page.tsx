@@ -40,7 +40,7 @@ export default async function PipelinePage({ params, searchParams }: Props) {
   const cookieStore = cookies()
   const includeArchived = readShowArchivedFromCookieHeader(cookieStore.toString())
 
-  const { pipeline, members, channels, equipment, statuses, followUpReasons, settings, deals } =
+  const { pipeline, members, channels, equipment, statuses, settings, deals } =
     await loadPipelineKanbanData(tenantId, {
       ownerId: filters.owner,
       channelKey: filters.channel,
@@ -152,7 +152,6 @@ export default async function PipelinePage({ params, searchParams }: Props) {
           canEdit={canEdit}
           canArchive={canArchiveDeal(membership.role)}
           canDelete={canDeleteDeal(membership.role)}
-          followUpReasons={followUpReasons}
         />
       </div>
       <PrintReport

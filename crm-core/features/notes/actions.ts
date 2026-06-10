@@ -5,7 +5,6 @@ import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
 import { requireRole, canEditDeal } from "@/lib/auth/rbac"
 import { resolveActionActor } from "@/lib/auth/action-pin"
-import { prisma } from "@/lib/db/client"
 import { recordActivity } from "@/features/activity/queries"
 import { addNoteSchema, deleteNoteSchema } from "@/features/notes/schemas"
 import { getDealNotes, getClientNotes } from "@/features/notes/queries"
@@ -54,8 +53,10 @@ export async function deleteNoteAction(raw: unknown): Promise<{ ok: boolean; err
 
   const { tenantId, tenantSlug, noteId, pin } = parsed.data
 
-  const note = await prisma.note.findUnique({ where: { id: noteId } })
-  if (!note || note.tenantId !== tenantId) return { ok: false, error: "Nota no encontrada." }
+  const note = await withTenant(tenantId, (tx) =>
+    tx.note.findUnique({ where: { id: noteId, tenantId }, select: { dealId: true } }),
+  )
+  if (!note) return { ok: false, error: "Nota no encontrada." }
 
   const actor = await resolveActionActor({ tenantId, pin, dealId: note.dealId })
   if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }

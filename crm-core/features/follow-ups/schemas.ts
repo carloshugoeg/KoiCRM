@@ -5,7 +5,7 @@ export const addFollowUpSchema = z.object({
   tenantSlug: z.string().min(1),
   dealId: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida."),
-  reasonKey: z.string().min(1, "El motivo es requerido."),
+  note: z.string().trim().max(500, "El texto del seguimiento es muy largo.").optional(),
   pin: z.string().regex(/^\d{4}$/, "El PIN debe tener 4 dígitos.").optional(),
 })
 

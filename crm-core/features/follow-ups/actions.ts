@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache"
 import { withTenant } from "@/lib/db/rls"
 import { canEditDeal } from "@/lib/auth/rbac"
 import { resolveActionActor } from "@/lib/auth/action-pin"
-import { prisma } from "@/lib/db/client"
 import { recordActivity } from "@/features/activity/queries"
 import { addFollowUpSchema, completeFollowUpSchema, deleteFollowUpSchema } from "@/features/follow-ups/schemas"
 
@@ -12,14 +11,16 @@ export async function addFollowUpAction(raw: unknown): Promise<{ ok: boolean; er
   const parsed = addFollowUpSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
-  const { tenantId, tenantSlug, dealId, date, reasonKey, pin } = parsed.data
+  const { tenantId, tenantSlug, dealId, date, note, pin } = parsed.data
 
   const actor = await resolveActionActor({ tenantId, pin, dealId })
   if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
   const { actorUserId, actorRole } = actor.actor
   if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
 
-  const deal = await prisma.deal.findUnique({ where: { id: dealId, tenantId } })
+  const deal = await withTenant(tenantId, (tx) =>
+    tx.deal.findUnique({ where: { id: dealId, tenantId }, select: { id: true } }),
+  )
   if (!deal) return { ok: false, error: "Oportunidad no encontrada." }
 
   await withTenant(tenantId, async (tx) => {
@@ -28,7 +29,7 @@ export async function addFollowUpAction(raw: unknown): Promise<{ ok: boolean; er
         tenantId,
         dealId,
         date: new Date(date + "T12:00:00"),
-        reasonKey,
+        note: note || null,
         createdById: actorUserId,
       },
     })
@@ -37,7 +38,7 @@ export async function addFollowUpAction(raw: unknown): Promise<{ ok: boolean; er
       entity: "Deal",
       entityId: dealId,
       type: "followUpAdded",
-      payload: { date, reasonKey },
+      payload: { date, note: note ?? null },
       userId: actorUserId,
     })
   })
@@ -55,7 +56,9 @@ export async function completeFollowUpAction(raw: unknown): Promise<{ ok: boolea
 
   const { tenantId, tenantSlug, followUpId, result, pin } = parsed.data
 
-  const fu = await prisma.followUp.findUnique({ where: { id: followUpId, tenantId } })
+  const fu = await withTenant(tenantId, (tx) =>
+    tx.followUp.findUnique({ where: { id: followUpId, tenantId }, select: { dealId: true } }),
+  )
   if (!fu) return { ok: false, error: "Seguimiento no encontrado." }
 
   const actor = await resolveActionActor({ tenantId, pin, dealId: fu.dealId })
@@ -91,7 +94,9 @@ export async function deleteFollowUpAction(raw: unknown): Promise<{ ok: boolean;
 
   const { tenantId, tenantSlug, followUpId, pin } = parsed.data
 
-  const fu = await prisma.followUp.findUnique({ where: { id: followUpId, tenantId } })
+  const fu = await withTenant(tenantId, (tx) =>
+    tx.followUp.findUnique({ where: { id: followUpId, tenantId }, select: { dealId: true } }),
+  )
   if (!fu) return { ok: false, error: "Seguimiento no encontrado." }
 
   const actor = await resolveActionActor({ tenantId, pin, dealId: fu.dealId })

@@ -1,12 +1,11 @@
 import { withTenant } from "@/lib/db/rls"
 
-export type CatalogKey = "equipment" | "salesChannel" | "dealStatus" | "followupReason"
+export type CatalogKey = "equipment" | "salesChannel" | "dealStatus"
 
 export const CATALOG_LABELS: Record<CatalogKey, string> = {
   equipment: "Equipos",
   salesChannel: "Canal de ventas",
   dealStatus: "Estado de oportunidad",
-  followupReason: "Motivo de seguimiento",
 }
 
 export type GetCatalogItemsOptions = {
@@ -59,9 +58,6 @@ export async function getCatalogItemUsageCount(
     }
     if (catalogKey === "dealStatus") {
       return tx.deal.count({ where: { tenantId, statusKey: key } })
-    }
-    if (catalogKey === "followupReason") {
-      return tx.followUp.count({ where: { tenantId, reasonKey: key } })
     }
     return 0
   })

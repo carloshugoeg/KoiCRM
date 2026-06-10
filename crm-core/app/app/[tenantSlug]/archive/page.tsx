@@ -5,7 +5,6 @@ import { canSeeAllDeals } from "@/lib/auth/rbac"
 import { getArchivedDeals } from "@/features/deals/queries"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
 import { withTenant } from "@/lib/db/rls"
-import { getCatalogItems } from "@/features/catalogs/queries"
 import { ArchiveTable } from "@/features/deals/components/ArchiveTable"
 import { prisma } from "@/lib/db/client"
 import type { IntlSettings } from "@/lib/intl/format"
@@ -29,10 +28,9 @@ export default async function ArchivePage({ params, searchParams }: Props) {
 
   const cursor = searchParams.cursor as string | undefined
 
-  const [{ deals, nextCursor }, pipeline, followUpReasons, settings] = await Promise.all([
+  const [{ deals, nextCursor }, pipeline, settings] = await Promise.all([
     getArchivedDeals(tenantId, cursor, 10, canSeeAll ? undefined : session.user.id),
     withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
-    getCatalogItems(tenantId, "followupReason", { activeOnly: true }),
     prisma.tenantSettings.findUnique({ where: { tenantId } }),
   ])
 
@@ -76,7 +74,6 @@ export default async function ArchivePage({ params, searchParams }: Props) {
         nextCursor={nextCursor}
         hasPrev={!!cursor}
         stages={pipeline?.stages ?? []}
-        followUpReasons={followUpReasons}
         settings={intlSettings}
       />
     </div>

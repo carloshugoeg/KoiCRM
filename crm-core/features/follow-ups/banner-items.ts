@@ -8,7 +8,7 @@ export type FollowUpBannerItem = {
   dealName: string
   company: string | null
   stageLabel: string
-  reasonLabel: string
+  note: string
   dateIso: string
   urgency: FollowUpBannerUrgency
 }
@@ -18,7 +18,6 @@ type Alerts = Awaited<ReturnType<typeof getFollowUpAlerts>>
 function mapBucket(
   items: Alerts["overdue"],
   urgency: FollowUpBannerUrgency,
-  reasonLabels: Record<string, string>,
 ): FollowUpBannerItem[] {
   return items.map((fu) => ({
     id: fu.id,
@@ -26,7 +25,7 @@ function mapBucket(
     dealName: fu.deal.name,
     company: fu.deal.company,
     stageLabel: fu.deal.stage.label,
-    reasonLabel: reasonLabels[fu.reasonKey] ?? fu.reasonKey,
+    note: fu.note ?? "",
     dateIso: fu.date.toISOString(),
     urgency,
   }))
@@ -35,13 +34,12 @@ function mapBucket(
 /** Flatten alert buckets into banner items (overdue → today → próximos 7 días). */
 export function toFollowUpBannerItems(
   alerts: Alerts,
-  reasonLabels: Record<string, string>,
   max = 5,
 ): FollowUpBannerItem[] {
   const all = [
-    ...mapBucket(alerts.overdue, "overdue", reasonLabels),
-    ...mapBucket(alerts.today, "today", reasonLabels),
-    ...mapBucket(alerts.next7, "upcoming", reasonLabels),
+    ...mapBucket(alerts.overdue, "overdue"),
+    ...mapBucket(alerts.today, "today"),
+    ...mapBucket(alerts.next7, "upcoming"),
   ]
   return all.slice(0, max)
 }

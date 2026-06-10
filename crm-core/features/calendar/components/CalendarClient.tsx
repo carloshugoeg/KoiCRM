@@ -19,7 +19,7 @@ import { DealDetailModal } from "@/features/deals/components/DealDetailModal"
 import { getDealSummaryAction } from "@/features/deals/actions"
 import type { CalendarFollowUp } from "@/features/calendar/queries"
 import type { IntlSettings } from "@/lib/intl/format"
-import type { PipelineStage, CatalogItem } from "@prisma/client"
+import type { PipelineStage } from "@prisma/client"
 
 const MONTH_NAMES = [
   "Enero",
@@ -46,7 +46,6 @@ interface CalendarClientProps {
   followUps: CalendarFollowUp[]
   members: { id: string; name: string | null; email: string }[]
   stages: PipelineStage[]
-  followUpReasons: CatalogItem[]
   currentOwnerId?: string
   settings: IntlSettings
   currentUserId: string
@@ -63,7 +62,6 @@ export function CalendarClient({
   followUps,
   members,
   stages,
-  followUpReasons,
   currentOwnerId,
   settings,
   currentUserId,
@@ -173,7 +171,6 @@ export function CalendarClient({
               month={month}
               year={year}
               followUps={followUps}
-              followUpReasons={followUpReasons}
               onOpenDeal={handleOpenDeal}
               loadingDealId={openingDealId}
             />
@@ -188,7 +185,6 @@ export function CalendarClient({
         <DealDetailModal
           deal={selectedDeal}
           stages={stages}
-          followUpReasons={followUpReasons}
           tenantId={tenantId}
           tenantSlug={tenantSlug}
           settings={settings}

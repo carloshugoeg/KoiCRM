@@ -54,7 +54,6 @@ interface ClientProfileProps {
   channels: CatalogItem[]
   equipment: CatalogItem[]
   statuses: CatalogItem[]
-  followUpReasons: CatalogItem[]
   settings: IntlSettings
   canEdit: boolean
 }
@@ -70,7 +69,6 @@ export function ClientProfile({
   channels,
   equipment,
   statuses,
-  followUpReasons,
   settings,
   canEdit,
 }: ClientProfileProps) {
@@ -243,7 +241,6 @@ export function ClientProfile({
           channels={channels}
           equipment={equipment}
           statuses={statuses}
-          followUpReasons={followUpReasons}
           prefill={{
             name: client.name,
             company: client.company,

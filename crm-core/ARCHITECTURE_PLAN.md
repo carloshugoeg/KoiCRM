@@ -56,7 +56,7 @@ crm-core/
 │   │       └── settings/
 │   │           ├── appearance/
 │   │           ├── users/
-│   │           ├── catalogs/         # equipment, channels, status, fu-reasons
+│   │           ├── catalogs/         # equipment, channels, status
 │   │           ├── pipeline/
 │   │           └── custom-fields/
 │   ├── api/                          # route handlers
@@ -371,7 +371,7 @@ V1: cada tenant tiene un pipeline default (creado por la plantilla de industria)
 model CatalogItem {
   id         String   @id @default(cuid())
   tenantId   String
-  catalogKey String   // "equipment" | "salesChannel" | "dealStatus" | "followupReason"
+  catalogKey String   // "equipment" | "salesChannel" | "dealStatus"
   key        String   // estable, ej "bomba" o "whatsapp"
   label      String
   color      String?
@@ -384,7 +384,7 @@ model CatalogItem {
 }
 ```
 
-Reemplaza `sf-equipment`, `sf-channels`, `STATUS_OPTIONS`, `FU_REASONS`. Cada catálogo es renderizable y administrable desde Settings → Catálogos.
+Reemplaza `sf-equipment`, `sf-channels` y `STATUS_OPTIONS`. Los seguimientos usan texto libre por deal, no catálogo de motivos. Cada catálogo es renderizable y administrable desde Settings → Catálogos.
 
 ### 7.5 Deal core + relaciones
 
@@ -510,7 +510,7 @@ model FollowUp {
   tenantId    String
   dealId      String
   date        DateTime               // sólo fecha (00:00 local), comparada al noon
-  reasonKey   String                  // CatalogItem(catalogKey="followupReason")
+  note        String?                 // texto libre del seguimiento
   result      String?
   completed   Boolean  @default(false)
   completedAt DateTime?
@@ -610,7 +610,7 @@ Generación de Deal.id: en transacción incrementar y formatear `{prefix}-{count
 | Seed                            | Cuándo                                                   | Contenido                                                                                                                                               |
 | ------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `seed/core.ts`                  | Bootstrap inicial (dev y demo).                          | `IndustryTemplate(slug=aquasistemas)`. En dev: usuario admin `dev@local`. NUNCA en prod.                                                                |
-| `seed/industry-aquasistemas.ts` | Aplicada en onboarding cuando un tenant elige industria. | Pipeline default 6 stages, CatalogItems para equipment/channels/status/followupReason, branding default (colores AquaCRM), `dealIdPrefix=AQX`.          |
+| `seed/industry-aquasistemas.ts` | Aplicada en onboarding cuando un tenant elige industria. | Pipeline default 6 stages, CatalogItems para equipment/channels/status, branding default (colores AquaCRM), `dealIdPrefix=AQX`.                         |
 | `seed/demo-aquasistemas.ts`     | Comando opcional `pnpm seed:demo`.                       | Tenant "demo-aqua", usuario owner demo, 4 colaboradores (Roberto/Emanuel/Jhonatan/Leticia), 30 deals representativos sin imágenes, follow-ups variados. |
 
 Todo seed reproducible (idempotente). Datos demo siempre marcados con flag (`Tenant.slug` empieza con `demo-`). Nunca usados como persistencia real.

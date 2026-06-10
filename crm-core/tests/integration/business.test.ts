@@ -72,12 +72,11 @@ describe("T2.2 — Business schema", () => {
       data: [
         { tenantId, catalogKey: "salesChannel", key: "whatsapp", label: "WhatsApp" },
         { tenantId, catalogKey: "dealStatus", key: "active", label: "Active" },
-        { tenantId, catalogKey: "followupReason", key: "call", label: "Llamada" },
         { tenantId, catalogKey: "equipment", key: "bomba", label: "Bomba" },
       ],
     });
     const items = await prismaAdmin.catalogItem.findMany({ where: { tenantId } });
-    expect(items).toHaveLength(4);
+    expect(items).toHaveLength(3);
   });
 
   it("enforces unique (tenantId, catalogKey, key) on CatalogItem", async () => {
@@ -119,7 +118,7 @@ describe("T2.2 — Business schema", () => {
           create: [{ tenantId, number: "FAC-001", date: new Date() }],
         },
         followUps: {
-          create: [{ tenantId, date: new Date(), reasonKey: "call" }],
+          create: [{ tenantId, date: new Date(), note: "Llamar al cliente" }],
         },
         notes: {
           create: [{ tenantId, text: "Primera nota del deal" }],

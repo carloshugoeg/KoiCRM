@@ -26,7 +26,7 @@ export default async function ClientDetailPage({ params }: Props) {
   const tenantSlug = params.tenantSlug
   const canEdit = membership.role !== "VIEWER"
 
-  const [clientData, kpis, pipeline, members, channels, equipment, statuses, followUpReasons, settings] =
+  const [clientData, kpis, pipeline, members, channels, equipment, statuses, settings] =
     await Promise.all([
       getClientWithDeals(tenantId, params.clientId),
       getClientKpis(tenantId, params.clientId),
@@ -35,7 +35,6 @@ export default async function ClientDetailPage({ params }: Props) {
       getCatalogItems(tenantId, "salesChannel", { activeOnly: true }),
       getCatalogItems(tenantId, "equipment", { activeOnly: true }),
       getCatalogItems(tenantId, "dealStatus", { activeOnly: true }),
-      getCatalogItems(tenantId, "followupReason", { activeOnly: true }),
       prisma.tenantSettings.findUnique({ where: { tenantId } }),
     ])
 
@@ -86,7 +85,6 @@ export default async function ClientDetailPage({ params }: Props) {
         channels={channels}
         equipment={equipment}
         statuses={statuses}
-        followUpReasons={followUpReasons}
         settings={intlSettings}
         canEdit={canEdit}
       />

@@ -6,7 +6,7 @@ const alerts = {
   overdue: [
     {
       id: "fu-1",
-      reasonKey: "no_responde",
+      note: "No responde, intentar WhatsApp",
       date: new Date("2026-05-08T12:00:00"),
       deal: {
         id: "deal-1",
@@ -19,7 +19,7 @@ const alerts = {
   today: [
     {
       id: "fu-2",
-      reasonKey: "pide_info",
+      note: "Pide información de financiamiento",
       date: new Date("2026-05-10T09:00:00"),
       deal: {
         id: "deal-2",
@@ -32,7 +32,7 @@ const alerts = {
   next7: [
     {
       id: "fu-3",
-      reasonKey: "visita",
+      note: "Agendar visita técnica",
       date: new Date("2026-05-12T15:00:00"),
       deal: {
         id: "deal-3",
@@ -45,23 +45,19 @@ const alerts = {
 } as Awaited<ReturnType<typeof getFollowUpAlerts>>
 
 describe("toFollowUpBannerItems", () => {
-  it("orders overdue, today, then upcoming and maps labels", () => {
-    const items = toFollowUpBannerItems(alerts, {
-      no_responde: "No responde",
-      pide_info: "Pide información",
-      visita: "Agendar visita",
-    })
+  it("orders overdue, today, then upcoming and maps free-text notes", () => {
+    const items = toFollowUpBannerItems(alerts)
 
     expect(items).toHaveLength(3)
     expect(items[0]?.urgency).toBe("overdue")
     expect(items[1]?.urgency).toBe("today")
     expect(items[2]?.urgency).toBe("upcoming")
-    expect(items[0]?.reasonLabel).toBe("No responde")
+    expect(items[0]?.note).toBe("No responde, intentar WhatsApp")
     expect(items[0]?.dateIso).toContain("2026-05-08")
   })
 
   it("respects max limit", () => {
-    expect(toFollowUpBannerItems(alerts, {}, 2)).toHaveLength(2)
+    expect(toFollowUpBannerItems(alerts, 2)).toHaveLength(2)
   })
 })
 

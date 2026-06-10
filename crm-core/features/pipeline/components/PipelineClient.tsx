@@ -29,7 +29,6 @@ interface PipelineClientProps {
   channels: CatalogItem[]
   equipment: CatalogItem[]
   statuses: CatalogItem[]
-  followUpReasons: CatalogItem[]
   currentFilters: PipelineFiltersParams
   intlSettings: IntlSettings
   currentUserId: string
@@ -74,7 +73,6 @@ export function PipelineClient({
   channels,
   equipment,
   statuses,
-  followUpReasons,
   currentFilters,
   intlSettings,
   currentUserId,
@@ -234,7 +232,6 @@ export function PipelineClient({
           channels={channels}
           equipment={equipment}
           statuses={statuses}
-          followUpReasons={followUpReasons}
           canChooseOwner={canEdit}
           currentUserId={currentUserId}
         />
@@ -244,7 +241,6 @@ export function PipelineClient({
         <DealDetailModal
           deal={modalDeal}
           stages={stages}
-          followUpReasons={followUpReasons}
           tenantId={tenantId}
           tenantSlug={tenantSlug}
           settings={intlSettings}

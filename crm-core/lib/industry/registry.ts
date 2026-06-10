@@ -80,13 +80,6 @@ const AQUASISTEMAS: IndustryConfig = {
     { catalogKey: "dealStatus", key: "esperando",   label: "Esperando",   color: "#6366f1", order: 2 },
     { catalogKey: "dealStatus", key: "frio",        label: "Frío",        color: "#6b7280", order: 3 },
     { catalogKey: "dealStatus", key: "urgente",     label: "Urgente",     color: "#ef4444", order: 4 },
-    // Follow-up reasons (6)
-    { catalogKey: "followupReason", key: "no_responde",        label: "No responde",          order: 0 },
-    { catalogKey: "followupReason", key: "pide_informacion",   label: "Pide más información", order: 1 },
-    { catalogKey: "followupReason", key: "necesita_tiempo",    label: "Necesita tiempo",      order: 2 },
-    { catalogKey: "followupReason", key: "revisar_cotizacion", label: "Revisar cotización",   order: 3 },
-    { catalogKey: "followupReason", key: "agendar_visita",     label: "Agendar visita",       order: 4 },
-    { catalogKey: "followupReason", key: "otro",               label: "Otro",                 order: 5 },
   ],
   settings: {
     dealIdPrefix: "AQX",
@@ -145,12 +138,6 @@ const GENERIC: IndustryConfig = {
     { catalogKey: "dealStatus", key: "esperando", label: "Esperando", color: "#6366f1", order: 2 },
     { catalogKey: "dealStatus", key: "frio", label: "Frío", color: "#6b7280", order: 3 },
     { catalogKey: "dealStatus", key: "urgente", label: "Urgente", color: "#ef4444", order: 4 },
-    { catalogKey: "followupReason", key: "no_responde", label: "No responde", order: 0 },
-    { catalogKey: "followupReason", key: "pide_informacion", label: "Pide más información", order: 1 },
-    { catalogKey: "followupReason", key: "necesita_tiempo", label: "Necesita tiempo", order: 2 },
-    { catalogKey: "followupReason", key: "revisar_cotizacion", label: "Revisar cotización", order: 3 },
-    { catalogKey: "followupReason", key: "agendar_visita", label: "Agendar visita", order: 4 },
-    { catalogKey: "followupReason", key: "otro", label: "Otro", order: 5 },
   ],
   settings: {
     dealIdPrefix: "TST",

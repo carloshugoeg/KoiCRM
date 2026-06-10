@@ -122,8 +122,8 @@ export function FollowUpBanners({ tenantSlug, items, totalCount }: Props) {
               {item.company && (
                 <p className="truncate text-xs text-muted-foreground">{item.company}</p>
               )}
-              <p className="mt-1 text-xs text-muted-foreground">
-                {item.reasonLabel} · {item.stageLabel}
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {item.note ? `${item.note} · ${item.stageLabel}` : item.stageLabel}
               </p>
               <p className="mt-1 flex items-center gap-1 text-xs font-medium text-foreground/80">
                 <CalendarClock className="h-3 w-3 shrink-0" aria-hidden />

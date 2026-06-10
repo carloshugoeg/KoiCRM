@@ -2,19 +2,17 @@ import { CalendarCheck } from "lucide-react"
 import { avatarColor, avatarInitials } from "@/lib/utils/avatar-color"
 import { Button } from "@/components/ui/button"
 import type { CalendarFollowUp } from "@/features/calendar/queries"
-import type { CatalogItem } from "@prisma/client"
 
 interface DayPanelProps {
   day: number
   month: number
   year: number
   followUps: CalendarFollowUp[]
-  followUpReasons: CatalogItem[]
   onOpenDeal: (dealId: string) => void
   loadingDealId?: string | null
 }
 
-export function DayPanel({ day, month, year, followUps, followUpReasons, onOpenDeal, loadingDealId }: DayPanelProps) {
+export function DayPanel({ day, month, year, followUps, onOpenDeal, loadingDealId }: DayPanelProps) {
   const today = new Date()
   const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate())
 
@@ -36,7 +34,6 @@ export function DayPanel({ day, month, year, followUps, followUpReasons, onOpenD
     <div className="flex flex-col gap-3 p-3 overflow-y-auto h-full">
       {dayFus.map((fu) => {
         const isOverdue = !fu.completed && new Date(fu.date) < todayMidnight
-        const reason = followUpReasons.find((r) => r.key === fu.reasonKey)
         const initials = avatarInitials(fu.deal.owner.name)
         const color = avatarColor(fu.deal.owner.id)
         const stageColor = fu.deal.stage.color
@@ -70,8 +67,8 @@ export function DayPanel({ day, month, year, followUps, followUpReasons, onOpenD
                   >
                     {fu.deal.stage.label}
                   </span>
-                  {reason && (
-                    <span className="text-[10px] text-muted-foreground">{reason.label}</span>
+                  {fu.note && (
+                    <span className="text-[10px] text-muted-foreground">{fu.note}</span>
                   )}
                 </div>
               </div>

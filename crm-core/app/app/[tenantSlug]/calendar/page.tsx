@@ -6,7 +6,6 @@ import { getCalendarFollowUps } from "@/features/calendar/queries"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
 import { withTenant } from "@/lib/db/rls"
 import { getTenantMembers } from "@/features/tenants/queries"
-import { getCatalogItems } from "@/features/catalogs/queries"
 import { CalendarClient } from "@/features/calendar/components/CalendarClient"
 import { prisma } from "@/lib/db/client"
 import type { IntlSettings } from "@/lib/intl/format"
@@ -34,11 +33,10 @@ export default async function CalendarPage({ params, searchParams }: Props) {
   // Asesores only see their own calendar; supervisors/superadmins may filter by advisor.
   const ownerId = canSeeAll ? (searchParams.owner as string | undefined) : session.user.id
 
-  const [followUps, members, pipeline, followUpReasons, settings] = await Promise.all([
+  const [followUps, members, pipeline, settings] = await Promise.all([
     getCalendarFollowUps(tenantId, year, month, ownerId),
     getTenantMembers(tenantId),
     withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
-    getCatalogItems(tenantId, "followupReason", { activeOnly: true }),
     prisma.tenantSettings.findUnique({ where: { tenantId } }),
   ])
 
@@ -59,7 +57,6 @@ export default async function CalendarPage({ params, searchParams }: Props) {
       followUps={followUps}
       members={memberList}
       stages={pipeline?.stages ?? []}
-      followUpReasons={followUpReasons}
       currentOwnerId={canSeeAll ? ownerId : undefined}
       settings={intlSettings}
       currentUserId={session.user.id}

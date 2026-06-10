@@ -49,7 +49,6 @@ interface ClientFormModalProps {
   channels: CatalogItem[]
   equipment: CatalogItem[]
   statuses: CatalogItem[]
-  followUpReasons: CatalogItem[]
   /** Asesores can't choose the owner — the deal is always assigned to them. */
   canChooseOwner?: boolean
   currentUserId?: string
@@ -97,7 +96,6 @@ export function ClientFormModal({
   channels,
   equipment,
   statuses,
-  followUpReasons,
   canChooseOwner = true,
   currentUserId,
   prefill,
@@ -119,7 +117,7 @@ export function ClientFormModal({
   const [value, setValue] = useState(0)
   const [statusKey, setStatusKey] = useState(statuses[0]?.key ?? "activo")
   const [followUpDate, setFollowUpDate] = useState("")
-  const [followUpReason, setFollowUpReason] = useState(followUpReasons[0]?.key ?? "")
+  const [followUpNote, setFollowUpNote] = useState("")
   const [notes, setNotes] = useState<{ text: string; ts: string }[]>([])
   const [newNote, setNewNote] = useState("")
 
@@ -147,13 +145,13 @@ export function ClientFormModal({
     setValue(0)
     setStatusKey(statuses[0]?.key ?? "activo")
     setFollowUpDate("")
-    setFollowUpReason(followUpReasons[0]?.key ?? "")
+    setFollowUpNote("")
     setNotes([])
     setNewNote("")
     setPendingQuotes([])
     setPendingPayments([])
     setErrors({})
-  }, [open, prefill, members, channels, statuses, followUpReasons, canChooseOwner, currentUserId])
+  }, [open, prefill, members, channels, statuses, canChooseOwner, currentUserId])
 
   function toggleEquipment(key: string) {
     setSelectedEquipment((prev) =>
@@ -304,7 +302,7 @@ export function ClientFormModal({
           tenantSlug,
           dealId,
           date: followUpDate,
-          reasonKey: followUpReason || followUpReasons[0]?.key || "otro",
+          note: followUpNote.trim() || undefined,
           pin,
         }),
       )
@@ -801,26 +799,17 @@ export function ClientFormModal({
                       onChange={(e) => setFollowUpDate(e.target.value)}
                       className={fieldClass()}
                     />
-                    {followUpDate && followUpReasons.length > 0 && (
-                      <div className="relative mt-2">
-                        <select
-                          id="followUpReason"
-                          aria-label="Motivo de seguimiento"
-                          value={followUpReason}
-                          onChange={(e) => setFollowUpReason(e.target.value)}
-                          className={`${fieldClass()} appearance-none pr-8`}
-                        >
-                          {followUpReasons.map((r) => (
-                            <option key={r.key} value={r.key}>
-                              {r.label}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown
-                          size={13}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground"
-                        />
-                      </div>
+                    {followUpDate && (
+                      <input
+                        id="followUpNote"
+                        type="text"
+                        aria-label="Texto de seguimiento"
+                        placeholder="Texto del seguimiento (opcional)"
+                        maxLength={500}
+                        value={followUpNote}
+                        onChange={(e) => setFollowUpNote(e.target.value)}
+                        className={`${fieldClass()} mt-2`}
+                      />
                     )}
                   </div>
                   <div>

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { DealDetailModal } from "@/features/deals/components/DealDetailModal"
 import { formatCurrency, formatDate } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
-import type { PipelineStage, CatalogItem } from "@prisma/client"
+import type { PipelineStage } from "@prisma/client"
 
 interface ArchivedDeal {
   id: string
@@ -38,7 +38,6 @@ interface ArchiveTableProps {
   nextCursor: string | null
   hasPrev: boolean
   stages: PipelineStage[]
-  followUpReasons: CatalogItem[]
   settings: IntlSettings
 }
 
@@ -49,7 +48,6 @@ export function ArchiveTable({
   nextCursor,
   hasPrev,
   stages,
-  followUpReasons,
   settings,
 }: ArchiveTableProps) {
   const router = useRouter()
@@ -159,7 +157,6 @@ export function ArchiveTable({
             paymentCount: selectedDeal.paymentCount,
           }}
           stages={stages}
-          followUpReasons={followUpReasons}
           tenantId={tenantId}
           tenantSlug={tenantSlug}
           settings={settings}

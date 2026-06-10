@@ -415,7 +415,7 @@ Cada task usa este formato:
 - **Archivos esperados**: `features/catalogs/*`, `app/app/[tenantSlug]/settings/catalogs/page.tsx`.
 - **Dependencias**: T3.4.
 - **Criterios de aceptación**:
-  - Ver, agregar, editar, soft-disable items por catálogo (`equipment`, `salesChannel`, `dealStatus`, `followupReason`).
+  - Ver, agregar, editar, soft-disable items por catálogo (`equipment`, `salesChannel`, `dealStatus`).
   - Reordenar (DnD básico o número de orden).
   - Borrar bloquea si hay deals usándolo (mostrar warning, ofrecer migrar).
 - **Tests requeridos**: integration "crear, listar, marcar inactivo".
@@ -720,9 +720,9 @@ Cada task usa este formato:
 
 - **Objetivo**: gestionar seguimientos por deal.
 - **Archivos esperados**: `features/follow-ups/*`.
-- **Dependencias**: T5.5, T4.3 (catálogo `followupReason`).
+- **Dependencias**: T5.5.
 - **Criterios de aceptación**:
-  - Add con date + reasonKey.
+  - Add con date + texto libre (`note`) opcional.
   - Mark completed registra `completedAt` y permite `result`.
   - Activity `followUpAdded` y `followUpCompleted`.
 - **Tests requeridos**: integration.
@@ -827,7 +827,7 @@ Cada task usa este formato:
 - **Dependencias**: T2.2, T4.3, T4.4.
 - **Criterios de aceptación**:
   - Pipeline default 6 stages: prospecto / contactado / cotizacion / negociacion / ganado(locked) / perdido(locked).
-  - CatalogItems para `equipment` (Bomba, Jacuzzi, Sauna, Calentador, Filtro, Hidrojet, Servicio Técnico, Iluminación), `salesChannel` (Sala, Teléfono, WhatsApp, Facebook, Instagram), `dealStatus` (Activo, Seguimiento, Esperando, Frío, Urgente), `followupReason` (los 6).
+  - CatalogItems para `equipment` (Bomba, Jacuzzi, Sauna, Calentador, Filtro, Hidrojet, Servicio Técnico, Iluminación), `salesChannel` (Sala, Teléfono, WhatsApp, Facebook, Instagram), `dealStatus` (Activo, Seguimiento, Esperando, Frío, Urgente).
   - TenantSettings default con `dealIdPrefix=AQX`, `locale=es-GT`, `currency=GTQ`.
   - Branding default con colores y productName placeholder.
 - **Tests requeridos**: integration "aplicar plantilla a tenant nuevo y verificar todo el contenido".

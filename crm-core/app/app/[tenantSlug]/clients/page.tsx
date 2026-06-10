@@ -32,7 +32,7 @@ export default async function ClientsPage({ params, searchParams }: Props) {
   const sort = (searchParams.sort as "name" | "recent" | undefined) ?? "name"
   const selectedClientId = searchParams.client as string | undefined
 
-  const [clients, pipeline, members, channels, equipment, statuses, followUpReasons, settings] =
+  const [clients, pipeline, members, channels, equipment, statuses, settings] =
     await Promise.all([
       listClients(tenantId, { search: q, sort }),
       withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
@@ -40,7 +40,6 @@ export default async function ClientsPage({ params, searchParams }: Props) {
       getCatalogItems(tenantId, "salesChannel", { activeOnly: true }),
       getCatalogItems(tenantId, "equipment", { activeOnly: true }),
       getCatalogItems(tenantId, "dealStatus", { activeOnly: true }),
-      getCatalogItems(tenantId, "followupReason", { activeOnly: true }),
       prisma.tenantSettings.findUnique({ where: { tenantId } }),
     ])
 
@@ -102,7 +101,6 @@ export default async function ClientsPage({ params, searchParams }: Props) {
           channels={channels}
           equipment={equipment}
           statuses={statuses}
-          followUpReasons={followUpReasons}
           settings={intlSettings}
           canEdit={canEdit}
         />

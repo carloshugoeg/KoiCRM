@@ -123,36 +123,6 @@ const CATALOG_ITEMS = [
   { catalogKey: "dealStatus", key: "esperando", label: "Esperando", color: "#6366f1", order: 2 },
   { catalogKey: "dealStatus", key: "frio", label: "Frío", color: "#6b7280", order: 3 },
   { catalogKey: "dealStatus", key: "urgente", label: "Urgente", color: "#ef4444", order: 4 },
-  { catalogKey: "followupReason", key: "no_responde", label: "No responde", color: null, order: 0 },
-  {
-    catalogKey: "followupReason",
-    key: "pide_informacion",
-    label: "Pide más información",
-    color: null,
-    order: 1,
-  },
-  {
-    catalogKey: "followupReason",
-    key: "necesita_tiempo",
-    label: "Necesita tiempo",
-    color: null,
-    order: 2,
-  },
-  {
-    catalogKey: "followupReason",
-    key: "revisar_cotizacion",
-    label: "Revisar cotización",
-    color: null,
-    order: 3,
-  },
-  {
-    catalogKey: "followupReason",
-    key: "agendar_visita",
-    label: "Agendar visita",
-    color: null,
-    order: 4,
-  },
-  { catalogKey: "followupReason", key: "otro", label: "Otro", color: null, order: 5 },
 ];
 
 // ─── CLI arg parsing ──────────────────────────────────────────────────────────

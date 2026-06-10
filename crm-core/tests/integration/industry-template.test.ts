@@ -145,18 +145,11 @@ describe("T9.1 — catalog items", () => {
     expect(keys).not.toContain("closed")
   })
 
-  it("followupReason catalog has exactly 6 items", async () => {
+  it("does not seed predefined follow-up reason catalog items", async () => {
     const items = await prismaAdmin.catalogItem.findMany({
       where: { tenantId, catalogKey: "followupReason" },
     })
-    expect(items).toHaveLength(6)
-    const keys = items.map((i) => i.key)
-    for (const k of [
-      "no_responde", "pide_informacion", "necesita_tiempo",
-      "revisar_cotizacion", "agendar_visita", "otro",
-    ]) {
-      expect(keys).toContain(k)
-    }
+    expect(items).toHaveLength(0)
   })
 
   it("no catalog items exist under 'channel' or 'status' (wrong catalogKeys)", async () => {

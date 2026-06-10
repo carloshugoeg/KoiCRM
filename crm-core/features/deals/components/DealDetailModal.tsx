@@ -29,7 +29,7 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 import { formatPhone } from "@/lib/deals/phone-format"
 import { formatCurrency, formatDate } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
-import type { PipelineStage, CatalogItem, FollowUp, Quote, Payment } from "@prisma/client"
+import type { PipelineStage, FollowUp, Quote, Payment } from "@prisma/client"
 
 interface DealDetailData {
   id: string
@@ -58,7 +58,6 @@ interface DealDetailData {
 interface DealDetailModalProps {
   deal: DealDetailData
   stages: PipelineStage[]
-  followUpReasons: CatalogItem[]
   tenantId: string
   tenantSlug: string
   settings: IntlSettings
@@ -104,7 +103,6 @@ type FollowUpRow = Omit<FollowUp, "date" | "completedAt" | "createdAt"> & {
 function DealDetailModalContent({
   deal,
   stages,
-  followUpReasons,
   tenantId,
   tenantSlug,
   settings,
@@ -134,7 +132,7 @@ function DealDetailModalContent({
 
   // Follow-up add form
   const [fuDate, setFuDate] = useState("")
-  const [fuReason, setFuReason] = useState(followUpReasons[0]?.key ?? "")
+  const [fuNote, setFuNote] = useState("")
   const [fuLoading, setFuLoading] = useState(false)
   const [completingId, setCompletingId] = useState<string | null>(null)
   const [completingResult, setCompletingResult] = useState("")
@@ -248,14 +246,10 @@ function DealDetailModalContent({
       toast.error("Selecciona una fecha para el seguimiento.")
       return
     }
-    if (!fuReason) {
-      toast.error("Selecciona un motivo de seguimiento.")
-      return
-    }
     setFuLoading(true)
     try {
       const result = await guard((pin) =>
-        addFollowUpAction({ tenantId, tenantSlug, dealId: deal.id, date: fuDate, reasonKey: fuReason, pin }),
+        addFollowUpAction({ tenantId, tenantSlug, dealId: deal.id, date: fuDate, note: fuNote.trim() || undefined, pin }),
       )
       if (!result.ok) {
         if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorFollowUp))
@@ -264,6 +258,7 @@ function DealDetailModalContent({
         const updated = await getDealFollowUpsAction(tenantId, deal.id)
         setFollowUps(updated)
         setFuDate("")
+        setFuNote("")
         router.refresh()
       }
     } finally {
@@ -623,12 +618,11 @@ function DealDetailModalContent({
               <div className="space-y-2 mb-3">
                 {pendingFUs.map((fu) => {
                   const isCompleting = completingId === fu.id
-                  const reasonLabel = followUpReasons.find((r) => r.key === fu.reasonKey)?.label ?? fu.reasonKey
                   return (
                     <div key={fu.id} className="p-2 bg-muted/40 rounded space-y-2">
                       <div className="flex items-start gap-2">
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium">{reasonLabel}</p>
+                          {fu.note && <p className="text-xs font-medium">{fu.note}</p>}
                           <p className="text-xs text-muted-foreground">{formatDate(fu.date, settings)}</p>
                         </div>
                         {canEdit && (
@@ -683,21 +677,19 @@ function DealDetailModalContent({
                       className="h-7 text-xs"
                     />
                   </div>
-                  <Select value={fuReason} onValueChange={setFuReason}>
-                    <SelectTrigger className="w-36 h-7 text-xs">
-                      <SelectValue placeholder="Motivo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {followUpReasons.map((r) => (
-                        <SelectItem key={r.key} value={r.key}>{r.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    type="text"
+                    placeholder="Texto del seguimiento (opcional)"
+                    maxLength={500}
+                    value={fuNote}
+                    onChange={(e) => setFuNote(e.target.value)}
+                    className="h-7 text-xs flex-1"
+                  />
                   <Button
                     size="sm"
                     className="h-7 text-xs"
                     onClick={handleAddFollowUp}
-                    disabled={fuLoading || !fuDate || !fuReason || followUpReasons.length === 0}
+                    disabled={fuLoading || !fuDate}
                   >
                     {fuLoading ? "..." : "Agregar"}
                   </Button>
@@ -712,7 +704,7 @@ function DealDetailModalContent({
                   <div className="space-y-1 mt-2">
                     {completedFUs.map((fu) => (
                       <div key={fu.id} className="p-2 bg-muted/20 rounded opacity-60">
-                        <p className="text-xs line-through">{followUpReasons.find((r) => r.key === fu.reasonKey)?.label ?? fu.reasonKey}</p>
+                        {fu.note && <p className="text-xs line-through">{fu.note}</p>}
                         {fu.result && <p className="text-xs text-muted-foreground">{fu.result}</p>}
                       </div>
                     ))}

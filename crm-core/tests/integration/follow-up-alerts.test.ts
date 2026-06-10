@@ -47,12 +47,12 @@ beforeAll(async () => {
   // past (overdue): 2026-05-08   today: 2026-05-10   near (next7): 2026-05-12   far: 2026-05-25
   await prismaAdmin.followUp.createMany({
     data: [
-      { tenantId, dealId, createdById: userId, date: new Date("2026-05-08T12:00:00"), reasonKey: "no_responde" },
-      { tenantId, dealId, createdById: userId, date: new Date("2026-05-10T12:00:00"), reasonKey: "pide_informacion" },
-      { tenantId, dealId, createdById: userId, date: new Date("2026-05-12T12:00:00"), reasonKey: "agendar_visita" },
-      { tenantId, dealId, createdById: userId, date: new Date("2026-05-25T12:00:00"), reasonKey: "otro" },
+      { tenantId, dealId, createdById: userId, date: new Date("2026-05-08T12:00:00"), note: "No responde" },
+      { tenantId, dealId, createdById: userId, date: new Date("2026-05-10T12:00:00"), note: "Pide información" },
+      { tenantId, dealId, createdById: userId, date: new Date("2026-05-12T12:00:00"), note: "Agendar visita" },
+      { tenantId, dealId, createdById: userId, date: new Date("2026-05-25T12:00:00"), note: "Otro seguimiento" },
       // Completed overdue — must NOT appear in any bucket
-      { tenantId, dealId, createdById: userId, date: new Date("2026-05-07T12:00:00"), reasonKey: "otro", completed: true },
+      { tenantId, dealId, createdById: userId, date: new Date("2026-05-07T12:00:00"), note: "Completado", completed: true },
     ],
   })
 })

@@ -338,14 +338,14 @@ Todas con `tenantId` excepto identidad global (`User`, `Account`, etc.).
 | **IndustryTemplate** | Payload de plantilla por industria | slug, version, payload JSON |
 | **Pipeline** | Flujo de ventas | stages, deals |
 | **PipelineStage** | Etapa del embudo | order, key, label, color, iconKey, locked |
-| **CatalogItem** | Catálogo genérico | equipment, salesChannel, dealStatus, followupReason |
+| **CatalogItem** | Catálogo genérico | equipment, salesChannel, dealStatus |
 | **Client** | Persona+empresa única | deals, notes |
 | **Deal** | Oportunidad de venta | client, stage, owner, equipment, quotes, payments, followUps, notes, activities |
 | **DealEquipment** | M-N deal ↔ equipment | equipmentKey, customLabel |
 | **Quote** | Cotización | number, date, fileUrl, isVoid |
 | **Payment** | Comprobante de pago | number, date, fileUrl, isVoid |
 | **Attachment** | Metadata de archivo subido | url, mimeType, size |
-| **FollowUp** | Seguimiento programado | date, reasonKey, result, completed, completedAt |
+| **FollowUp** | Seguimiento programado | date, note, result, completed, completedAt |
 | **Note** | Nota timestamped | dealId y/o clientId |
 | **Activity** | Audit log | type, payload JSON, userId |
 | **SavedView** | Vista guardada (filtros/columnas) | entity, config JSON — schema listo |
@@ -359,7 +359,7 @@ Todas con `tenantId` excepto identidad global (`User`, `Account`, etc.).
 | -------- | ---------------------------------------- |
 | **Stages** | prospecto → contactado → cotizacion → negociacion → ganado (locked) / perdido (locked) |
 | **Deal status** | activo, seguimiento, esperando, frio, urgente |
-| **Follow-up reasons** | No responde, Pide más información, Necesita tiempo, Revisar cotización, Agendar visita, Otro |
+| **Follow-up text** | Texto libre por seguimiento |
 | **Equipment** | Bomba, Jacuzzi, Sauna, Calentador, Filtro, Hidrojet, Servicio Técnico, Iluminación |
 | **Sales channels** | Sala, Teléfono, WhatsApp, Facebook, Instagram |
 
@@ -374,7 +374,7 @@ Rutas bajo `/app/[tenantSlug]/settings/`.
 | **Apariencia** | Dark/light, colores (fondo, header, KPIs), logo upload, bg image, productName | ✅ |
 | **General** | locale, currency, timezone, phoneFormat, whatsappCountryCode, dealIdPrefix, dealIdYearDigits | ✅ |
 | **Embudo** | CRUD stages, reorder DnD, edit label/sublabel/color/icon/locked, delete con reasignación | ✅ |
-| **Catálogos** | Tabs por catalogKey: equipment, salesChannel, dealStatus, followupReason; CRUD, reorder, soft-disable | ✅ |
+| **Catálogos** | Tabs por catalogKey: equipment, salesChannel, dealStatus; CRUD, reorder, soft-disable | ✅ |
 | **Usuarios** | Lista miembros, invitar, cambiar rol, remover, editar (nombre, color, foto) | ✅ |
 | **Campos personalizados** | CRUD definitions para Deal/Client; tipos text/number/date/select/multiselect/boolean/url | ✅ (ruta existe; no en nav lateral Settings) |
 

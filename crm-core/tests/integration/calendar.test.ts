@@ -43,12 +43,12 @@ beforeAll(async () => {
   dealId = deal.id
 
   // May 2026 (month index 4)
-  const fuA = await prismaAdmin.followUp.create({ data: { tenantId, dealId, createdById: userId, date: new Date("2026-05-15T12:00:00"), reasonKey: "no_responde" } })
+  const fuA = await prismaAdmin.followUp.create({ data: { tenantId, dealId, createdById: userId, date: new Date("2026-05-15T12:00:00"), note: "No responde" } })
   fuMayAId = fuA.id
-  const fuB = await prismaAdmin.followUp.create({ data: { tenantId, dealId, createdById: userId, date: new Date("2026-05-05T12:00:00"), reasonKey: "agendar_visita" } })
+  const fuB = await prismaAdmin.followUp.create({ data: { tenantId, dealId, createdById: userId, date: new Date("2026-05-05T12:00:00"), note: "Agendar visita" } })
   fuMayBId = fuB.id
   // June 2026 (month index 5) — should be excluded from May query
-  await prismaAdmin.followUp.create({ data: { tenantId, dealId, createdById: userId, date: new Date("2026-06-01T12:00:00"), reasonKey: "otro" } })
+  await prismaAdmin.followUp.create({ data: { tenantId, dealId, createdById: userId, date: new Date("2026-06-01T12:00:00"), note: "Otro seguimiento" } })
 })
 
 afterAll(async () => { await cleanDatabase(); await disconnectAll() })
@@ -73,7 +73,7 @@ describe("getCalendarFollowUps", () => {
   it("excludes out-of-month follow-ups", async () => {
     const results = await getCalendarFollowUps(tenantId, 2026, 5)
     expect(results.length).toBe(1)
-    expect(results[0]!.reasonKey).toBe("otro")
+    expect(results[0]!.note).toBe("Otro seguimiento")
   })
 
   it("filters by ownerId when provided", async () => {

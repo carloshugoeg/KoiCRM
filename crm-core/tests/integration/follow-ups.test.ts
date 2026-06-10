@@ -142,19 +142,12 @@ describe("industry registry — catalog seeding", () => {
     await prismaAdmin.tenant.delete({ where: { id: seedTenantId } });
   });
 
-  it("applyIndustryTemplate seeds 6 followupReason items", async () => {
+  it("applyIndustryTemplate does not seed predefined follow-up reasons", async () => {
     const items = await prismaAdmin.catalogItem.findMany({
       where: { tenantId: seedTenantId, catalogKey: "followupReason" },
       orderBy: { order: "asc" },
     });
-    expect(items).toHaveLength(6);
-    const keys = items.map((i) => i.key);
-    expect(keys).toContain("no_responde");
-    expect(keys).toContain("pide_informacion");
-    expect(keys).toContain("necesita_tiempo");
-    expect(keys).toContain("revisar_cotizacion");
-    expect(keys).toContain("agendar_visita");
-    expect(keys).toContain("otro");
+    expect(items).toHaveLength(0);
   });
 
   it("applyIndustryTemplate seeds items under salesChannel key (not channel)", async () => {
@@ -191,17 +184,18 @@ describe("addFollowUpAction", () => {
       tenantSlug,
       dealId,
       date: "2026-06-15",
-      reasonKey: "no_responde",
+      note: "Llamar después de revisar medidas del proyecto",
     });
 
     expect(result.ok).toBe(true);
 
     // Verify follow-up row exists
     const followUp = await prismaAdmin.followUp.findFirst({
-      where: { dealId, reasonKey: "no_responde" },
+      where: { dealId, date: new Date("2026-06-15T12:00:00") },
     });
     expect(followUp).not.toBeNull();
     expect(followUp!.tenantId).toBe(tenantId);
+    expect((followUp as unknown as { note: string | null }).note).toBe("Llamar después de revisar medidas del proyecto");
     expect(followUp!.completed).toBe(false);
     expect(followUp!.completedAt).toBeNull();
 
@@ -222,7 +216,7 @@ describe("addFollowUpAction", () => {
       tenantSlug,
       dealId,
       date: "2026-06-20",
-      reasonKey: "otro",
+      note: "Texto libre",
     });
 
     expect(result.ok).toBe(false);
@@ -241,7 +235,7 @@ describe("completeFollowUpAction", () => {
         tenantId,
         dealId,
         date: new Date("2026-07-01T12:00:00"),
-        reasonKey: "pide_informacion",
+        note: "Cliente pidió información adicional",
         createdById: userId,
       },
     });
@@ -286,7 +280,7 @@ describe("deleteFollowUpAction", () => {
         tenantId,
         dealId,
         date: new Date("2026-08-01T12:00:00"),
-        reasonKey: "agendar_visita",
+        note: "Coordinar visita técnica",
         createdById: userId,
       },
     });
