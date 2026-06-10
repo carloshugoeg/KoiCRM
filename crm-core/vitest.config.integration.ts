@@ -29,6 +29,14 @@ export default defineConfig({
     fileParallelism: false,
   },
   resolve: {
-    alias: [{ find: /^@\/(.*)/, replacement: path.resolve(__dirname, "./$1") }],
+    alias: [
+      // `server-only` throws under the node runner (no react-server condition);
+      // stub it so modules that import it (lib/auth/*) can load in tests.
+      { find: /^server-only$/, replacement: path.resolve(__dirname, "./tests/integration/server-only-stub.ts") },
+      // `next/headers` cookies()/headers() require a request scope; give the node
+      // runner an in-memory stub so action tests can run the PIN gate.
+      { find: /^next\/headers$/, replacement: path.resolve(__dirname, "./tests/integration/next-headers-stub.ts") },
+      { find: /^@\/(.*)/, replacement: path.resolve(__dirname, "./$1") },
+    ],
   },
 });

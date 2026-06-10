@@ -2,6 +2,7 @@ import "server-only"
 import { cookies } from "next/headers"
 import type { Role } from "@prisma/client"
 import { prisma } from "@/lib/db/client"
+import { withTenant } from "@/lib/db/rls"
 import { auth } from "@/lib/auth/auth"
 import { getUserRole } from "@/lib/auth/rbac"
 import { isSessionPinLocked } from "@/lib/auth/session-pin-lock"
@@ -46,10 +47,12 @@ async function resolveDealOwnerId(
 ): Promise<string | null | undefined> {
   if (targetOwnerId) return targetOwnerId
   if (!dealId) return null
-  const deal = await prisma.deal.findUnique({
-    where: { id: dealId, tenantId },
-    select: { ownerId: true },
-  })
+  // Deal has RLS — bare prisma runs as app_user without app.tenant_id set and
+  // returns null, which would force a PIN even on the user's own leads. Read
+  // through withTenant so the tenant context is established.
+  const deal = await withTenant(tenantId, (tx) =>
+    tx.deal.findUnique({ where: { id: dealId, tenantId }, select: { ownerId: true } }),
+  )
   return deal?.ownerId ?? null
 }
 
