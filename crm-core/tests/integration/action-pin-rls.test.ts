@@ -131,10 +131,12 @@ afterAll(async () => {
   await disconnectAll();
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   cookieJar.clear();
   mockAuth.mockReset();
   mockAuth.mockResolvedValue({ user: { id: userA } } as Session);
+  // Reset brute-force counters so each test starts from a clean attempt budget.
+  await prismaAdmin.$executeRawUnsafe("TRUNCATE TABLE rate_limit_entries").catch(() => {});
 });
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -176,6 +178,21 @@ describe("resolveActionActor under RLS (PIN enabled, session lock off)", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.requiresPin).toBe(true);
+    }
+  });
+
+  it("throttles PIN brute-force: refuses further attempts after repeated failures", async () => {
+    // Hammer another member's lead with wrong PINs, well past any sane attempt budget.
+    for (let i = 0; i < 15; i++) {
+      await resolveActionActor({ tenantId, dealId: dealOwnedByB, pin: "0000" });
+    }
+    // Even the CORRECT PIN is now refused — attempts are throttled, not just the message.
+    const locked = await resolveActionActor({ tenantId, dealId: dealOwnedByB, pin: PIN_B });
+
+    expect(locked.ok).toBe(false);
+    if (!locked.ok) {
+      expect(locked.requiresPin).toBe(true);
+      expect(locked.error).toMatch(/demasiados/i);
     }
   });
 });

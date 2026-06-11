@@ -6,6 +6,7 @@ import { withTenant } from "@/lib/db/rls"
 import { auth } from "@/lib/auth/auth"
 import { getUserRole } from "@/lib/auth/rbac"
 import { isSessionPinLocked } from "@/lib/auth/session-pin-lock"
+import { rateLimit } from "@/lib/auth/rate-limit"
 import {
   hashActionPin,
   isValidPinFormat,
@@ -18,6 +19,14 @@ import { isPinRequiredForDealAction } from "@/lib/auth/action-pin-policy"
 export { isPinRequiredForDealAction } from "@/lib/auth/action-pin-policy"
 
 const COOKIE_NAME = "koi_pin_actor"
+
+// Brute-force throttle for the 4-digit action PIN (only 10k possible values). Counts every PIN
+// submission per user+tenant; once the budget is spent the gate refuses further attempts —
+// including correct ones — until the window resets, so the PIN space can't be enumerated. This
+// is a security guardrail (like the signup/login rate limits), not a tenant-tunable business
+// limit, so it stays hardcoded rather than in TenantSettings.
+const PIN_MAX_ATTEMPTS = 10
+const PIN_ATTEMPT_WINDOW_MS = 5 * 60_000
 
 export interface ActionActor {
   actorUserId: string
@@ -108,6 +117,19 @@ export async function resolveActionActor(params: {
   if (pin) {
     // requiresPin on an invalid PIN so the client keeps the dialog open to retry.
     if (!isValidPinFormat(pin)) return { ok: false, requiresPin: true, error: "El PIN debe tener 4 dígitos." }
+    // Throttle brute-force: cap PIN submissions per user+tenant before doing the lookup.
+    const withinLimit = await rateLimit(
+      `pin-attempt:${tenantId}:${session.user.id}`,
+      PIN_MAX_ATTEMPTS,
+      PIN_ATTEMPT_WINDOW_MS,
+    )
+    if (!withinLimit) {
+      return {
+        ok: false,
+        requiresPin: true,
+        error: "Demasiados intentos de PIN. Espera unos minutos e inténtalo de nuevo.",
+      }
+    }
     const membership = await prisma.membership.findFirst({
       where: { tenantId, status: "ACTIVE", actionPinHash: hashActionPin(pin) },
       select: { userId: true, role: true, user: { select: { name: true } } },
