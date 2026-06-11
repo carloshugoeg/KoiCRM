@@ -24,7 +24,7 @@ interface ArchivedDeal {
   statusKey: string
   ownerName: string | null
   ownerId: string
-  equipment: { equipmentKey: string; customLabel: string | null }[]
+  equipment: { categoryKey: string; subcategoryKey: string }[]
   createdAt: string
   stageEnteredAt: string
   quoteCount: number

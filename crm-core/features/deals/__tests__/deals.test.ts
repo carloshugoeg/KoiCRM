@@ -78,7 +78,7 @@ describe("Deal CRUD", () => {
       })
 
       await tx.dealEquipment.createMany({
-        data: [{ dealId: id, equipmentKey: "bomba", customLabel: null }],
+        data: [{ dealId: id, categoryKey: "bombas", subcategoryKey: "bombas__sumergible" }],
       })
 
       await recordActivity(tx, {
@@ -100,7 +100,7 @@ describe("Deal CRUD", () => {
 
     const equipment = await prismaAdmin.dealEquipment.findMany({ where: { dealId: dealId! } })
     expect(equipment).toHaveLength(1)
-    expect(equipment[0]?.equipmentKey).toBe("bomba")
+    expect(equipment[0]?.subcategoryKey).toBe("bombas__sumergible")
 
     const activity = await prismaAdmin.activity.findMany({ where: { tenantId, entity: "Deal", entityId: dealId! } })
     expect(activity).toHaveLength(1)

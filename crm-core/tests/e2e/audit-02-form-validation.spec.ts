@@ -12,12 +12,22 @@ async function openNewDealModal(page: any) {
   await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5_000 })
 }
 
+// Adds the first categoría and selects its first subcategoría via the new equipment selector.
+async function selectFirstEquipment(page: any) {
+  const dialog = page.getByRole("dialog")
+  // Open the "Agregar categoría…" select (distinct from the native status <select>).
+  await dialog.getByRole("combobox").filter({ hasText: /agregar categoría/i }).click()
+  await page.getByRole("option").first().click()
+  // Open the subcategoría combobox and pick the first subcategoría.
+  await dialog.getByRole("button", { name: /selecciona subcategorías/i }).click()
+  await page.getByRole("option").first().click()
+  await page.keyboard.press("Escape")
+}
+
 async function fillMinimumValidForm(page: any) {
   await page.locator("input#name").fill("Test Validación")
   await page.locator("input#phone").fill("1234-5678")
-  // Select first equipment chip
-  const chips = page.locator('[type="button"]').filter({ hasText: /bomba|jacuzzi|sauna|calentador|filtro|hidrojet/i })
-  if (await chips.count() > 0) await chips.first().click()
+  await selectFirstEquipment(page)
 }
 
 test.describe("AUDIT-02: Form Validation", () => {
@@ -25,34 +35,30 @@ test.describe("AUDIT-02: Form Validation", () => {
   // ─────────────────────────────────────────────
   // FV-01: Cannot submit without selecting equipment (no custom text either)
   // ─────────────────────────────────────────────
-  test("FV-01: sin equipo seleccionado ni custom → error de validación", async ({ page }) => {
+  test("FV-01: sin categoría/subcategoría → error de validación", async ({ page }) => {
     await openNewDealModal(page)
     await page.locator("input#name").fill("Test Sin Equipo")
     await page.locator("input#phone").fill("1234-5678")
-    // Deliberately leave equipment empty and equipmentCustom empty
+    // Deliberately leave equipo de interés empty (no categoría added).
     await page.locator("input#value").fill("5000")
     await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
-    // Expect either: toast error OR browser validation message
-    const errorToast = page.getByText(/selecciona al menos un equipo|debe seleccionar un equipo/i)
+    // Expect the inline equipment error and the modal to stay open (form not submitted).
+    const errorMsg = page.getByText(/categoría con al menos una subcategoría/i)
     const modalStillOpen = page.getByRole("dialog")
 
-    // Modal must remain open (form not submitted)
     await expect(modalStillOpen).toBeVisible({ timeout: 3_000 })
-    // Error should be displayed
-    await expect(errorToast).toBeVisible({ timeout: 5_000 })
+    await expect(errorMsg).toBeVisible({ timeout: 5_000 })
   })
 
   // ─────────────────────────────────────────────
-  // FV-02: Custom equipment text satisfies equipment requirement
+  // FV-02: Selecting the "Otros" categoría + subcategoría satisfies the requirement
   // ─────────────────────────────────────────────
-  test("FV-02: equipmentCustom solo (sin chips) → deal creado exitosamente", async ({ page }) => {
+  test("FV-02: categoría Otros con subcategoría → deal creado exitosamente", async ({ page }) => {
     await openNewDealModal(page)
-    await page.locator("input#name").fill("Test Custom Equipo")
+    await page.locator("input#name").fill("Test Otros Equipo")
     await page.locator("input#phone").fill("1234-5678")
-    // Fill only custom equipment, leave chips unselected
-    const customInput = page.locator('input[placeholder*="Otro equipo"]')
-    await customInput.fill("Piscina Olimpica")
+    await selectFirstEquipment(page)
     await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
     await expect(page.getByText(/oportunidad creada/i)).toBeVisible({ timeout: 8_000 })
@@ -66,8 +72,7 @@ test.describe("AUDIT-02: Form Validation", () => {
     await openNewDealModal(page)
     await page.locator("input#name").fill("Test Telefono Invalido")
     await page.locator("input#phone").fill("12345678") // No dash, invalid per spec XXXX-XXXX
-    const chips = page.locator('[type="button"]').filter({ hasText: /bomba|jacuzzi|sauna|calentador|filtro|hidrojet/i })
-    if (await chips.count() > 0) await chips.first().click()
+    await selectFirstEquipment(page)
     await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
     // Per DEMO_INVENTORY.md §7.11 this SHOULD be rejected
@@ -98,8 +103,7 @@ test.describe("AUDIT-02: Form Validation", () => {
     await page.locator("input#name").fill("Test WA Invalido")
     await page.locator("input#phone").fill("1234-5678")
     await page.locator("input#whatsapp").fill("99999999") // No +502 prefix, invalid per spec
-    const chips = page.locator('[type="button"]').filter({ hasText: /bomba|jacuzzi|sauna|calentador|filtro|hidrojet/i })
-    if (await chips.count() > 0) await chips.first().click()
+    await selectFirstEquipment(page)
     await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
     await page.waitForTimeout(3_000)
@@ -154,8 +158,7 @@ test.describe("AUDIT-02: Form Validation", () => {
     const longName = "A".repeat(500)
     await page.locator("input#name").fill(longName)
     await page.locator("input#phone").fill("1234-5678")
-    const chips = page.locator('[type="button"]').filter({ hasText: /bomba|jacuzzi|sauna|calentador|filtro|hidrojet/i })
-    if (await chips.count() > 0) await chips.first().click()
+    await selectFirstEquipment(page)
     await page.getByRole("button", { name: /crear oportunidad/i }).click()
 
     await page.waitForTimeout(3_000)
@@ -172,8 +175,7 @@ test.describe("AUDIT-02: Form Validation", () => {
     await openNewDealModal(page)
     // Leave name empty, fill everything else
     await page.locator("input#phone").fill("1234-5678")
-    const chips = page.locator('[type="button"]').filter({ hasText: /bomba|jacuzzi|sauna|calentador|filtro|hidrojet/i })
-    if (await chips.count() > 0) await chips.first().click()
+    await selectFirstEquipment(page)
     await page.getByRole("button", { name: /crear oportunidad/i }).click()
     // HTML required attribute should prevent form submission
     // or server should return error

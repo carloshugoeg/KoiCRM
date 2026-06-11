@@ -30,9 +30,37 @@ import {
   deleteDealSchema,
 } from "@/features/deals/schemas"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
-import { isActiveCatalogItemKey } from "@/features/catalogs/queries"
+import { isActiveCatalogItemKey, isActiveSubcategoryOfCategory } from "@/features/catalogs/queries"
+import type { PrismaTx } from "@/lib/db/rls"
 import { z } from "zod"
 import { getDeal } from "@/features/deals/queries"
+
+/**
+ * Validates an equipo-de-interés selection and flattens it into (categoría, subcategoría) rows.
+ * Runs inside the caller's tenant transaction. Enforces the OBLIGATORY ≥1 subcategoría rule and
+ * that every subcategoría is active and belongs to its stated categoría.
+ */
+async function resolveEquipmentPairs(
+  tx: PrismaTx,
+  tenantId: string,
+  groups: { categoryKey: string; subcategoryKeys: string[] }[],
+): Promise<
+  | { ok: true; pairs: { categoryKey: string; subcategoryKey: string }[] }
+  | { ok: false; error: string }
+> {
+  const pairs: { categoryKey: string; subcategoryKey: string }[] = []
+  for (const group of groups) {
+    for (const subcategoryKey of group.subcategoryKeys) {
+      const valid = await isActiveSubcategoryOfCategory(tx, tenantId, group.categoryKey, subcategoryKey)
+      if (!valid) return { ok: false, error: "La subcategoría seleccionada no es válida o está inactiva." }
+      pairs.push({ categoryKey: group.categoryKey, subcategoryKey })
+    }
+  }
+  if (pairs.length === 0) {
+    return { ok: false, error: "Selecciona al menos una categoría con una subcategoría." }
+  }
+  return { ok: true, pairs }
+}
 
 export async function createDealAction(
   raw: unknown
@@ -73,6 +101,10 @@ export async function createDealAction(
         return
       }
 
+      // Validate equipo de interés before creating anything (so a bad selection rolls back cleanly).
+      const equipmentResult = await resolveEquipmentPairs(tx, tenantId, fields.equipment)
+      if (!equipmentResult.ok) { createError = equipmentResult.error; return }
+
       // Get owner name for ID generation
       const owner = await tx.user.findUnique({ where: { id: ownerId }, select: { name: true } })
       const initials = ownerInitials(owner?.name)
@@ -109,17 +141,10 @@ export async function createDealAction(
         },
       })
 
-      // Save equipment
-      const equipmentRows: { dealId: string; equipmentKey: string; customLabel: string | null }[] = []
-      for (const key of fields.equipment) {
-        equipmentRows.push({ dealId: id, equipmentKey: key, customLabel: null })
-      }
-      if (fields.equipmentCustom?.trim()) {
-        equipmentRows.push({ dealId: id, equipmentKey: "__custom__", customLabel: fields.equipmentCustom.trim() })
-      }
-      if (equipmentRows.length > 0) {
-        await tx.dealEquipment.createMany({ data: equipmentRows })
-      }
+      // Save equipo de interés (categoría → subcategoría rows, validated above).
+      await tx.dealEquipment.createMany({
+        data: equipmentResult.pairs.map((p) => ({ dealId: id, ...p })),
+      })
 
       await recordActivity(tx, {
         tenantId,
@@ -177,6 +202,14 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
       }
     }
 
+    // Validate equipo de interés before mutating, so an invalid edit can't leave a partial update.
+    let equipmentPairs: { categoryKey: string; subcategoryKey: string }[] | null = null
+    if (fields.equipment !== undefined) {
+      const equipmentResult = await resolveEquipmentPairs(tx, tenantId, fields.equipment)
+      if (!equipmentResult.ok) { validationError = equipmentResult.error; return }
+      equipmentPairs = equipmentResult.pairs
+    }
+
     const updateData: Prisma.DealUpdateInput = {}
     if (fields.name !== undefined) updateData.name = fields.name.trim()
     if (fields.company !== undefined) updateData.company = fields.company?.trim() || null
@@ -190,18 +223,11 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
 
     await tx.deal.update({ where: { id: dealId, tenantId }, data: updateData })
 
-    if (fields.equipment !== undefined || fields.equipmentCustom !== undefined) {
+    if (equipmentPairs) {
       await tx.dealEquipment.deleteMany({ where: { dealId } })
-      const equipmentRows: { dealId: string; equipmentKey: string; customLabel: string | null }[] = []
-      for (const key of fields.equipment ?? []) {
-        equipmentRows.push({ dealId, equipmentKey: key, customLabel: null })
-      }
-      if (fields.equipmentCustom?.trim()) {
-        equipmentRows.push({ dealId, equipmentKey: "__custom__", customLabel: fields.equipmentCustom.trim() })
-      }
-      if (equipmentRows.length > 0) {
-        await tx.dealEquipment.createMany({ data: equipmentRows })
-      }
+      await tx.dealEquipment.createMany({
+        data: equipmentPairs.map((p) => ({ dealId, ...p })),
+      })
     }
 
     if (fields.ownerId && fields.ownerId !== existing.ownerId) {
@@ -440,7 +466,7 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
     stageId: string; stageKey: string; createdAt: string; stageEnteredAt: string
     ownerId: string; ownerName: string | null; ownerImage: string | null
     createdById: string | null; createdByName: string | null; createdByImage: string | null
-    equipment: { equipmentKey: string; customLabel: string | null }[]
+    equipment: { categoryKey: string; subcategoryKey: string }[]
     quoteCount: number; paymentCount: number
   }
 }> {

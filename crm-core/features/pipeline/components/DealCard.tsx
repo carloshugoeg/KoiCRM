@@ -26,7 +26,7 @@ export interface DealCardData {
   statusKey: string
   createdAt: Date
   stageEnteredAt: Date
-  equipment: { equipmentKey: string; customLabel: string | null }[]
+  equipment: { categoryKey: string; subcategoryKey: string }[]
   hasActiveQuote: boolean
   hasActivePayment: boolean
   hasOverdueFollowUp: boolean
@@ -99,11 +99,8 @@ export function DealCard({
   const daysTotal = diffDays(deal.createdAt, now)
   const daysStage = diffDays(deal.stageEnteredAt, now)
 
-  const chips = deal.equipment
-    .filter((e) => e.equipmentKey !== "__custom__")
-    .slice(0, 2)
-  const customEq = deal.equipment.find((e) => e.equipmentKey === "__custom__")
-  const overflow = deal.equipment.filter((e) => e.equipmentKey !== "__custom__").length - 2
+  const chips = deal.equipment.slice(0, 2)
+  const overflow = deal.equipment.length - 2
 
   const hasQuoteAlert = deal.hasQuoteAlert ?? false
   const hasPaymentAlert = deal.hasPaymentAlert ?? false
@@ -200,21 +197,16 @@ export function DealCard({
             {formatCurrency(deal.value, settings)}
           </p>
           <div className="flex min-w-0 shrink gap-1 justify-end overflow-hidden">
-             {(chips.length > 0 || customEq) && (
+             {chips.length > 0 && (
                 <div className="flex gap-1 items-center flex-wrap justify-end">
                   {chips.map((e) => (
                     <span
-                      key={e.equipmentKey}
+                      key={e.subcategoryKey}
                       className="text-[10px] font-medium text-slate-500 truncate max-w-[80px]"
                     >
-                      {equipmentLabel(e.equipmentKey, equipmentLabels)}
+                      {equipmentLabel(e.subcategoryKey, equipmentLabels)}
                     </span>
                   ))}
-                  {customEq && (
-                    <span className="text-[10px] font-medium text-slate-500 truncate max-w-[80px]">
-                      {customEq.customLabel}
-                    </span>
-                  )}
                   {overflow > 0 && (
                     <span className="flex items-center justify-center w-4 h-4 rounded-full bg-blue-50 text-blue-600 text-[9px] font-bold border border-blue-100 ml-1 shrink-0">
                       +{overflow}

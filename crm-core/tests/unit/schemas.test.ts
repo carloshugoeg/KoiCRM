@@ -3,7 +3,7 @@ import { createDealSchema, updateDealFieldSchema } from "@/features/deals/schema
 
 const BASE_CREATE = {
   tenantId: "t1", tenantSlug: "demo", ownerId: "u1", channelKey: "web",
-  name: "Deal A", equipment: ["equip1"],
+  name: "Deal A", equipment: [{ categoryKey: "bombas", subcategoryKeys: ["bombas__sumergible"] }],
 }
 
 describe("createDealSchema — phone", () => {

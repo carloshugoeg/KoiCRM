@@ -79,9 +79,9 @@ beforeAll(async () => {
 
   await prismaAdmin.dealEquipment.createMany({
     data: [
-      { dealId: "STA-0001", equipmentKey: "bomba" },
-      { dealId: "STA-0002", equipmentKey: "bomba" },
-      { dealId: "STA-0003", equipmentKey: "jacuzzi" },
+      { dealId: "STA-0001", categoryKey: "bomba", subcategoryKey: "bomba" },
+      { dealId: "STA-0002", categoryKey: "bomba", subcategoryKey: "bomba" },
+      { dealId: "STA-0003", categoryKey: "jacuzzi", subcategoryKey: "jacuzzi" },
     ],
   })
 })

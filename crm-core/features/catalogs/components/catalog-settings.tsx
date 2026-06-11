@@ -13,8 +13,9 @@ import {
   reorderCatalogItemsAction,
 } from "@/features/catalogs/actions"
 import { CATALOG_LABELS } from "@/features/catalogs/constants"
+import { EquipmentSettings } from "@/features/catalogs/components/equipment-settings"
 import type { CatalogItem, Tenant } from "@prisma/client"
-import type { CatalogKey } from "@/features/catalogs/queries"
+import type { CatalogKey, EquipmentCategory } from "@/features/catalogs/queries"
 import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 
 const CATALOG_KEYS: CatalogKey[] = ["equipment", "salesChannel", "dealStatus"]
@@ -22,6 +23,7 @@ const CATALOG_KEYS: CatalogKey[] = ["equipment", "salesChannel", "dealStatus"]
 interface Props {
   tenant: Tenant
   itemsByKey: Record<CatalogKey, CatalogItem[]>
+  equipmentCategories: EquipmentCategory[]
   canManage: boolean
 }
 
@@ -198,7 +200,7 @@ function CatalogTab({
   )
 }
 
-export function CatalogSettings({ tenant, itemsByKey, canManage }: Props) {
+export function CatalogSettings({ tenant, itemsByKey, equipmentCategories, canManage }: Props) {
   return (
     <div className="p-6 space-y-6 max-w-3xl">
       <h1 className="text-2xl font-semibold">Catálogos</h1>
@@ -210,12 +212,17 @@ export function CatalogSettings({ tenant, itemsByKey, canManage }: Props) {
         </TabsList>
         {CATALOG_KEYS.map((k) => (
           <TabsContent key={k} value={k} className="pt-4">
-            <CatalogTab
-              catalogKey={k}
-              items={itemsByKey[k]}
-              tenant={tenant}
-              canManage={canManage}
-            />
+            {k === "equipment" ? (
+              // Equipo de interés is a 2-level taxonomy — use the nested manager, not the flat list.
+              <EquipmentSettings tenant={tenant} categories={equipmentCategories} canManage={canManage} />
+            ) : (
+              <CatalogTab
+                catalogKey={k}
+                items={itemsByKey[k]}
+                tenant={tenant}
+                canManage={canManage}
+              />
+            )}
           </TabsContent>
         ))}
       </Tabs>

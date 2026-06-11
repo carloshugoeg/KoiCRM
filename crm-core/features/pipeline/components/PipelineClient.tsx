@@ -14,6 +14,7 @@ import { getDealSummaryAction } from "@/features/deals/actions"
 import { PinProvider } from "@/features/auth/pin-gate"
 import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 import type { PipelineStage, CatalogItem } from "@prisma/client"
+import type { EquipmentCategory } from "@/features/catalogs/queries"
 import type { PipelineFiltersParams } from "@/features/pipeline/schemas"
 import type { IntlSettings } from "@/lib/intl/format"
 import type { DealCardData } from "@/features/pipeline/components/DealCard"
@@ -27,7 +28,7 @@ interface PipelineClientProps {
   deals: (Omit<DealCardData, "createdAt" | "stageEnteredAt"> & { createdAt: string; stageEnteredAt: string })[]
   members: { id: string; name: string | null; email: string; image?: string | null }[]
   channels: CatalogItem[]
-  equipment: CatalogItem[]
+  equipmentHierarchy: EquipmentCategory[]
   statuses: CatalogItem[]
   currentFilters: PipelineFiltersParams
   intlSettings: IntlSettings
@@ -71,7 +72,7 @@ export function PipelineClient({
   deals,
   members,
   channels,
-  equipment,
+  equipmentHierarchy,
   statuses,
   currentFilters,
   intlSettings,
@@ -95,8 +96,14 @@ export function PipelineClient({
   })), [deals])
 
   const equipmentLabels = useMemo(
-    () => Object.fromEntries(equipment.map((e) => [e.key, e.label])),
-    [equipment],
+    () =>
+      Object.fromEntries(
+        equipmentHierarchy.flatMap((h) => [
+          [h.category.key, h.category.label] as const,
+          ...h.subcategories.map((s) => [s.key, s.label] as const),
+        ]),
+      ),
+    [equipmentHierarchy],
   )
 
   const clearDealParam = useCallback(() => {
@@ -194,7 +201,7 @@ export function PipelineClient({
         <FilterBar
           members={members}
           channels={channels}
-          equipment={equipment}
+          equipmentHierarchy={equipmentHierarchy}
           currentFilters={currentFilters}
           tenantSlug={tenantSlug}
         />
@@ -230,7 +237,7 @@ export function PipelineClient({
           tenantSlug={tenantSlug}
           members={members}
           channels={channels}
-          equipment={equipment}
+          equipmentHierarchy={equipmentHierarchy}
           statuses={statuses}
           canChooseOwner={canEdit}
           currentUserId={currentUserId}
@@ -248,6 +255,7 @@ export function PipelineClient({
           canArchive={canArchive}
           canDelete={canDelete}
           members={members}
+          equipmentHierarchy={equipmentHierarchy}
           onClose={closeDealModal}
           onAction={() => {
             closeDealModal()

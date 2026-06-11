@@ -16,6 +16,7 @@ import { avatarColor, avatarInitials } from "@/lib/utils/avatar-color"
 import { formatCurrency } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
 import type { PipelineStage, CatalogItem } from "@prisma/client"
+import type { EquipmentCategory } from "@/features/catalogs/queries"
 
 interface ClientDeal {
   id: string
@@ -52,7 +53,7 @@ interface ClientProfileProps {
   stages: PipelineStage[]
   members: { id: string; name: string | null; email: string; image?: string | null }[]
   channels: CatalogItem[]
-  equipment: CatalogItem[]
+  equipmentHierarchy: EquipmentCategory[]
   statuses: CatalogItem[]
   settings: IntlSettings
   canEdit: boolean
@@ -67,7 +68,7 @@ export function ClientProfile({
   stages: _stages,
   members,
   channels,
-  equipment,
+  equipmentHierarchy,
   statuses,
   settings,
   canEdit,
@@ -239,7 +240,7 @@ export function ClientProfile({
           tenantSlug={tenantSlug}
           members={members}
           channels={channels}
-          equipment={equipment}
+          equipmentHierarchy={equipmentHierarchy}
           statuses={statuses}
           prefill={{
             name: client.name,

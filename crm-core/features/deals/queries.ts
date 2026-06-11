@@ -4,7 +4,8 @@ import type { Prisma } from "@prisma/client"
 export interface PipelineFilters {
   ownerId?: string
   channelKey?: string
-  equipmentKey?: string
+  equipmentCategoryKey?: string
+  equipmentSubcategoryKey?: string
   alerts?: "missingQuote" | "missingPayment" | "overdueFollowUp"
   from?: Date
   to?: Date
@@ -57,8 +58,13 @@ function buildPipelineDealsWhere(tenantId: string, filters: PipelineFilters): Pr
       ...(filters.to ? { lte: filters.to } : {}),
     }
   }
-  if (filters.equipmentKey) {
-    where.equipment = { some: { equipmentKey: filters.equipmentKey } }
+  if (filters.equipmentCategoryKey || filters.equipmentSubcategoryKey) {
+    where.equipment = {
+      some: {
+        ...(filters.equipmentCategoryKey ? { categoryKey: filters.equipmentCategoryKey } : {}),
+        ...(filters.equipmentSubcategoryKey ? { subcategoryKey: filters.equipmentSubcategoryKey } : {}),
+      },
+    }
   }
 
   return where

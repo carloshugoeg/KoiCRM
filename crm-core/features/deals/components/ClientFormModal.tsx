@@ -25,12 +25,13 @@ import { confirmUpload } from "@/features/attachments/actions"
 import { uploadDealFile } from "@/features/attachments/upload-deal-file"
 import { formatPhone } from "@/lib/deals/phone-format"
 import { getChannelColor, getChannelIcon } from "@/lib/deals/channel-icons"
-import { equipmentIcon } from "@/lib/settings/constants"
 import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 import { avatarColor } from "@/lib/utils/avatar-color"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { hex2rgba } from "@/lib/utils/color"
+import { EquipmentSelector, type EquipmentGroup } from "@/features/deals/components/EquipmentSelector"
 import type { CatalogItem } from "@prisma/client"
+import type { EquipmentCategory } from "@/features/catalogs/queries"
 
 export interface ClientFormMember {
   id: string
@@ -47,7 +48,7 @@ interface ClientFormModalProps {
   tenantSlug: string
   members: ClientFormMember[]
   channels: CatalogItem[]
-  equipment: CatalogItem[]
+  equipmentHierarchy: EquipmentCategory[]
   statuses: CatalogItem[]
   /** Asesores can't choose the owner — the deal is always assigned to them. */
   canChooseOwner?: boolean
@@ -94,7 +95,7 @@ export function ClientFormModal({
   tenantSlug,
   members,
   channels,
-  equipment,
+  equipmentHierarchy,
   statuses,
   canChooseOwner = true,
   currentUserId,
@@ -111,8 +112,7 @@ export function ClientFormModal({
   const [phone, setPhone] = useState(prefill?.phone ?? "")
   const [whatsapp, setWhatsapp] = useState(prefill?.whatsapp ?? "")
   const [email, setEmail] = useState(prefill?.email ?? "")
-  const [selectedEquipment, setSelectedEquipment] = useState<string[]>([])
-  const [equipmentCustom, setEquipmentCustom] = useState("")
+  const [equipmentGroups, setEquipmentGroups] = useState<EquipmentGroup[]>([])
   const [valueDisplay, setValueDisplay] = useState("")
   const [value, setValue] = useState(0)
   const [statusKey, setStatusKey] = useState(statuses[0]?.key ?? "activo")
@@ -139,8 +139,7 @@ export function ClientFormModal({
     setPhone(prefill?.phone ?? "")
     setWhatsapp(prefill?.whatsapp ?? "")
     setEmail(prefill?.email ?? "")
-    setSelectedEquipment([])
-    setEquipmentCustom("")
+    setEquipmentGroups([])
     setValueDisplay("")
     setValue(0)
     setStatusKey(statuses[0]?.key ?? "activo")
@@ -153,19 +152,13 @@ export function ClientFormModal({
     setErrors({})
   }, [open, prefill, members, channels, statuses, canChooseOwner, currentUserId])
 
-  function toggleEquipment(key: string) {
-    setSelectedEquipment((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
-    )
-  }
-
   function validate(): boolean {
     const e: FormErrors = {}
     if (!ownerId) e.owner = true
     if (!channelKey) e.channel = true
     if (!name.trim()) e.name = true
     if (!phone.trim()) e.phone = true
-    if (selectedEquipment.length === 0 && !equipmentCustom.trim()) e.equipment = true
+    if (!equipmentGroups.some((g) => g.subcategoryKeys.length > 0)) e.equipment = true
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -280,8 +273,7 @@ export function ClientFormModal({
       phone,
       whatsapp: whatsapp || null,
       email: email || null,
-      equipment: selectedEquipment,
-      equipmentCustom: equipmentCustom || null,
+      equipment: equipmentGroups.filter((g) => g.subcategoryKeys.length > 0),
       value,
       statusKey,
       pin,
@@ -581,46 +573,15 @@ export function ClientFormModal({
                     {errors.equipment && (
                       <span className="normal-case font-normal">
                         {" "}
-                        — selecciona al menos uno
+                        — agrega una categoría con al menos una subcategoría
                       </span>
                     )}
                   </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {equipment.map((eq) => {
-                      const sel = selectedEquipment.includes(eq.key)
-                      const Icon = equipmentIcon(eq.label)
-                      return (
-                        <button
-                          key={eq.key}
-                          type="button"
-                          onClick={() => toggleEquipment(eq.key)}
-                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold border transition-all"
-                          style={{
-                            background: sel ? hex2rgba("#818cf8", 0.18) : undefined,
-                            borderColor: sel
-                              ? "#818cf8"
-                              : errors.equipment
-                                ? "rgba(248,113,113,0.4)"
-                                : undefined,
-                            color: sel ? "#a5b4fc" : undefined,
-                            boxShadow: sel ? "0 0 0 1px #818cf840" : "none",
-                          }}
-                        >
-                          <Icon
-                            size={11}
-                            className={sel ? "text-indigo-400" : "text-muted-foreground"}
-                          />
-                          {eq.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <input
-                    id="equipment-custom"
-                    value={equipmentCustom}
-                    onChange={(e) => setEquipmentCustom(e.target.value)}
-                    placeholder="Otro equipo..."
-                    className={`${fieldClass()} mt-2 text-xs`}
+                  <EquipmentSelector
+                    hierarchy={equipmentHierarchy}
+                    value={equipmentGroups}
+                    onChange={setEquipmentGroups}
+                    invalid={errors.equipment}
                   />
                 </div>
               </div>

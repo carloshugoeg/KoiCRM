@@ -17,7 +17,7 @@ export interface PrintDeal {
   value: number
   createdAt: string | Date
   stageEnteredAt: string | Date
-  equipment: { equipmentKey: string; customLabel: string | null }[]
+  equipment: { categoryKey: string; subcategoryKey: string }[]
   hasQuoteAlert: boolean
   hasPaymentAlert: boolean
   hasOverdueFollowUp: boolean
@@ -41,12 +41,7 @@ function diffDays(from: Date, to: Date): number {
   return Math.floor((to.getTime() - from.getTime()) / 86_400_000)
 }
 
-function equipmentChipLabel(
-  key: string,
-  customLabel: string | null,
-  labels: Record<string, string>,
-): string {
-  if (key === "__custom__") return customLabel ?? "Otro"
+function equipmentChipLabel(key: string, labels: Record<string, string>): string {
   return labels[key] ?? key
 }
 
@@ -125,8 +120,6 @@ export function PrintReport({
             const daysTotal = diffDays(created, now)
             const daysStage = diffDays(stageEntered, now)
             const bg = i % 2 === 1 ? "bg-slate-50/60" : ""
-            const eqItems = d.equipment.filter((e) => e.equipmentKey !== "__custom__")
-            const customEq = d.equipment.find((e) => e.equipmentKey === "__custom__")
 
             return (
               <Fragment key={d.id}>
@@ -169,19 +162,14 @@ export function PrintReport({
                   </td>
                   <td className="px-4 py-3 align-top">
                     <div className="flex flex-wrap gap-1">
-                      {eqItems.map((e) => (
+                      {d.equipment.map((e) => (
                         <span
-                          key={e.equipmentKey}
+                          key={e.subcategoryKey}
                           className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200"
                         >
-                          {equipmentChipLabel(e.equipmentKey, e.customLabel, equipmentLabels)}
+                          {equipmentChipLabel(e.subcategoryKey, equipmentLabels)}
                         </span>
                       ))}
-                      {customEq && (
-                        <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-200">
-                          {equipmentChipLabel("__custom__", customEq.customLabel, equipmentLabels)}
-                        </span>
-                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right font-black text-slate-800 tabular-nums align-top">

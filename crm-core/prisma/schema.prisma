@@ -240,9 +240,16 @@ model CatalogItem {
   metadata   Json?
   order      Int     @default(0)
   active     Boolean @default(true)
+  // For the "equipment" catalog this expresses a 2-level taxonomy: parentId null = categoría
+  // (equipo de interés), parentId set = subcategoría of that categoría. Other catalogs stay flat.
+  parentId   String?
+
+  parent   CatalogItem?  @relation("CatalogItemHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children CatalogItem[] @relation("CatalogItemHierarchy")
 
   @@unique([tenantId, catalogKey, key])
   @@index([tenantId, catalogKey])
+  @@index([parentId])
 }
 
 model Client {
@@ -310,13 +317,16 @@ model Deal {
 }
 
 model DealEquipment {
-  dealId       String
-  equipmentKey String
-  customLabel  String?
+  dealId         String
+  // Denormalized parent categoría key, so cards/stats/filters read the category without a join.
+  categoryKey    String
+  // The selected subcategoría's CatalogItem.key (namespaced "<categoryKey>__<subKey>").
+  subcategoryKey String
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
-  @@id([dealId, equipmentKey])
+  @@id([dealId, subcategoryKey])
+  @@index([categoryKey])
 }
 
 /// Read-only access grant created when a deal is ceded: the previous owner keeps

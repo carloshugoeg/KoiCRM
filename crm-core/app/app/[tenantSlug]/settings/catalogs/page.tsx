@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
 import { canManageSettings } from "@/lib/auth/rbac"
-import { getCatalogItems } from "@/features/catalogs/queries"
+import { getCatalogItems, getEquipmentHierarchy } from "@/features/catalogs/queries"
 import { CatalogSettings } from "@/features/catalogs/components/catalog-settings"
 import type { CatalogKey } from "@/features/catalogs/queries"
 
@@ -21,9 +21,10 @@ export default async function CatalogsSettingsPage({ params }: Props) {
 
   const { tenant, membership } = resolved
 
-  const allItems = await Promise.all(
-    CATALOG_KEYS.map((k) => getCatalogItems(tenant.id, k))
-  )
+  const [allItems, equipmentCategories] = await Promise.all([
+    Promise.all(CATALOG_KEYS.map((k) => getCatalogItems(tenant.id, k))),
+    getEquipmentHierarchy(tenant.id),
+  ])
 
   const itemsByKey = Object.fromEntries(
     CATALOG_KEYS.map((k, i) => [k, allItems[i]])
@@ -33,6 +34,7 @@ export default async function CatalogsSettingsPage({ params }: Props) {
     <CatalogSettings
       tenant={tenant}
       itemsByKey={itemsByKey}
+      equipmentCategories={equipmentCategories}
       canManage={canManageSettings(membership.role)}
     />
   )
