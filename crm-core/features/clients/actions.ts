@@ -5,7 +5,6 @@ import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
 import { requireRole } from "@/lib/auth/rbac"
-import { prisma } from "@/lib/db/client"
 import { createClientSchema, updateClientSchema, deleteClientSchema } from "@/features/clients/schemas"
 
 export async function createClientAction(raw: unknown): Promise<{ ok: boolean; error?: string; id?: string }> {
@@ -64,11 +63,12 @@ export async function updateClientAction(raw: unknown): Promise<{ ok: boolean; e
     return { ok: false, error: "Acceso denegado." }
   }
 
-  const client = await prisma.client.findUnique({ where: { id, tenantId } })
-  if (!client) return { ok: false, error: "Cliente no encontrado." }
-
+  // Verify the client exists inside the tenant context — a bare prisma read runs as
+  // app_user without app.tenant_id set (RLS) and returns null even for own rows.
   try {
-    await withTenant(tenantId, async (tx) => {
+    const found = await withTenant(tenantId, async (tx) => {
+      const client = await tx.client.findUnique({ where: { id, tenantId } })
+      if (!client) return false
       await tx.client.update({
         where: { id },
         data: {
@@ -80,7 +80,9 @@ export async function updateClientAction(raw: unknown): Promise<{ ok: boolean; e
           customData: fields.customData as Prisma.InputJsonValue | undefined,
         },
       })
+      return true
     })
+    if (!found) return { ok: false, error: "Cliente no encontrado." }
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return { ok: false, error: "Ya existe un cliente con ese nombre y empresa." }
@@ -106,20 +108,27 @@ export async function deleteClientAction(raw: unknown): Promise<{ ok: boolean; e
     return { ok: false, error: "Acceso denegado." }
   }
 
-  const client = await prisma.client.findUnique({ where: { id, tenantId } })
-  if (!client) return { ok: false, error: "Cliente no encontrado." }
+  // Existence + linked-deal guard + delete all inside the tenant context — bare prisma reads
+  // run as app_user without app.tenant_id set (RLS) and return null/0 even for own rows.
+  const result = await withTenant(tenantId, async (tx) => {
+    const client = await tx.client.findUnique({ where: { id, tenantId } })
+    if (!client) return { kind: "notfound" as const }
 
-  const dealCount = await prisma.deal.count({ where: { clientId: id, tenantId } })
-  if (dealCount > 0) {
+    const dealCount = await tx.deal.count({ where: { clientId: id, tenantId } })
+    if (dealCount > 0) return { kind: "linked" as const, dealCount }
+
+    await tx.client.delete({ where: { id } })
+    return { kind: "ok" as const }
+  })
+
+  if (result.kind === "notfound") return { ok: false, error: "Cliente no encontrado." }
+  if (result.kind === "linked") {
     return {
       ok: false,
-      error: `No se puede eliminar: ${dealCount} oportunidad(es) vinculada(s). Elimínalas primero.`,
+      error: `No se puede eliminar: ${result.dealCount} oportunidad(es) vinculada(s). Elimínalas primero.`,
     }
   }
 
-  await withTenant(tenantId, async (tx) => {
-    await tx.client.delete({ where: { id } })
-  })
   revalidatePath(`/app/${tenantSlug}/clients`, "page")
   return { ok: true }
 }

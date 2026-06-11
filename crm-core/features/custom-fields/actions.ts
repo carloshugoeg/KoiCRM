@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache"
 import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth/auth"
-import { prisma } from "@/lib/db/client"
 import { withTenant } from "@/lib/db/rls"
 import { requireRole } from "@/lib/auth/rbac"
 import {
@@ -67,13 +66,15 @@ export async function deleteCustomFieldAction(raw: unknown): Promise<{ ok: boole
     return { ok: false, error: "Acceso denegado." }
   }
 
-  // Verify field belongs to this tenant
-  const def = await prisma.customFieldDefinition.findUnique({ where: { id, tenantId } })
-  if (!def) return { ok: false, error: "Campo no encontrado." }
-
-  await withTenant(tenantId, async (tx) => {
+  // Verify the field belongs to this tenant inside the tenant context — a bare prisma read
+  // runs as app_user without app.tenant_id set (RLS) and returns null even for own rows.
+  const deleted = await withTenant(tenantId, async (tx) => {
+    const def = await tx.customFieldDefinition.findUnique({ where: { id, tenantId } })
+    if (!def) return false
     await tx.customFieldDefinition.delete({ where: { id } })
+    return true
   })
+  if (!deleted) return { ok: false, error: "Campo no encontrado." }
   revalidatePath(`/app/${tenantSlug}/settings/custom-fields`, "page")
   return { ok: true }
 }
@@ -93,19 +94,21 @@ export async function reorderCustomFieldsAction(raw: unknown): Promise<{ ok: boo
     return { ok: false, error: "Acceso denegado." }
   }
 
-  // Validate IDs belong to this tenant/entity
-  const count = await prisma.customFieldDefinition.count({
-    where: { id: { in: orderedIds }, tenantId, entity },
-  })
-  if (count !== orderedIds.length) return { ok: false, error: "IDs inválidos." }
-
-  await withTenant(tenantId, async (tx) => {
+  // Validate IDs belong to this tenant/entity inside the tenant context — a bare prisma
+  // count runs as app_user without app.tenant_id set (RLS) and returns 0 for own rows.
+  const valid = await withTenant(tenantId, async (tx) => {
+    const count = await tx.customFieldDefinition.count({
+      where: { id: { in: orderedIds }, tenantId, entity },
+    })
+    if (count !== orderedIds.length) return false
     await Promise.all(
       orderedIds.map((id, idx) =>
         tx.customFieldDefinition.update({ where: { id }, data: { order: idx } })
       )
     )
+    return true
   })
+  if (!valid) return { ok: false, error: "IDs inválidos." }
   revalidatePath(`/app/${tenantSlug}/settings/custom-fields`, "page")
   return { ok: true }
 }

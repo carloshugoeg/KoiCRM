@@ -1,13 +1,17 @@
-import { prisma } from "@/lib/db/client"
-import type { CustomFieldDef } from "@/lib/config/custom-fields"
+import { withTenant } from "@/lib/db/rls"
+import type { CustomFieldDef, CustomFieldType } from "@/lib/config/custom-fields"
 
 export type EntityType = "Deal" | "Client"
 
 export async function getCustomFieldDefs(tenantId: string, entity: EntityType) {
-  return prisma.customFieldDefinition.findMany({
-    where: { tenantId, entity },
-    orderBy: { order: "asc" },
-  })
+  // CustomFieldDefinition is RLS-protected: a bare prisma read runs as app_user without
+  // app.tenant_id set and returns []. Read through withTenant so the tenant context is set.
+  return withTenant(tenantId, (tx) =>
+    tx.customFieldDefinition.findMany({
+      where: { tenantId, entity },
+      orderBy: { order: "asc" },
+    }),
+  )
 }
 
 export function toCustomFieldDef(
@@ -16,7 +20,7 @@ export function toCustomFieldDef(
   return {
     key: raw.key,
     label: raw.label,
-    type: raw.type as import("@/lib/config/custom-fields").CustomFieldType,
+    type: raw.type as CustomFieldType,
     required: raw.required,
     options: Array.isArray(raw.options) ? (raw.options as string[]) : null,
   }
