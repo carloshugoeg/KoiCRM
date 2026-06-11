@@ -40,25 +40,37 @@ export async function recordActivity(tx: PrismaTx, input: RecordActivityInput): 
   })
 }
 
-export async function getDealActivity(tenantId: string, dealId: string, limit = 50) {
+export async function getDealActivity(tenantId: string, dealId: string, cursor?: string, limit = 50) {
+  const where: Prisma.ActivityWhereInput = { tenantId, entity: "Deal", entityId: dealId }
+  if (cursor) {
+    const cursorDate = new Date(cursor)
+    if (isNaN(cursorDate.getTime())) throw new Error("Invalid cursor: expected ISO 8601 date string")
+    where.createdAt = { lt: cursorDate }
+  }
+
   return withTenant(tenantId, async (tx) => {
     const rows = await tx.activity.findMany({
-      where: { tenantId, entity: "Deal", entityId: dealId },
+      where,
       orderBy: { createdAt: "desc" },
-      take: limit,
+      take: limit + 1,
     })
+    const hasMore = rows.length > limit
+    const page = hasMore ? rows.slice(0, limit) : rows
+    const nextCursor = hasMore ? page[page.length - 1]!.createdAt.toISOString() : null
+
     // Resolve the author of each entry — with the PIN feature this is the PIN owner,
     // so the timeline shows who actually performed each change.
-    const userIds = [...new Set(rows.map((r) => r.userId).filter((id): id is string => !!id))]
+    const userIds = [...new Set(page.map((r) => r.userId).filter((id): id is string => !!id))]
     const users = userIds.length
       ? await tx.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, image: true } })
       : []
     const byId = new Map(users.map((u) => [u.id, u]))
-    return rows.map((r) => ({
+    const items = page.map((r) => ({
       ...r,
       actorName: r.userId ? byId.get(r.userId)?.name ?? null : null,
       actorImage: r.userId ? byId.get(r.userId)?.image ?? null : null,
     }))
+    return { items, nextCursor }
   })
 }
 
@@ -72,7 +84,7 @@ export async function getClientActivity(tenantId: string, clientId: string, limi
   )
 }
 
-export type ActivityEntry = Awaited<ReturnType<typeof getDealActivity>>[number]
+export type ActivityEntry = Awaited<ReturnType<typeof getDealActivity>>["items"][number]
 
 // Human-readable labels for each activity type (Spanish)
 export const ACTIVITY_LABELS: Record<ActivityType, string> = {

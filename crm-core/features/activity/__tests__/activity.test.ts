@@ -73,7 +73,7 @@ describe("Activity log", () => {
       await recordActivity(tx, { tenantId, entity: "Deal", entityId: dealId, type: "stageChanged", payload: { from: "prospecto", to: "contactado" }, userId })
     })
 
-    const entries = await getDealActivity(tenantId, dealId)
+    const { items: entries } = await getDealActivity(tenantId, dealId)
     expect(entries.length).toBeGreaterThanOrEqual(3)
     // Descending: first entry is the most recent
     const types = entries.map((e) => e.type)
@@ -86,7 +86,7 @@ describe("Activity log", () => {
     const otherTenant = await prismaAdmin.tenant.create({
       data: { name: "Other", slug: `other-act-${Date.now()}` },
     })
-    const entries = await getDealActivity(otherTenant.id, dealId)
+    const { items: entries } = await getDealActivity(otherTenant.id, dealId)
     expect(entries).toHaveLength(0)
     await prismaAdmin.tenant.delete({ where: { id: otherTenant.id } })
   })

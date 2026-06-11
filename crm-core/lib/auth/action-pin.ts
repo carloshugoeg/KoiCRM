@@ -14,6 +14,7 @@ import {
   actorTokenIsFresh,
 } from "@/lib/auth/action-pin-token"
 import { isPinRequiredForDealAction } from "@/lib/auth/action-pin-policy"
+import { rateLimit } from "@/lib/auth/rate-limit"
 
 export { isPinRequiredForDealAction } from "@/lib/auth/action-pin-policy"
 
@@ -108,6 +109,8 @@ export async function resolveActionActor(params: {
   if (pin) {
     // requiresPin on an invalid PIN so the client keeps the dialog open to retry.
     if (!isValidPinFormat(pin)) return { ok: false, requiresPin: true, error: "El PIN debe tener 4 dígitos." }
+    const allowed = await rateLimit(`pin:${tenantId}:${session.user.id}`, 10, 5 * 60_000)
+    if (!allowed) return { ok: false, requiresPin: true, error: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo." }
     const membership = await prisma.membership.findFirst({
       where: { tenantId, status: "ACTIVE", actionPinHash: hashActionPin(pin) },
       select: { userId: true, role: true, user: { select: { name: true } } },

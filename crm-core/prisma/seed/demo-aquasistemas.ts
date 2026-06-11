@@ -56,6 +56,7 @@ const CATALOG_ITEMS = [
 ]
 
 export async function seedDemo() {
+  if (process.env.NODE_ENV === "production") { throw new Error("Refusing to seed demo data in production (NODE_ENV=production)") }
   console.log("Seeding demo-aqua tenant...")
 
   // Idempotent: clean up any existing demo-aqua data

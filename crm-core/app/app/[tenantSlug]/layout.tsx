@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
-import { checkTenantEmbudoAccess, getDefaultAppPathForUser } from "@/lib/tenant/access"
+import { checkTenantEmbudoAccess } from "@/lib/tenant/access"
 import { resolveTenant, getUserMemberships } from "@/lib/tenant/resolve"
 import { canSeeAllDeals } from "@/lib/auth/rbac"
 import { TenantProvider } from "@/lib/tenant/context"
@@ -31,7 +31,7 @@ export default async function TenantLayout({ children, params }: Props) {
   ])
 
   if (!resolved) {
-    redirect(await getDefaultAppPathForUser(session.user.id))
+    notFound()
   }
 
   const embudoAccess = await checkTenantEmbudoAccess(session.user.id, params.tenantSlug)

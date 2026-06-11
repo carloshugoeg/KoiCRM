@@ -1,7 +1,10 @@
 import { withTenant, type PrismaTx } from "@/lib/db/rls"
 import type { Prisma } from "@prisma/client"
 
-export type ClientWithDealCount = Awaited<ReturnType<typeof listClients>>[number]
+export type ClientWithDealCount = Awaited<ReturnType<typeof listClients>>["items"][number]
+
+/** Default page size for the bounded clients list (cursor pagination). */
+export const CLIENTS_PAGE_SIZE = 50
 
 /**
  * Detect-or-create a Client by name+company (case-insensitive).
@@ -54,9 +57,9 @@ export async function countClients(tenantId: string) {
 
 export async function listClients(
   tenantId: string,
-  opts: { search?: string; sort?: "name" | "recent" } = {}
+  opts: { search?: string; sort?: "name" | "recent"; cursor?: string; limit?: number } = {}
 ) {
-  const { search, sort = "name" } = opts
+  const { search, sort = "name", cursor, limit = CLIENTS_PAGE_SIZE } = opts
 
   const where: Prisma.ClientWhereInput = { tenantId }
   if (search) {
@@ -67,10 +70,16 @@ export async function listClients(
     ]
   }
 
-  return withTenant(tenantId, (tx) =>
+  // Stable order for cursor paging: primary sort + id tiebreaker.
+  const orderBy: Prisma.ClientOrderByWithRelationInput[] =
+    sort === "name"
+      ? [{ name: "asc" }, { id: "asc" }]
+      : [{ updatedAt: "desc" }, { id: "asc" }]
+
+  const clients = await withTenant(tenantId, (tx) =>
     tx.client.findMany({
       where,
-      orderBy: sort === "name" ? { name: "asc" } : { updatedAt: "desc" },
+      orderBy,
       include: {
         _count: {
           select: {
@@ -78,8 +87,16 @@ export async function listClients(
           },
         },
       },
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     })
   )
+
+  const hasMore = clients.length > limit
+  const items = hasMore ? clients.slice(0, limit) : clients
+  const nextCursor = hasMore ? items[items.length - 1]!.id : null
+
+  return { items, nextCursor }
 }
 
 export async function getClientWithDeals(tenantId: string, clientId: string) {

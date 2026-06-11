@@ -1,6 +1,11 @@
 // @ts-check
 import { withSentryConfig } from "@sentry/nextjs";
 
+// `next dev` relies on eval() for fast refresh, so 'unsafe-eval' is only
+// permitted in development. Production CSP omits it for XSS hardening.
+const isDev = process.env.NODE_ENV !== "production";
+const scriptSrc = `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async headers() {
@@ -23,7 +28,7 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              scriptSrc,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",

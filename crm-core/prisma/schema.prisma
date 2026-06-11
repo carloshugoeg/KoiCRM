@@ -50,12 +50,16 @@ model User {
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
 
-  memberships  Membership[]
-  ownedDeals   Deal[]       @relation("DealOwner")
-  createdDeals Deal[]       @relation("DealCreator")
-  dealViews    DealViewer[]
-  accounts     Account[]
-  sessions     Session[]
+  memberships      Membership[]
+  ownedDeals       Deal[]       @relation("DealOwner")
+  createdDeals     Deal[]       @relation("DealCreator")
+  dealViews        DealViewer[]
+  accounts         Account[]
+  sessions         Session[]
+  followUpsCreated FollowUp[]   @relation("FollowUpCreator")
+  notesCreated     Note[]       @relation("NoteCreator")
+  activities       Activity[]   @relation("ActivityUser")
+  savedViews       SavedView[]  @relation("SavedViewUser")
 }
 
 model Account {
@@ -292,7 +296,7 @@ model Deal {
   pipeline    Pipeline      @relation(fields: [pipelineId], references: [id])
   stage       PipelineStage @relation(fields: [stageId], references: [id])
   owner       User          @relation("DealOwner", fields: [ownerId], references: [id])
-  createdBy   User?         @relation("DealCreator", fields: [createdById], references: [id])
+  createdBy   User?         @relation("DealCreator", fields: [createdById], references: [id], onDelete: SetNull)
   equipment   DealEquipment[]
   quotes      Quote[]
   payments    Payment[]
@@ -305,6 +309,7 @@ model Deal {
   @@index([tenantId, stageId])
   @@index([tenantId, ownerId])
   @@index([tenantId, clientId])
+  @@index([tenantId, createdById])
   @@index([tenantId, createdAt])
   @@index([tenantId, channelKey])
 }
@@ -397,7 +402,8 @@ model FollowUp {
   createdById String?
   createdAt   DateTime  @default(now())
 
-  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  deal      Deal  @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("FollowUpCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([tenantId, dealId])
   @@index([tenantId, completed, date])
@@ -412,8 +418,9 @@ model Note {
   createdById String?
   createdAt   DateTime @default(now())
 
-  deal   Deal?   @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  client Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  deal      Deal?   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  client    Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("NoteCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([tenantId, dealId])
   @@index([tenantId, clientId])
@@ -429,6 +436,8 @@ model Activity {
   userId    String?
   createdAt DateTime @default(now())
 
+  user User? @relation("ActivityUser", fields: [userId], references: [id], onDelete: SetNull)
+
   @@index([tenantId, entity, entityId])
   @@index([tenantId, createdAt])
 }
@@ -441,6 +450,8 @@ model SavedView {
   name      String
   config    Json
   createdAt DateTime @default(now())
+
+  user User? @relation("SavedViewUser", fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, entity])
 }
