@@ -31,10 +31,11 @@ export default async function ClientsPage({ params, searchParams }: Props) {
   const q = searchParams.q as string | undefined
   const sort = (searchParams.sort as "name" | "recent" | undefined) ?? "name"
   const selectedClientId = searchParams.client as string | undefined
+  const cursor = searchParams.cursor as string | undefined
 
-  const [clients, pipeline, members, channels, equipmentHierarchy, statuses, settings] =
+  const [{ items: clients, nextCursor }, pipeline, members, channels, equipmentHierarchy, statuses, settings] =
     await Promise.all([
-      listClients(tenantId, { search: q, sort }),
+      listClients(tenantId, { search: q, sort, cursor }),
       withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
       getTenantMembers(tenantId),
       getCatalogItems(tenantId, "salesChannel", { activeOnly: true }),
@@ -114,6 +115,7 @@ export default async function ClientsPage({ params, searchParams }: Props) {
         tenantSlug={tenantSlug}
         clients={clients}
         selectedClientId={selectedClientId}
+        nextCursor={nextCursor}
       />
       {profileContent}
     </div>

@@ -12,9 +12,15 @@ interface ClientSidebarProps {
   tenantSlug: string
   clients: ClientWithDealCount[]
   selectedClientId?: string
+  nextCursor: string | null
 }
 
-export function ClientSidebar({ tenantSlug, clients, selectedClientId }: ClientSidebarProps) {
+export function ClientSidebar({
+  tenantSlug,
+  clients,
+  selectedClientId,
+  nextCursor,
+}: ClientSidebarProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [search, setSearch] = useState(searchParams.get("q") ?? "")
@@ -32,11 +38,22 @@ export function ClientSidebar({ tenantSlug, clients, selectedClientId }: ClientS
     [router, tenantSlug]
   )
 
-  // Debounce search
+  function loadMore() {
+    if (!nextCursor) return
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("cursor", nextCursor)
+    router.push(`/app/${tenantSlug}/clients?${params.toString()}`)
+  }
+
+  // Debounce search/sort. Only push when the value actually changed from the URL,
+  // so the mount-time run doesn't strip an active `cursor` (load-more) param.
   useEffect(() => {
+    const urlSearch = searchParams.get("q") ?? ""
+    const urlSort = (searchParams.get("sort") as "name" | "recent") ?? "name"
+    if (search === urlSearch && sort === urlSort) return
     const t = setTimeout(() => pushParams(search, sort), 300)
     return () => clearTimeout(t)
-  }, [search, sort, pushParams])
+  }, [search, sort, pushParams, searchParams])
 
   const alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".split("")
 
@@ -148,6 +165,20 @@ export function ClientSidebar({ tenantSlug, clients, selectedClientId }: ClientS
             </div>
           )
         })}
+
+        {/* Load more (cursor pagination) */}
+        {nextCursor && (
+          <div className="p-3">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 w-full text-xs"
+              onClick={loadMore}
+            >
+              Cargar más
+            </Button>
+          </div>
+        )}
       </div>
     </aside>
   )

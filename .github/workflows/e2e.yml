@@ -13,27 +13,38 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:15-alpine
         env:
-          POSTGRES_DB: koi_crm
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: koicrm
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d koicrm"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/koi_crm
-      DATABASE_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/koi_crm
-      NEXTAUTH_SECRET: e2e-test-secret-32-chars-minimum-ok
-      NEXTAUTH_URL: http://localhost:3000
+      # App connects as app_user (RLS active); migrations/seed use admin_user (BYPASSRLS).
+      DATABASE_URL: postgresql://app_user:app_pass@localhost:5432/koicrm
+      DATABASE_ADMIN_URL: postgresql://admin_user:admin_pass@localhost:5432/koicrm
+      DATABASE_SET_ROLE: app_user
+      AUTH_SECRET: e2e-test-secret-32-chars-minimum-ok
+      AUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
       PLAYWRIGHT_BASE_URL: http://localhost:3000
       RESEND_API_KEY: re_placeholder_not_used_in_e2e
-      NODE_ENV: production
+      # Storage isn't exercised by the e2e suite; placeholders satisfy the startup env check.
+      S3_ENDPOINT: http://localhost:9000
+      S3_BUCKET: e2e-bucket
+      S3_ACCESS_KEY_ID: e2e-key
+      S3_SECRET_ACCESS_KEY: e2e-secret
+      S3_REGION: auto
+      S3_PUBLIC_URL: http://localhost:9000/e2e-bucket
+      # NODE_ENV is intentionally unset: `next build`/`next start` force production
+      # internally, while `seed:demo` refuses to run when NODE_ENV=production.
 
     steps:
       - uses: actions/checkout@v4
@@ -50,8 +61,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Apply DB init script (creates app_user / admin_user roles)
+        run: |
+          PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d koicrm \
+            -f docker/init.sql
+
       - name: Run migrations
         run: pnpm exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ env.DATABASE_ADMIN_URL }}
 
       - name: Seed demo tenant
         run: pnpm seed:demo
@@ -63,7 +81,7 @@ jobs:
         run: pnpm start &
 
       - name: Wait for server to be ready
-        run: npx wait-on http://localhost:3000 --timeout 30000
+        run: npx wait-on http://localhost:3000 --timeout 60000
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium

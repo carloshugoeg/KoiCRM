@@ -1,5 +1,6 @@
 "use server"
 
+import * as Sentry from "@sentry/nextjs"
 import { z } from "zod"
 import { prisma } from "@/lib/db/client"
 import { auth } from "@/lib/auth/auth"
@@ -47,7 +48,7 @@ export async function createTenantAction(
     if (message.includes("Unknown industry")) {
       return { ok: false, error: "Industria no válida." }
     }
-    console.error("[createTenantAction]", err)
+    Sentry.captureException(err)
     if (process.env.NODE_ENV === "development" && message) {
       return { ok: false, error: message.slice(0, 300) }
     }

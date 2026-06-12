@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs"
 import { prisma } from "@/lib/db/client"
 
 export async function rateLimit(key: string, max: number, windowMs: number): Promise<boolean> {
@@ -21,8 +22,9 @@ export async function rateLimit(key: string, max: number, windowMs: number): Pro
       RETURNING count
     `
     return (rows[0]?.count ?? 1) <= max
-  } catch {
+  } catch (e) {
     // Fail open: if DB is unavailable, don't block legitimate users
+    Sentry.captureException(e)
     return true
   }
 }

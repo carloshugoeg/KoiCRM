@@ -121,6 +121,8 @@ function DealDetailModalContent({
   const router = useRouter()
   const { guard } = useActionPin()
   const [activities, setActivities] = useState<ActivityEntry[]>([])
+  const [activityCursor, setActivityCursor] = useState<string | null>(null)
+  const [loadingMoreAct, setLoadingMoreAct] = useState(false)
   const [followUps, setFollowUps] = useState<FollowUpRow[]>([])
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
@@ -151,7 +153,8 @@ function DealDetailModalContent({
       getQuotesForDealAction(tenantId, deal.id),
       getPaymentsForDealAction(tenantId, deal.id),
     ]).then(([acts, fus, qs, ps]) => {
-      setActivities(acts)
+      setActivities(acts.items)
+      setActivityCursor(acts.nextCursor)
       setFollowUps(fus)
       setQuotes(qs)
       setPayments(ps)
@@ -167,8 +170,21 @@ function DealDetailModalContent({
     ])
     setQuotes(qs)
     setPayments(ps)
-    setActivities(acts)
+    setActivities(acts.items)
+    setActivityCursor(acts.nextCursor)
     router.refresh()
+  }
+
+  async function handleLoadMoreActivity() {
+    if (loadingMoreAct || !activityCursor) return
+    setLoadingMoreAct(true)
+    try {
+      const { items, nextCursor } = await getDealActivityAction(tenantId, deal.id, activityCursor)
+      setActivities((prev) => [...prev, ...items])
+      setActivityCursor(nextCursor)
+    } finally {
+      setLoadingMoreAct(false)
+    }
   }
 
   async function saveField(field: string, value: string | number) {
@@ -813,7 +829,22 @@ function DealDetailModalContent({
             {loadingAct ? (
               <p className="text-xs text-muted-foreground">Cargando...</p>
             ) : (
-              <HistoryPanel activities={activities} settings={settings} />
+              <>
+                <HistoryPanel activities={activities} settings={settings} />
+                {activityCursor && (
+                  <div className="mt-3 flex justify-center">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={handleLoadMoreActivity}
+                      disabled={loadingMoreAct}
+                    >
+                      {loadingMoreAct ? "Cargando..." : "Cargar más"}
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
             </div>
           </ScrollArea>

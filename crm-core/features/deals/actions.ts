@@ -513,11 +513,11 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
   }
 }
 
-export async function getDealActivityAction(tenantId: string, dealId: string) {
+export async function getDealActivityAction(tenantId: string, dealId: string, cursor?: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error("No autenticado.")
   await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"])
-  return getDealActivity(tenantId, dealId)
+  return getDealActivity(tenantId, dealId, cursor)
 }
 
 export async function getDealFollowUpsAction(tenantId: string, dealId: string) {

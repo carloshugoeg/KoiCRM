@@ -10,7 +10,12 @@ const REQUIRED_ENV = [
   "S3_PUBLIC_URL",
 ] as const;
 
-if (process.env.NODE_ENV === "production") {
+// Next.js evaluates route modules during `next build` (page-data collection) where
+// runtime secrets are intentionally absent — a hard throw there breaks the build (and
+// Vercel deploys). Validate only when the server is actually serving, not while building.
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+
+if (process.env.NODE_ENV === "production" && !isBuildPhase) {
   const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
   if (missing.length > 0) {
     throw new Error(

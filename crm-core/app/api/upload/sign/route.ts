@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/client";
 import { withTenant } from "@/lib/db/rls";
+import { rateLimit } from "@/lib/auth/rate-limit";
 import { signUploadUrl } from "@/lib/storage/s3";
 import { dealIdSchema } from "@/lib/schemas/deal-id";
 import { extensionForMime, isDealUploadMimeType } from "@/lib/storage/upload-mime";
@@ -20,6 +21,10 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!(await rateLimit(`upload:${session.user.id}`, 60, 60_000))) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   }
 
   const body = await req.json().catch(() => null);
@@ -75,7 +80,13 @@ export async function POST(req: NextRequest) {
 
   const ext = extensionForMime(contentType);
   const key = `${tenantId}/deals/${dealId}/${randomUUID()}.${ext}`;
-  const { signedUrl, publicUrl } = await signUploadUrl(key, contentType, size);
+  let signed;
+  try {
+    signed = await signUploadUrl(key, contentType, size);
+  } catch {
+    return NextResponse.json({ error: "storage_unavailable" }, { status: 503 });
+  }
+  const { signedUrl, publicUrl } = signed;
 
   return NextResponse.json({ signedUrl, key, publicUrl });
 }

@@ -69,16 +69,16 @@ describe("Client CRUD + detect-or-create", () => {
     await prismaAdmin.client.create({
       data: { tenantId, name: "Búsqueda Test", company: "ABC" },
     })
-    const results = await listClients(tenantId, { search: "Búsqueda" })
-    expect(results.some((c) => c.name === "Búsqueda Test")).toBe(true)
+    const { items } = await listClients(tenantId, { search: "Búsqueda" })
+    expect(items.some((c) => c.name === "Búsqueda Test")).toBe(true)
   })
 
   it("listClients filters by search term (phone)", async () => {
     await prismaAdmin.client.create({
       data: { tenantId, name: "Telefono Test", phone: "5555-1234" },
     })
-    const results = await listClients(tenantId, { search: "5555-1234" })
-    expect(results.some((c) => c.phone === "5555-1234")).toBe(true)
+    const { items } = await listClients(tenantId, { search: "5555-1234" })
+    expect(items.some((c) => c.phone === "5555-1234")).toBe(true)
   })
 
   it("getClientKpis returns correct counts", async () => {
