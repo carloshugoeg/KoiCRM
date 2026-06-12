@@ -1,4 +1,6 @@
 name: CI
+# NOTE: GitHub Actions only runs workflows under the repository-root .github/workflows/.
+# This file lives at the root (not crm-core/.github/workflows/) so it actually executes.
 on:
   push:
     branches: ["main", "master"]
@@ -22,10 +24,10 @@ jobs:
           cache-dependency-path: crm-core/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm type-check
-      - run: pnpm lint:check
+      - run: pnpm lint
       - run: pnpm test
 
-  e2e:
+  integration:
     runs-on: ubuntu-latest
     needs: ci
     defaults:
@@ -48,6 +50,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://app_user:app_pass@localhost:5434/koicrm
       DATABASE_ADMIN_URL: postgresql://admin_user:admin_pass@localhost:5434/koicrm
+      # Exercise the same RLS-hardening path as local: withTenant() runs
+      # `SET LOCAL ROLE app_user`, which requires GRANT app_user TO admin_user (docker/init.sql).
+      DATABASE_SET_ROLE: app_user
       AUTH_SECRET: ci-test-secret-not-for-production
       AUTH_URL: http://localhost:3000
       RESEND_API_KEY: re_ci_placeholder
@@ -78,11 +83,5 @@ jobs:
         run: pnpm exec prisma migrate deploy
         env:
           DATABASE_URL: ${{ env.DATABASE_ADMIN_URL }}
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Build app
-        run: pnpm build
-      - name: Run E2E tests
-        run: pnpm test:e2e
-        env:
-          PLAYWRIGHT_BASE_URL: http://localhost:3000
+      - name: Run integration tests
+        run: pnpm test:integration
