@@ -110,7 +110,7 @@ describe("T2.2 — Business schema", () => {
         statusKey: "active",
         name: "Instalación Bomba",
         value: 5000,
-        equipment: { create: [{ equipmentKey: "bomba" }] },
+        equipment: { create: [{ categoryKey: "bombas", subcategoryKey: "bombas__sumergible" }] },
         quotes: {
           create: [{ tenantId, number: "COT-001", date: new Date() }],
         },

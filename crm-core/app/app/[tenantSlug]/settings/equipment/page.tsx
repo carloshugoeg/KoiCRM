@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
 import { canManageSettings } from "@/lib/auth/rbac"
-import { getCatalogItems } from "@/features/catalogs/queries"
+import { getEquipmentHierarchy } from "@/features/catalogs/queries"
 import { EquipmentSettings } from "@/features/catalogs/components/equipment-settings"
 
 interface Props {
@@ -17,12 +17,12 @@ export default async function EquipmentSettingsPage({ params }: Props) {
   if (!resolved) notFound()
 
   const { tenant, membership } = resolved
-  const items = await getCatalogItems(tenant.id, "equipment")
+  const categories = await getEquipmentHierarchy(tenant.id)
 
   return (
     <EquipmentSettings
       tenant={tenant}
-      items={items}
+      categories={categories}
       canManage={canManageSettings(membership.role)}
     />
   )

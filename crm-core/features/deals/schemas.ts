@@ -6,6 +6,25 @@ const WA_RE = /^\+502 \d{4}-\d{4}$/
 /** Optional 4-digit action PIN sent on retry to identify the author of a sensitive write. */
 const pinField = z.string().regex(/^\d{4}$/, "El PIN debe tener 4 dígitos.").optional()
 
+/**
+ * Equipo de interés selection: one entry per chosen categoría, each carrying the subcategorías
+ * picked from it. The OBLIGATORY rule (≥1 categoría with ≥1 subcategoría) is enforced by the
+ * refinements on each deal schema.
+ */
+export const equipmentSelectionSchema = z.array(
+  z.object({
+    categoryKey: z.string().min(1),
+    subcategoryKeys: z.array(z.string().min(1)),
+  }),
+)
+
+/** True when at least one categoría carries at least one subcategoría. */
+function hasAtLeastOneSubcategory(groups: { subcategoryKeys: string[] }[]): boolean {
+  return groups.some((g) => g.subcategoryKeys.length > 0)
+}
+
+const EQUIPMENT_REQUIRED_MSG = "Selecciona al menos una categoría con una subcategoría."
+
 export const createDealSchema = z
   .object({
     tenantId: z.string().min(1),
@@ -22,18 +41,17 @@ export const createDealSchema = z
       .nullable()
       .or(z.literal("")),
     email: z.string().email("Email inválido.").optional().nullable().or(z.literal("")),
-    equipment: z.array(z.string()).default([]),
-    equipmentCustom: z.string().max(300).optional().nullable(),
+    equipment: equipmentSelectionSchema.default([]),
     value: z.coerce.number().min(0).default(0),
     statusKey: z.string().min(1).default("activo"),
     customData: z.record(z.string(), z.unknown()).optional(),
     clientId: z.string().optional(),
     pin: pinField,
   })
-  .refine(
-    (d) => d.equipment.length > 0 || (d.equipmentCustom?.trim() ?? "").length > 0,
-    { message: "Selecciona al menos un equipo o escribe uno personalizado." }
-  )
+  .refine((d) => hasAtLeastOneSubcategory(d.equipment), {
+    message: EQUIPMENT_REQUIRED_MSG,
+    path: ["equipment"],
+  })
 
 export const updateDealSchema = z.object({
   tenantId: z.string().min(1),
@@ -56,12 +74,16 @@ export const updateDealSchema = z.object({
     .nullable()
     .or(z.literal("")),
   email: z.string().email().optional().nullable().or(z.literal("")),
-  equipment: z.array(z.string()).optional(),
-  equipmentCustom: z.string().max(300).optional().nullable(),
+  equipment: equipmentSelectionSchema.optional(),
   value: z.coerce.number().min(0).optional(),
   statusKey: z.string().min(1).optional(),
   customData: z.record(z.string(), z.unknown()).optional(),
   pin: pinField,
+}).superRefine((d, ctx) => {
+  // When equipment is being edited it must keep at least one categoría → subcategoría (OBLIGATORY).
+  if (d.equipment !== undefined && !hasAtLeastOneSubcategory(d.equipment)) {
+    ctx.addIssue({ code: "custom", message: EQUIPMENT_REQUIRED_MSG, path: ["equipment"] })
+  }
 })
 
 export const moveDealSchema = z.object({

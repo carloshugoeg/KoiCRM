@@ -125,6 +125,22 @@ const CATALOG_ITEMS = [
   { catalogKey: "dealStatus", key: "urgente", label: "Urgente", color: "#ef4444", order: 4 },
 ];
 
+// Equipo de interés taxonomy: categorías → subcategorías (subcategoría key = "<cat>__<sub>").
+// Always includes the default "Otros" categoría so a lead can always be classified.
+const EQUIPMENT = [
+  { key: "bombas", label: "Bombas", subs: [
+    { key: "bombas__sumergible", label: "Bomba sumergible" },
+    { key: "bombas__centrifuga", label: "Bomba centrífuga" },
+  ] },
+  { key: "filtros", label: "Filtros", subs: [
+    { key: "filtros__arena", label: "Filtro de arena" },
+    { key: "filtros__cartucho", label: "Filtro de cartucho" },
+  ] },
+  { key: "otros", label: "Otros", subs: [
+    { key: "otros__otros", label: "Otros" },
+  ] },
+];
+
 // ─── CLI arg parsing ──────────────────────────────────────────────────────────
 function getArg(flag: string): string | undefined {
   const idx = process.argv.indexOf(flag);
@@ -211,6 +227,23 @@ async function main() {
   await prisma.catalogItem.createMany({
     data: CATALOG_ITEMS.map((c) => ({ tenantId: tenant.id, ...c })),
   });
+
+  // Equipo de interés taxonomy: create each categoría, then nest its subcategorías under it.
+  for (const [order, cat] of EQUIPMENT.entries()) {
+    const created = await prisma.catalogItem.create({
+      data: { tenantId: tenant.id, catalogKey: "equipment", key: cat.key, label: cat.label, order },
+    });
+    await prisma.catalogItem.createMany({
+      data: cat.subs.map((s, idx) => ({
+        tenantId: tenant.id,
+        catalogKey: "equipment",
+        key: s.key,
+        label: s.label,
+        order: idx,
+        parentId: created.id,
+      })),
+    });
+  }
 
   // ── 4. TenantSettings
   const prefix = dealPrefix ?? tenantSlug.slice(0, 3).toUpperCase();

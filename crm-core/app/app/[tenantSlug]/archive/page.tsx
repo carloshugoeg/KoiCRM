@@ -54,7 +54,7 @@ export default async function ArchivePage({ params, searchParams }: Props) {
     statusKey: d.statusKey,
     ownerName: d.owner.name,
     ownerId: d.ownerId,
-    equipment: [] as { equipmentKey: string; customLabel: string | null }[],
+    equipment: [] as { categoryKey: string; subcategoryKey: string }[],
     createdAt: d.createdAt.toISOString(),
     stageEnteredAt: d.stageEnteredAt.toISOString(),
     quoteCount: 0,

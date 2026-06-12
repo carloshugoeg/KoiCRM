@@ -31,7 +31,8 @@ export default async function PipelinePage({ params, searchParams }: Props) {
   const rawParams = {
     owner: searchParams.owner as string | undefined,
     channel: searchParams.channel as string | undefined,
-    equipment: searchParams.equipment as string | undefined,
+    equipmentCategory: searchParams.equipmentCategory as string | undefined,
+    equipmentSubcategory: searchParams.equipmentSubcategory as string | undefined,
     alerts: searchParams.alerts as string | undefined,
     from: searchParams.from as string | undefined,
     to: searchParams.to as string | undefined,
@@ -40,11 +41,12 @@ export default async function PipelinePage({ params, searchParams }: Props) {
   const cookieStore = cookies()
   const includeArchived = readShowArchivedFromCookieHeader(cookieStore.toString())
 
-  const { pipeline, members, channels, equipment, statuses, settings, deals } =
+  const { pipeline, members, channels, equipmentHierarchy, statuses, settings, deals } =
     await loadPipelineKanbanData(tenantId, {
       ownerId: filters.owner,
       channelKey: filters.channel,
-      equipmentKey: filters.equipment,
+      equipmentCategoryKey: filters.equipmentCategory,
+      equipmentSubcategoryKey: filters.equipmentSubcategory,
       alerts: filters.alerts,
       from: filters.from ? new Date(filters.from) : undefined,
       to: filters.to ? new Date(filters.to) : undefined,
@@ -66,7 +68,13 @@ export default async function PipelinePage({ params, searchParams }: Props) {
   }
 
   const channelByKey = Object.fromEntries(channels.map((c) => [c.key, c.label]))
-  const equipmentLabels = Object.fromEntries(equipment.map((e) => [e.key, e.label]))
+  // Flat key→label across both levels (categorías + subcategorías) for cards, print, and summaries.
+  const equipmentLabels = Object.fromEntries(
+    equipmentHierarchy.flatMap((h) => [
+      [h.category.key, h.category.label] as const,
+      ...h.subcategories.map((s) => [s.key, s.label] as const),
+    ]),
+  )
 
   const filterParts: string[] = []
   if (filters.owner) {
@@ -76,8 +84,11 @@ export default async function PipelinePage({ params, searchParams }: Props) {
   if (filters.channel) {
     filterParts.push(`Origen: ${channelByKey[filters.channel] ?? filters.channel}`)
   }
-  if (filters.equipment) {
-    filterParts.push(`Equipo: ${equipmentLabels[filters.equipment] ?? filters.equipment}`)
+  if (filters.equipmentCategory) {
+    filterParts.push(`Categoría: ${equipmentLabels[filters.equipmentCategory] ?? filters.equipmentCategory}`)
+  }
+  if (filters.equipmentSubcategory) {
+    filterParts.push(`Subcategoría: ${equipmentLabels[filters.equipmentSubcategory] ?? filters.equipmentSubcategory}`)
   }
   if (filters.alerts === "missingQuote") filterParts.push("Alerta: sin cotización")
   if (filters.alerts === "missingPayment") filterParts.push("Alerta: sin pago")
@@ -143,7 +154,7 @@ export default async function PipelinePage({ params, searchParams }: Props) {
           deals={serializedDeals}
           members={memberList}
           channels={channels}
-          equipment={equipment}
+          equipmentHierarchy={equipmentHierarchy}
           statuses={statuses}
           currentFilters={filters}
           intlSettings={intlSettings}

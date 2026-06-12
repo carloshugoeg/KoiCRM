@@ -18,6 +18,8 @@ export interface CatalogItemConfig {
   label: string
   color?: string
   order: number
+  /** For the equipment catalog, the subcategorías nested under this categoría (keys namespaced). */
+  children?: { key: string; label: string; order: number }[]
 }
 
 export interface SettingsConfig {
@@ -59,15 +61,34 @@ const AQUASISTEMAS: IndustryConfig = {
     { key: "perdido",     label: "Perdido",          color: "#ef4444", iconKey: "x-circle",     order: 5, locked: true },
   ],
   catalogItems: [
-    // Equipment (8)
-    { catalogKey: "equipment", key: "bomba",            label: "Bomba",            order: 0 },
-    { catalogKey: "equipment", key: "jacuzzi",          label: "Jacuzzi",          order: 1 },
-    { catalogKey: "equipment", key: "sauna",            label: "Sauna",            order: 2 },
-    { catalogKey: "equipment", key: "calentador",       label: "Calentador",       order: 3 },
-    { catalogKey: "equipment", key: "filtro",           label: "Filtro",           order: 4 },
-    { catalogKey: "equipment", key: "hidrojet",         label: "Hidrojet",         order: 5 },
-    { catalogKey: "equipment", key: "servicio_tecnico", label: "Servicio Técnico", order: 6 },
-    { catalogKey: "equipment", key: "iluminacion",      label: "Iluminación",      order: 7 },
+    // Equipo de interés — categorías con subcategorías (subcategoría key = "<cat>__<sub>").
+    { catalogKey: "equipment", key: "bombas", label: "Bombas", order: 0, children: [
+      { key: "bombas__sumergible", label: "Bomba sumergible", order: 0 },
+      { key: "bombas__centrifuga", label: "Bomba centrífuga", order: 1 },
+    ] },
+    { catalogKey: "equipment", key: "filtros", label: "Filtros", order: 1, children: [
+      { key: "filtros__arena", label: "Filtro de arena", order: 0 },
+      { key: "filtros__cartucho", label: "Filtro de cartucho", order: 1 },
+    ] },
+    { catalogKey: "equipment", key: "calentadores", label: "Calentadores", order: 2, children: [
+      { key: "calentadores__electrico", label: "Calentador eléctrico", order: 0 },
+      { key: "calentadores__gas", label: "Calentador de gas", order: 1 },
+    ] },
+    { catalogKey: "equipment", key: "spa_sauna", label: "Spa y sauna", order: 3, children: [
+      { key: "spa_sauna__jacuzzi", label: "Jacuzzi", order: 0 },
+      { key: "spa_sauna__sauna", label: "Sauna", order: 1 },
+      { key: "spa_sauna__hidrojet", label: "Hidrojet", order: 2 },
+    ] },
+    { catalogKey: "equipment", key: "iluminacion", label: "Iluminación", order: 4, children: [
+      { key: "iluminacion__led", label: "Iluminación LED", order: 0 },
+    ] },
+    { catalogKey: "equipment", key: "servicio_tecnico", label: "Servicio técnico", order: 5, children: [
+      { key: "servicio_tecnico__mantenimiento", label: "Mantenimiento", order: 0 },
+      { key: "servicio_tecnico__reparacion", label: "Reparación", order: 1 },
+    ] },
+    { catalogKey: "equipment", key: "otros", label: "Otros", order: 6, children: [
+      { key: "otros__otros", label: "Otros", order: 0 },
+    ] },
     // Sales channels (5)
     { catalogKey: "salesChannel", key: "sala",      label: "Sala",      color: "#6366f1", order: 0 },
     { catalogKey: "salesChannel", key: "telefono",  label: "Teléfono",  color: "#f59e0b", order: 1 },
@@ -128,6 +149,13 @@ const GENERIC: IndustryConfig = {
     { key: "perdido", label: "Perdido", color: "#ef4444", iconKey: "x-circle", order: 5, locked: true },
   ],
   catalogItems: [
+    // Equipo de interés — every tenant needs at least one categoría → subcategoría (OBLIGATORY).
+    { catalogKey: "equipment", key: "general", label: "General", order: 0, children: [
+      { key: "general__general", label: "General", order: 0 },
+    ] },
+    { catalogKey: "equipment", key: "otros", label: "Otros", order: 1, children: [
+      { key: "otros__otros", label: "Otros", order: 0 },
+    ] },
     { catalogKey: "salesChannel", key: "sala", label: "Sala", color: "#6366f1", order: 0 },
     { catalogKey: "salesChannel", key: "telefono", label: "Teléfono", color: "#f59e0b", order: 1 },
     { catalogKey: "salesChannel", key: "whatsapp", label: "WhatsApp", color: "#22c55e", order: 2 },
@@ -196,17 +224,31 @@ export async function applyIndustryTemplate(
     },
   })
 
-  if (config.catalogItems.length > 0) {
-    await tx.catalogItem.createMany({
-      data: config.catalogItems.map((c) => ({
+  for (const c of config.catalogItems) {
+    // Categorías with children create the parent first to get its id, then nest subcategorías.
+    const created = await tx.catalogItem.create({
+      data: {
         tenantId,
         catalogKey: c.catalogKey,
         key: c.key,
         label: c.label,
         color: c.color ?? null,
         order: c.order,
-      })),
+      },
     })
+    if (c.children?.length) {
+      await tx.catalogItem.createMany({
+        data: c.children.map((ch) => ({
+          tenantId,
+          catalogKey: c.catalogKey,
+          key: ch.key,
+          label: ch.label,
+          color: null,
+          order: ch.order,
+          parentId: created.id,
+        })),
+      })
+    }
   }
 
   await tx.tenantSettings.upsert({

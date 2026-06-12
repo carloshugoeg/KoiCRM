@@ -48,8 +48,13 @@ export async function getPipelineKpis(tenantId: string, filters: PipelineFilters
       ...(filters.to ? { lte: filters.to } : {}),
     }
   }
-  if (filters.equipmentKey) {
-    baseWhere.equipment = { some: { equipmentKey: filters.equipmentKey } }
+  if (filters.equipmentCategoryKey || filters.equipmentSubcategoryKey) {
+    baseWhere.equipment = {
+      some: {
+        ...(filters.equipmentCategoryKey ? { categoryKey: filters.equipmentCategoryKey } : {}),
+        ...(filters.equipmentSubcategoryKey ? { subcategoryKey: filters.equipmentSubcategoryKey } : {}),
+      },
+    }
   }
 
   return withTenant(tenantId, async (tx) => {
@@ -300,11 +305,11 @@ export async function getProductosStats(tenantId: string, filters: StatsFilters)
     const [demandDeals, wonDeals, equipmentCatalog] = await Promise.all([
       tx.deal.findMany({
         where: { ...base, stageId: { notIn: closedIds.length ? closedIds : ["__none__"] } },
-        select: { value: true, equipment: { select: { equipmentKey: true } } },
+        select: { value: true, equipment: { select: { subcategoryKey: true } } },
       }),
       tx.deal.findMany({
         where: { ...base, stageId: { in: wonIds.length ? wonIds : ["__none__"] } },
-        select: { value: true, equipment: { select: { equipmentKey: true } } },
+        select: { value: true, equipment: { select: { subcategoryKey: true } } },
       }),
       tx.catalogItem.findMany({
         where: { tenantId, catalogKey: "equipment" },
@@ -319,18 +324,18 @@ export async function getProductosStats(tenantId: string, filters: StatsFilters)
 
   for (const deal of demandDeals) {
     for (const eq of deal.equipment) {
-      const e = map.get(eq.equipmentKey) ?? { demandCount: 0, soldCount: 0, pendingValue: 0, soldValue: 0 }
+      const e = map.get(eq.subcategoryKey) ?? { demandCount: 0, soldCount: 0, pendingValue: 0, soldValue: 0 }
       e.demandCount++
       e.pendingValue += Number(deal.value)
-      map.set(eq.equipmentKey, e)
+      map.set(eq.subcategoryKey, e)
     }
   }
   for (const deal of wonDeals) {
     for (const eq of deal.equipment) {
-      const e = map.get(eq.equipmentKey) ?? { demandCount: 0, soldCount: 0, pendingValue: 0, soldValue: 0 }
+      const e = map.get(eq.subcategoryKey) ?? { demandCount: 0, soldCount: 0, pendingValue: 0, soldValue: 0 }
       e.soldCount++
       e.soldValue += Number(deal.value)
-      map.set(eq.equipmentKey, e)
+      map.set(eq.subcategoryKey, e)
     }
   }
 

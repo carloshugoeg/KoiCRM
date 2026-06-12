@@ -103,19 +103,32 @@ describe("T9.1 — pipeline and stages", () => {
 // ── Catalog items ─────────────────────────────────────────────────────────────
 
 describe("T9.1 — catalog items", () => {
-  it("equipment catalog has exactly 8 items with correct keys", async () => {
+  it("equipment catalog is a 2-level taxonomy with the expected categorías", async () => {
     const items = await prismaAdmin.catalogItem.findMany({
       where: { tenantId, catalogKey: "equipment" },
       orderBy: { order: "asc" },
     })
-    expect(items).toHaveLength(8)
-    const keys = items.map((i) => i.key)
+    const categories = items.filter((i) => i.parentId === null)
+    const subcategories = items.filter((i) => i.parentId !== null)
+
+    const catKeys = categories.map((i) => i.key)
     for (const k of [
-      "bomba", "jacuzzi", "sauna", "calentador",
-      "filtro", "hidrojet", "servicio_tecnico", "iluminacion",
+      "bombas", "filtros", "calentadores", "spa_sauna",
+      "iluminacion", "servicio_tecnico", "otros",
     ]) {
-      expect(keys).toContain(k)
+      expect(catKeys).toContain(k)
     }
+
+    // Every subcategoría points at one of the categorías in the same catalog.
+    expect(subcategories.length).toBeGreaterThan(0)
+    const catIds = new Set(categories.map((c) => c.id))
+    for (const sub of subcategories) {
+      expect(catIds.has(sub.parentId!)).toBe(true)
+    }
+
+    // The default "Otros" categoría always carries an "Otros" subcategoría.
+    const otros = categories.find((c) => c.key === "otros")!
+    expect(subcategories.some((s) => s.parentId === otros.id && s.key === "otros__otros")).toBe(true)
   })
 
   it("salesChannel catalog has exactly 5 items: sala/telefono/whatsapp/facebook/instagram", async () => {

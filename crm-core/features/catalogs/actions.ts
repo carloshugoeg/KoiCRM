@@ -100,7 +100,7 @@ export async function deleteCatalogItemAction(raw: unknown): Promise<{ ok: boole
   )
   if (!item) return { ok: false, error: "Item no encontrado." }
 
-  const usage = await getCatalogItemUsageCount(tenantId, item.catalogKey as CatalogKey, item.key)
+  const usage = await getCatalogItemUsageCount(tenantId, item.catalogKey as CatalogKey, item.key, item.parentId)
   if (usage > 0) {
     return { ok: false, error: `No se puede eliminar: está en uso en ${usage} registro(s).`, usageCount: usage }
   }

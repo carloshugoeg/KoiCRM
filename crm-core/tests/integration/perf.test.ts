@@ -102,7 +102,7 @@ describe("Performance benchmarks", () => {
         statusKey: true,
         createdAt: true,
         stageEnteredAt: true,
-        equipment: { select: { equipmentKey: true, customLabel: true } },
+        equipment: { select: { categoryKey: true, subcategoryKey: true } },
       },
     })
     const elapsed = Date.now() - start

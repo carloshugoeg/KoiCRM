@@ -20,7 +20,9 @@ import { NotesSection } from "@/features/notes/components/NotesSection"
 import { QuoteSection } from "@/features/quotes/components/QuoteSection"
 import { PaymentSection } from "@/features/payments/components/PaymentSection"
 import { DealAttachmentsSection } from "@/features/attachments/components/DealAttachmentsSection"
-import { updateDealFieldAction, moveDealAction, archiveDealAction, transferDealAction, deleteDealAction } from "@/features/deals/actions"
+import { updateDealAction, updateDealFieldAction, moveDealAction, archiveDealAction, transferDealAction, deleteDealAction } from "@/features/deals/actions"
+import { EquipmentSelector, rowsToEquipmentGroups, type EquipmentGroup } from "@/features/deals/components/EquipmentSelector"
+import type { EquipmentCategory } from "@/features/catalogs/queries"
 import { addFollowUpAction, completeFollowUpAction, deleteFollowUpAction } from "@/features/follow-ups/actions"
 import { getDealActivityAction, getDealFollowUpsAction, getQuotesForDealAction, getPaymentsForDealAction } from "@/features/deals/actions"
 import { PinProvider, useActionPin } from "@/features/auth/pin-gate"
@@ -50,7 +52,7 @@ interface DealDetailData {
   createdById?: string | null
   createdByName?: string | null
   createdByImage?: string | null
-  equipment: { equipmentKey: string; customLabel: string | null }[]
+  equipment: { categoryKey: string; subcategoryKey: string }[]
   quoteCount: number
   paymentCount: number
 }
@@ -69,6 +71,8 @@ interface DealDetailModalProps {
   canDelete?: boolean
   /** Team members for the cesión / reassignment selector. */
   members?: { id: string; name: string | null; email: string }[]
+  /** Equipo de interés taxonomy; when provided, equipment becomes inline-editable. */
+  equipmentHierarchy?: EquipmentCategory[]
   onClose: () => void
   onAction?: () => void
 }
@@ -110,6 +114,7 @@ function DealDetailModalContent({
   canArchive = false,
   canDelete = false,
   members = [],
+  equipmentHierarchy,
   onClose,
   onAction,
 }: DealDetailModalProps) {
@@ -129,6 +134,8 @@ function DealDetailModalContent({
   // Inline edit state
   const [editField, setEditField] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
+  const [editEquipment, setEditEquipment] = useState<EquipmentGroup[]>([])
+  const [savingEquipment, setSavingEquipment] = useState(false)
 
   // Follow-up add form
   const [fuDate, setFuDate] = useState("")
@@ -173,6 +180,34 @@ function DealDetailModalContent({
       setEditField(null)
     }
   }
+
+  async function saveEquipment() {
+    const groups = editEquipment.filter((g) => g.subcategoryKeys.length > 0)
+    if (groups.length === 0) {
+      toast.error("Selecciona al menos una categoría con una subcategoría.")
+      return
+    }
+    setSavingEquipment(true)
+    const result = await guard((pin) =>
+      updateDealAction({ tenantId, tenantSlug, dealId: deal.id, equipment: groups, pin }),
+    )
+    setSavingEquipment(false)
+    if (!result.ok) {
+      if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorSave))
+    } else {
+      toast.success(toastMessages.deal.saved, { onAutoClose: () => onAction?.() })
+      setEditField(null)
+    }
+  }
+
+  function categoryLabel(categoryKey: string): string {
+    return equipmentHierarchy?.find((h) => h.category.key === categoryKey)?.category.label ?? categoryKey
+  }
+  function subcategoryLabel(categoryKey: string, subcategoryKey: string): string {
+    const cat = equipmentHierarchy?.find((h) => h.category.key === categoryKey)
+    return cat?.subcategories.find((s) => s.key === subcategoryKey)?.label ?? subcategoryKey
+  }
+  const groupedEquipment = rowsToEquipmentGroups(deal.equipment)
 
   async function handleMove(toStageId: string, force = false) {
     if (moving) return
@@ -424,17 +459,60 @@ function DealDetailModalContent({
               )}
             </div>
 
-            {/* Equipment chips */}
-            {deal.equipment.length > 0 && (
+            {/* Equipo de interés (categoría → subcategorías) */}
+            {(deal.equipment.length > 0 || (canEdit && equipmentHierarchy)) && (
               <div className="mb-3">
-                <p className="text-xs text-muted-foreground mb-1">Equipos</p>
-                <div className="flex flex-wrap gap-1">
-                  {deal.equipment.map((e) => (
-                    <Badge key={e.equipmentKey} variant="secondary" className="text-xs">
-                      {e.equipmentKey === "__custom__" ? e.customLabel : e.equipmentKey}
-                    </Badge>
-                  ))}
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <p className="text-xs text-muted-foreground">Equipo de interés</p>
+                  {canEdit && equipmentHierarchy && editField !== "equipment" && (
+                    <FieldEditButton
+                      label="Editar equipo de interés"
+                      onClick={() => {
+                        setEditField("equipment")
+                        setEditEquipment(rowsToEquipmentGroups(deal.equipment))
+                      }}
+                    />
+                  )}
                 </div>
+                {editField === "equipment" && equipmentHierarchy ? (
+                  <div className="space-y-2">
+                    <EquipmentSelector
+                      hierarchy={equipmentHierarchy}
+                      value={editEquipment}
+                      onChange={setEditEquipment}
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" className="h-7 text-xs" onClick={saveEquipment} disabled={savingEquipment}>
+                        {savingEquipment ? "Guardando…" : "Guardar"}
+                      </Button>
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setEditField(null)}
+                        disabled={savingEquipment}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : deal.equipment.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {groupedEquipment.map((g) => (
+                      <div key={g.categoryKey}>
+                        <p className="text-[11px] font-semibold">{categoryLabel(g.categoryKey)}</p>
+                        <div className="mt-0.5 flex flex-wrap gap-1">
+                          {g.subcategoryKeys.map((s) => (
+                            <Badge key={s} variant="secondary" className="text-xs">
+                              {subcategoryLabel(g.categoryKey, s)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs italic text-muted-foreground">Sin equipo de interés.</p>
+                )}
               </div>
             )}
 

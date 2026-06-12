@@ -4,7 +4,7 @@ import { resolveTenant } from "@/lib/tenant/resolve"
 import { listClients, getClientWithDeals, getClientKpis } from "@/features/clients/queries"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
 import { withTenant } from "@/lib/db/rls"
-import { getCatalogItems } from "@/features/catalogs/queries"
+import { getCatalogItems, getEquipmentHierarchy } from "@/features/catalogs/queries"
 import { getTenantMembers } from "@/features/tenants/queries"
 import { ClientSidebar } from "@/features/clients/components/ClientSidebar"
 import { ClientProfile } from "@/features/clients/components/ClientProfile"
@@ -32,13 +32,13 @@ export default async function ClientsPage({ params, searchParams }: Props) {
   const sort = (searchParams.sort as "name" | "recent" | undefined) ?? "name"
   const selectedClientId = searchParams.client as string | undefined
 
-  const [clients, pipeline, members, channels, equipment, statuses, settings] =
+  const [clients, pipeline, members, channels, equipmentHierarchy, statuses, settings] =
     await Promise.all([
       listClients(tenantId, { search: q, sort }),
       withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
       getTenantMembers(tenantId),
       getCatalogItems(tenantId, "salesChannel", { activeOnly: true }),
-      getCatalogItems(tenantId, "equipment", { activeOnly: true }),
+      getEquipmentHierarchy(tenantId, { activeOnly: true }),
       getCatalogItems(tenantId, "dealStatus", { activeOnly: true }),
       prisma.tenantSettings.findUnique({ where: { tenantId } }),
     ])
@@ -99,7 +99,7 @@ export default async function ClientsPage({ params, searchParams }: Props) {
           stages={stages}
           members={memberList}
           channels={channels}
-          equipment={equipment}
+          equipmentHierarchy={equipmentHierarchy}
           statuses={statuses}
           settings={intlSettings}
           canEdit={canEdit}

@@ -34,15 +34,45 @@ const STAGES = [
   { key: "perdido",     label: "Perdido",        color: "#ef4444", iconKey: "x-circle",     order: 5, locked: true,  requiresQuote: false, requiresPayment: false },
 ]
 
+// Equipo de interés taxonomy: categorías → subcategorías (subcategoría key = "<cat>__<sub>").
+const EQUIPMENT = [
+  { key: "bombas", label: "Bombas", subs: [
+    { key: "bombas__sumergible", label: "Bomba sumergible" },
+    { key: "bombas__centrifuga", label: "Bomba centrífuga" },
+  ] },
+  { key: "filtros", label: "Filtros", subs: [
+    { key: "filtros__arena", label: "Filtro de arena" },
+    { key: "filtros__cartucho", label: "Filtro de cartucho" },
+  ] },
+  { key: "calentadores", label: "Calentadores", subs: [
+    { key: "calentadores__electrico", label: "Calentador eléctrico" },
+    { key: "calentadores__gas", label: "Calentador de gas" },
+  ] },
+  { key: "spa_sauna", label: "Spa y sauna", subs: [
+    { key: "spa_sauna__jacuzzi", label: "Jacuzzi" },
+    { key: "spa_sauna__sauna", label: "Sauna" },
+    { key: "spa_sauna__hidrojet", label: "Hidrojet" },
+  ] },
+  { key: "iluminacion", label: "Iluminación", subs: [
+    { key: "iluminacion__led", label: "Iluminación LED" },
+  ] },
+  { key: "otros", label: "Otros", subs: [
+    { key: "otros__otros", label: "Otros" },
+  ] },
+]
+
+// Maps the demo's legacy flat equipment keys onto (categoría, subcategoría) pairs.
+const EQUIP_PAIR: Record<string, { categoryKey: string; subcategoryKey: string }> = {
+  bomba:       { categoryKey: "bombas",       subcategoryKey: "bombas__sumergible" },
+  jacuzzi:     { categoryKey: "spa_sauna",    subcategoryKey: "spa_sauna__jacuzzi" },
+  sauna:       { categoryKey: "spa_sauna",    subcategoryKey: "spa_sauna__sauna" },
+  calentador:  { categoryKey: "calentadores", subcategoryKey: "calentadores__electrico" },
+  filtro:      { categoryKey: "filtros",      subcategoryKey: "filtros__arena" },
+  hidrojet:    { categoryKey: "spa_sauna",    subcategoryKey: "spa_sauna__hidrojet" },
+  iluminacion: { categoryKey: "iluminacion",  subcategoryKey: "iluminacion__led" },
+}
+
 const CATALOG_ITEMS = [
-  { catalogKey: "equipment",      key: "bomba",            label: "Bomba",            color: null, order: 0 },
-  { catalogKey: "equipment",      key: "jacuzzi",          label: "Jacuzzi",          color: null, order: 1 },
-  { catalogKey: "equipment",      key: "sauna",            label: "Sauna",            color: null, order: 2 },
-  { catalogKey: "equipment",      key: "calentador",       label: "Calentador",       color: null, order: 3 },
-  { catalogKey: "equipment",      key: "filtro",           label: "Filtro",           color: null, order: 4 },
-  { catalogKey: "equipment",      key: "hidrojet",         label: "Hidrojet",         color: null, order: 5 },
-  { catalogKey: "equipment",      key: "servicio_tecnico", label: "Servicio Técnico", color: null, order: 6 },
-  { catalogKey: "equipment",      key: "iluminacion",      label: "Iluminación",      color: null, order: 7 },
   { catalogKey: "salesChannel",   key: "sala",             label: "Sala",             color: "#6366f1", order: 0 },
   { catalogKey: "salesChannel",   key: "telefono",         label: "Teléfono",         color: "#f59e0b", order: 1 },
   { catalogKey: "salesChannel",   key: "whatsapp",         label: "WhatsApp",         color: "#22c55e", order: 2 },
@@ -97,6 +127,23 @@ export async function seedDemo() {
   await prisma.catalogItem.createMany({
     data: CATALOG_ITEMS.map((c) => ({ tenantId: tenant.id, ...c })),
   })
+
+  // Equipo de interés: create each categoría, then nest its subcategorías under it.
+  for (const [order, cat] of EQUIPMENT.entries()) {
+    const created = await prisma.catalogItem.create({
+      data: { tenantId: tenant.id, catalogKey: "equipment", key: cat.key, label: cat.label, order },
+    })
+    await prisma.catalogItem.createMany({
+      data: cat.subs.map((s, idx) => ({
+        tenantId: tenant.id,
+        catalogKey: "equipment",
+        key: s.key,
+        label: s.label,
+        order: idx,
+        parentId: created.id,
+      })),
+    })
+  }
 
   await prisma.tenantSettings.create({
     data: {
@@ -255,7 +302,7 @@ export async function seedDemo() {
           value,
           createdAt: daysAgo(30 - i),
           stageEnteredAt: daysAgo(15 - Math.floor(i / 2)),
-          equipment: { create: [{ equipmentKey: equipKey }] },
+          equipment: { create: [EQUIP_PAIR[equipKey] ?? EQUIP_PAIR.bomba] },
         },
       })
     })
