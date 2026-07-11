@@ -3,14 +3,13 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { useCallback } from "react"
 
-type Preset = "all" | "today" | "week" | "month" | "quarter" | "year"
+type Preset = "all" | "today" | "week" | "month" | "year"
 
 const PRESETS: { key: Preset; label: string }[] = [
   { key: "all", label: "Todo" },
   { key: "today", label: "Hoy" },
   { key: "week", label: "Semana" },
   { key: "month", label: "Mes" },
-  { key: "quarter", label: "Trimestre" },
   { key: "year", label: "Año" },
 ]
 
@@ -40,12 +39,6 @@ function getPresetRange(preset: Preset): { from: string; to: string } | null {
   if (preset === "month") {
     const first = new Date(now.getFullYear(), now.getMonth(), 1)
     const last = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    return { from: toISODate(first), to: toISODate(last) }
-  }
-  if (preset === "quarter") {
-    const q = Math.floor(now.getMonth() / 3)
-    const first = new Date(now.getFullYear(), q * 3, 1)
-    const last = new Date(now.getFullYear(), q * 3 + 3, 0)
     return { from: toISODate(first), to: toISODate(last) }
   }
   if (preset === "year") {
