@@ -18,6 +18,7 @@ export interface DatePickerProps {
   placeholder?: string
   id?: string
   disabled?: boolean
+  "aria-label"?: string
 }
 
 export function DatePicker({
@@ -27,6 +28,7 @@ export function DatePicker({
   placeholder = "dd/mm/aaaa",
   id,
   disabled,
+  "aria-label": ariaLabel,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
   const selected = value ? parse(value, "yyyy-MM-dd", new Date()) : undefined
@@ -40,6 +42,7 @@ export function DatePicker({
           id={id}
           variant="outline"
           disabled={disabled}
+          aria-label={ariaLabel}
           className={cn(
             "h-7 min-w-[7.5rem] justify-start px-2 text-left text-xs font-normal",
             !hasDate && "text-muted-foreground",

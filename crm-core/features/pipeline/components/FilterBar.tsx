@@ -4,11 +4,11 @@ import { useRouter, usePathname } from "next/navigation"
 import { useTransition } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { DatePicker } from "@/components/ui/date-picker"
 import type { CatalogItem } from "@prisma/client"
 import type { EquipmentCategory } from "@/features/catalogs/queries"
 import type { PipelineFiltersParams } from "@/features/pipeline/schemas"
-import { User, Phone, Package, Layers, Bell, Calendar } from "lucide-react"
+import { User, Phone, Package, Layers, Bell } from "lucide-react"
 
 interface FilterBarProps {
   members: { id: string; name: string | null; email: string }[]
@@ -143,24 +143,23 @@ export function FilterBar({ members, channels, equipmentHierarchy, currentFilter
         </SelectContent>
       </Select>
 
-      <div className="flex items-center bg-slate-50 border border-slate-200 rounded-full px-3 h-9 shadow-sm">
-        <Calendar className="w-3.5 h-3.5 opacity-60 mr-2 text-slate-600" />
-        <Input
-          type="date"
-          className={`h-7 text-xs w-28 border-0 bg-transparent px-0 py-0 text-slate-600 focus-visible:ring-0 focus-visible:ring-offset-0${isPending ? " opacity-50" : ""}`}
-          disabled={isPending}
+      <div className="flex items-center gap-1.5">
+        <DatePicker
           value={currentFilters.from ?? ""}
-          onChange={(e) => update("from", e.target.value || undefined)}
-          aria-label="Fecha desde"
-        />
-        <span className="text-xs text-slate-400 mx-2" aria-hidden="true">→</span>
-        <Input
-          type="date"
-          className={`h-7 text-xs w-28 border-0 bg-transparent px-0 py-0 text-slate-600 focus-visible:ring-0 focus-visible:ring-offset-0${isPending ? " opacity-50" : ""}`}
+          onChange={(v) => update("from", v || undefined)}
           disabled={isPending}
+          placeholder="Desde"
+          aria-label="Fecha desde"
+          className={`h-9 min-w-0 w-32 bg-slate-50 border-slate-200 rounded-full text-slate-600 shadow-sm${isPending ? " opacity-50" : ""}`}
+        />
+        <span className="text-xs text-slate-400" aria-hidden="true">→</span>
+        <DatePicker
           value={currentFilters.to ?? ""}
-          onChange={(e) => update("to", e.target.value || undefined)}
+          onChange={(v) => update("to", v || undefined)}
+          disabled={isPending}
+          placeholder="Hasta"
           aria-label="Fecha hasta"
+          className={`h-9 min-w-0 w-32 bg-slate-50 border-slate-200 rounded-full text-slate-600 shadow-sm${isPending ? " opacity-50" : ""}`}
         />
       </div>
 
