@@ -64,7 +64,10 @@ export default async function ResumenPage({ params, searchParams }: Props) {
                 <tr className="border-b bg-muted/50">
                   <th className="px-3 py-2 text-left font-medium text-muted-foreground">#</th>
                   <th className="px-3 py-2 text-left font-medium text-muted-foreground">Asesor</th>
+                  <th className="px-3 py-2 text-right font-medium text-muted-foreground">Deals creados</th>
+                  <th className="px-3 py-2 text-right font-medium text-muted-foreground">Deals en proceso</th>
                   <th className="px-3 py-2 text-right font-medium text-muted-foreground">Deals ganados</th>
+                  <th className="px-3 py-2 text-right font-medium text-muted-foreground">Deals perdidos</th>
                   <th className="px-3 py-2 text-right font-medium text-muted-foreground">Valor ganado</th>
                 </tr>
               </thead>
@@ -73,7 +76,10 @@ export default async function ResumenPage({ params, searchParams }: Props) {
                   <tr key={p.ownerId} className="border-b last:border-0">
                     <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
                     <td className="px-3 py-2 font-medium">{p.ownerName}</td>
+                    <td className="px-3 py-2 text-right">{p.dealsCount}</td>
+                    <td className="px-3 py-2 text-right">{p.openCount}</td>
                     <td className="px-3 py-2 text-right">{p.wonCount}</td>
+                    <td className="px-3 py-2 text-right">{p.lostCount}</td>
                     <td className="px-3 py-2 text-right">{fmt(p.wonValue)}</td>
                   </tr>
                 ))}

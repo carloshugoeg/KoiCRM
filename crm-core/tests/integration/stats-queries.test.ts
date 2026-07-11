@@ -104,6 +104,16 @@ describe("T8.1 — Stats aggregation queries", () => {
     expect(stats.topPerformers.length).toBeGreaterThan(0)
   })
 
+  it("getResumenStats: topPerformers includes per-advisor deal breakdown", async () => {
+    const stats = await getResumenStats(tenantId, {})
+    // userId2 owns deal3 only (won)
+    const a2 = stats.topPerformers.find((p) => p.ownerId === userId2)
+    expect(a2?.dealsCount).toBe(1)
+    expect(a2?.wonCount).toBe(1)
+    expect(a2?.lostCount).toBe(0)
+    expect(a2?.openCount).toBe(0)
+  })
+
   it("getEmbudoStats: returns per-stage counts and values", async () => {
     const stages = await getEmbudoStats(tenantId, {})
     const prospecto = stages.find((s) => s.stageKey === "prospecto")

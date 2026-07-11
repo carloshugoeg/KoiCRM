@@ -89,8 +89,19 @@ export async function getResumenStats(tenantId: string, filters: StatsFilters) {
   const df = dateFilter(filters)
   const ownerFilter = filters.ownerId ? { ownerId: filters.ownerId } : {}
 
-  const { wonIds, lostIds, closedIds, allCount, openSum, wonAgg, lostAgg, topPerformersRaw } =
-    await withTenant(tenantId, async (tx) => {
+  const {
+    wonIds,
+    lostIds,
+    closedIds,
+    allCount,
+    openSum,
+    wonAgg,
+    lostAgg,
+    topPerformersRaw,
+    dealsByOwner,
+    lostByOwner,
+    openByOwner,
+  } = await withTenant(tenantId, async (tx) => {
       const { wonIds, lostIds, closedIds } = await getStageKeysTx(tenantId, tx)
 
       const base: Prisma.DealWhereInput = { tenantId, isArchived: false, ...df, ...ownerFilter }
@@ -113,7 +124,28 @@ export async function getResumenStats(tenantId: string, filters: StatsFilters) {
         }),
       ])
 
-      return { wonIds, lostIds, closedIds, allCount, openSum, wonAgg, lostAgg, topPerformersRaw }
+      const topOwnerIds = topPerformersRaw.map((r) => r.ownerId)
+      const topOwnerFilter = { ownerId: { in: topOwnerIds.length ? topOwnerIds : ["__none__"] } }
+
+      const [dealsByOwner, lostByOwner, openByOwner] = await Promise.all([
+        tx.deal.groupBy({ by: ["ownerId"], where: { ...base, ...topOwnerFilter }, _count: { id: true } }),
+        tx.deal.groupBy({ by: ["ownerId"], where: { ...lostWhere, ...topOwnerFilter }, _count: { id: true } }),
+        tx.deal.groupBy({ by: ["ownerId"], where: { ...openWhere, ...topOwnerFilter }, _count: { id: true } }),
+      ])
+
+      return {
+        wonIds,
+        lostIds,
+        closedIds,
+        allCount,
+        openSum,
+        wonAgg,
+        lostAgg,
+        topPerformersRaw,
+        dealsByOwner,
+        lostByOwner,
+        openByOwner,
+      }
     })
 
   const ownerIds = topPerformersRaw.map((r) => r.ownerId)
@@ -132,6 +164,9 @@ export async function getResumenStats(tenantId: string, filters: StatsFilters) {
       ownerName: u?.name ?? u?.email ?? r.ownerId,
       wonValue: Number(r._sum.value ?? 0),
       wonCount: r._count.id,
+      dealsCount: dealsByOwner.find((a) => a.ownerId === r.ownerId)?._count.id ?? 0,
+      lostCount: lostByOwner.find((a) => a.ownerId === r.ownerId)?._count.id ?? 0,
+      openCount: openByOwner.find((a) => a.ownerId === r.ownerId)?._count.id ?? 0,
     }
   })
 
