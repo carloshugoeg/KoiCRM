@@ -1,5 +1,27 @@
 import { hexToHslComponents, isValidHexColor, primaryForegroundForHex } from "@/lib/utils/color"
 
+/**
+ * Makes a stored background URL safe to interpolate into a CSS `url("…")` inside a
+ * <style> block rendered via dangerouslySetInnerHTML.
+ *
+ * Escaping quotes alone is not enough: a stored value containing `</style>` closes the
+ * element and turns anything after it into live DOM (stored XSS). URL serialization
+ * percent-encodes `<`, `>` and `"` in the path, query and fragment, so returning
+ * `parsed.href` structurally removes every breakout character. Non-http(s) schemes are
+ * rejected outright.
+ */
+export function safeCssBackgroundUrl(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null
+  let parsed: URL
+  try {
+    parsed = new URL(raw.trim())
+  } catch {
+    return null
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null
+  return parsed.href
+}
+
 export function buildCssVars(branding: {
   primaryColor?: string | null
   bgColorLight?: string | null
@@ -33,9 +55,9 @@ export function buildCssVars(branding: {
   if (isValidHexColor(branding.kpiBgColor)) {
     root.push(`--color-kpi-bg: ${hexToHslComponents(branding.kpiBgColor)};`)
   }
-  if (branding.bgImageUrl) {
-    const safe = branding.bgImageUrl.replace(/"/g, "%22")
-    const bg = `url("${safe}") center/cover fixed`
+  const safeBgImageUrl = safeCssBackgroundUrl(branding.bgImageUrl)
+  if (safeBgImageUrl) {
+    const bg = `url("${safeBgImageUrl}") center/cover fixed`
     root.push(`--app-bg: ${bg};`)
     dark.push(`--app-bg: ${bg};`)
   }

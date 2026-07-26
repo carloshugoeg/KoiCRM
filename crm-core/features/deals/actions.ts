@@ -30,7 +30,7 @@ import {
   deleteDealSchema,
 } from "@/features/deals/schemas"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
-import { isActiveCatalogItemKey, isActiveSubcategoryOfCategory } from "@/features/catalogs/queries"
+import { isActiveCatalogItemKeyInTx, isActiveSubcategoryOfCategory } from "@/features/catalogs/queries"
 import type { PrismaTx } from "@/lib/db/rls"
 import { z } from "zod"
 import { getDeal } from "@/features/deals/queries"
@@ -95,7 +95,7 @@ export async function createDealAction(
       })
       if (!ownerMembership) { createError = "El asesor seleccionado no pertenece al equipo."; return }
 
-      const channelValid = await isActiveCatalogItemKey(tenantId, "salesChannel", fields.channelKey)
+      const channelValid = await isActiveCatalogItemKeyInTx(tx, tenantId, "salesChannel", fields.channelKey)
       if (!channelValid) {
         createError = "El origen seleccionado no es válido o está inactivo."
         return
@@ -195,7 +195,7 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
     }
 
     if (fields.channelKey !== undefined) {
-      const channelValid = await isActiveCatalogItemKey(tenantId, "salesChannel", fields.channelKey)
+      const channelValid = await isActiveCatalogItemKeyInTx(tx, tenantId, "salesChannel", fields.channelKey)
       if (!channelValid) {
         validationError = "El origen seleccionado no es válido o está inactivo."
         return
@@ -520,20 +520,32 @@ export async function getDealActivityAction(tenantId: string, dealId: string, cu
   return getDealActivity(tenantId, dealId, cursor)
 }
 
+/**
+ * `tenantId` arrives from the client and is what withTenant() feeds to
+ * set_config('app.tenant_id'), so RLS cannot vouch for it — every reader below must
+ * confirm the caller is actually a member of that tenant first (matches
+ * getDealActivityAction above). Without this a removed member keeps read access to the
+ * workspace they were offboarded from.
+ */
+const DEAL_READER_ROLES = ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"] as const
+
 export async function getDealFollowUpsAction(tenantId: string, dealId: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error("No autenticado.")
+  await requireRole(session, tenantId, [...DEAL_READER_ROLES])
   return getDealFollowUps(tenantId, dealId)
 }
 
 export async function getQuotesForDealAction(tenantId: string, dealId: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error("No autenticado.")
+  await requireRole(session, tenantId, [...DEAL_READER_ROLES])
   return getQuotesForDeal(tenantId, dealId)
 }
 
 export async function getPaymentsForDealAction(tenantId: string, dealId: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error("No autenticado.")
+  await requireRole(session, tenantId, [...DEAL_READER_ROLES])
   return getPaymentsForDeal(tenantId, dealId)
 }

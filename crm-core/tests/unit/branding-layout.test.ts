@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildCssVars } from "@/lib/branding/css-vars"
+import { buildCssVars, safeCssBackgroundUrl } from "@/lib/branding/css-vars"
 import { hexToHslComponents, primaryForegroundForHex } from "@/lib/utils/color"
 
 describe("buildCssVars CSS injection guard", () => {
@@ -24,6 +24,43 @@ describe("buildCssVars CSS injection guard", () => {
   it("valid 6-char hex with uppercase letters passes", () => {
     const result = buildCssVars({ primaryColor: "#AABBCC" })
     expect(result).toContain(`--color-primary: ${hexToHslComponents("#AABBCC")};`)
+  })
+})
+
+describe("bgImageUrl injection guard", () => {
+  // buildCssVars output is rendered with dangerouslySetInnerHTML inside a <style> element,
+  // so a stored value must never be able to emit a literal `</style>` and break out.
+  const breakout = 'https://x.com/#}</style><script>alert(document.cookie)</script>'
+
+  it("never emits a style-element breakout for a crafted url", () => {
+    const result = buildCssVars({ bgImageUrl: breakout })
+    expect(result).not.toContain("</style>")
+    expect(result).not.toContain("<script>")
+    expect(result).toContain("--app-bg: url(")
+  })
+
+  it("rejects non-http(s) schemes", () => {
+    expect(safeCssBackgroundUrl("javascript:alert(1)")).toBeNull()
+    expect(safeCssBackgroundUrl("data:text/html,<script>alert(1)</script>")).toBeNull()
+    expect(buildCssVars({ bgImageUrl: "javascript:alert(1)" })).toBe("")
+  })
+
+  it("rejects values that are not URLs at all", () => {
+    expect(safeCssBackgroundUrl('") ; } body { display: none } .x { --a: url("')).toBeNull()
+    expect(safeCssBackgroundUrl("")).toBeNull()
+    expect(safeCssBackgroundUrl(null)).toBeNull()
+  })
+
+  it("preserves a legitimate image url unchanged", () => {
+    const url = "https://cdn.example.com/bg-1.png?v=2"
+    expect(safeCssBackgroundUrl(url)).toBe(url)
+    expect(buildCssVars({ bgImageUrl: url })).toContain(`url("${url}")`)
+  })
+
+  it("applies the background to both :root and .dark", () => {
+    const result = buildCssVars({ bgImageUrl: "https://cdn.example.com/bg.png" })
+    expect(result).toContain(":root {")
+    expect(result).toContain(".dark {")
   })
 })
 

@@ -6,6 +6,28 @@ import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
 import { requireRole } from "@/lib/auth/rbac"
 
+/**
+ * `z.string().url()` validates but does not normalize, and accepts any scheme
+ * (`javascript:` included). Branding URLs are rendered into an <img src> and into a CSS
+ * `url()` inside a <style> block, so restrict them to http(s) at write time as well.
+ */
+const httpUrl = (max = 500) =>
+  z
+    .string()
+    .url("URL inválida")
+    .max(max)
+    .refine(
+      (v) => {
+        try {
+          const p = new URL(v).protocol
+          return p === "http:" || p === "https:"
+        } catch {
+          return false
+        }
+      },
+      { message: "La URL debe usar http o https." },
+    )
+
 const updateBrandingSchema = z.object({
   tenantId: z.string().min(1),
   tenantSlug: z.string().min(1),
@@ -15,8 +37,8 @@ const updateBrandingSchema = z.object({
   headerBgColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
   kpiBgColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
   productName: z.string().max(50).optional().nullable(),
-  logoUrl: z.string().url("URL inválida").max(500).optional().nullable(),
-  bgImageUrl: z.string().url("URL inválida").max(500).optional().nullable(),
+  logoUrl: httpUrl().optional().nullable(),
+  bgImageUrl: httpUrl().optional().nullable(),
 })
 
 export async function updateBrandingAction(

@@ -40,6 +40,25 @@ export async function recordActivity(tx: PrismaTx, input: RecordActivityInput): 
   })
 }
 
+/**
+ * Batch variant for bulk operations (e.g. reassigning every deal of an offboarded advisor).
+ * One INSERT per row inside a transaction risks exceeding the 20s production timeout once a
+ * member owns a few hundred deals.
+ */
+export async function recordActivities(tx: PrismaTx, inputs: RecordActivityInput[]): Promise<void> {
+  if (inputs.length === 0) return
+  await tx.activity.createMany({
+    data: inputs.map((input) => ({
+      tenantId: input.tenantId,
+      entity: input.entity,
+      entityId: input.entityId,
+      type: input.type,
+      payload: input.payload as Prisma.InputJsonValue,
+      userId: input.userId ?? null,
+    })),
+  })
+}
+
 export async function getDealActivity(tenantId: string, dealId: string, cursor?: string, limit = 50) {
   const where: Prisma.ActivityWhereInput = { tenantId, entity: "Deal", entityId: dealId }
   if (cursor) {
