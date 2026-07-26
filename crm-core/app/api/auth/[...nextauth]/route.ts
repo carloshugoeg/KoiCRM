@@ -1,6 +1,6 @@
 import { handlers } from "@/lib/auth/auth";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { headers } from "next/headers";
+import { getClientIp } from "@/lib/auth/client-ip";
 import type { NextRequest } from "next/server";
 
 export const GET = handlers.GET;
@@ -8,8 +8,8 @@ export const GET = handlers.GET;
 export async function POST(req: NextRequest, ctx: unknown) {
   const url = new URL(req.url);
   if (url.pathname.includes("/callback/credentials")) {
-    const h = await headers();
-    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    // Keyed on a platform-set address, not the caller-appendable x-forwarded-for head.
+    const ip = getClientIp();
     if (!(await rateLimit(`signin:ip:${ip}`, 10, 60_000))) {
       return Response.redirect(new URL("/signin?error=TooManyRequests", req.url));
     }

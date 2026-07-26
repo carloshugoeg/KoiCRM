@@ -37,18 +37,31 @@ export async function getCatalogItems(
   )
 }
 
+/** Validity check inside an existing tenant transaction — shares the caller's RLS connection. */
+export async function isActiveCatalogItemKeyInTx(
+  tx: PrismaTx,
+  tenantId: string,
+  catalogKey: CatalogKey,
+  key: string,
+): Promise<boolean> {
+  const item = await tx.catalogItem.findFirst({
+    where: { tenantId, catalogKey, key, active: true },
+    select: { id: true },
+  })
+  return !!item
+}
+
+/**
+ * Standalone variant — opens its own transaction. Never call this from inside a withTenant()
+ * callback: production runs connection_limit=1, so a nested transaction waits on a connection
+ * the caller is already holding (P2024/P2028). Use isActiveCatalogItemKeyInTx(tx, …) there.
+ */
 export async function isActiveCatalogItemKey(
   tenantId: string,
   catalogKey: CatalogKey,
   key: string,
 ): Promise<boolean> {
-  const item = await withTenant(tenantId, (tx) =>
-    tx.catalogItem.findFirst({
-      where: { tenantId, catalogKey, key, active: true },
-      select: { id: true },
-    }),
-  )
-  return !!item
+  return withTenant(tenantId, (tx) => isActiveCatalogItemKeyInTx(tx, tenantId, catalogKey, key))
 }
 
 /**

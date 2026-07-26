@@ -2,20 +2,15 @@
 
 import { z } from "zod"
 import { Prisma } from "@prisma/client"
-import { headers } from "next/headers"
 import { prisma } from "@/lib/db/client"
+import { getClientIp } from "@/lib/auth/client-ip"
 import { hashActionPin } from "@/lib/auth/action-pin-token"
 import { withPrismaTransaction } from "@/lib/db/rls"
 import { withTenant } from "@/lib/db/rls"
-import { recordActivity } from "@/features/activity/queries"
+import { recordActivities } from "@/features/activity/queries"
 import { hashPassword } from "@/lib/auth/password"
 import { rateLimit } from "@/lib/auth/rate-limit"
 import { auth } from "@/lib/auth/auth"
-
-function getClientIp(): string {
-  const h = headers()
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip") ?? "unknown"
-}
 
 // ─── Signup ──────────────────────────────────────────────────────────────────
 
@@ -209,6 +204,15 @@ export async function adminResetPasswordAction(raw: unknown): Promise<{ ok: bool
 
   if (!caller || !["OWNER", "ADMIN"].includes(caller.role)) return { ok: false, error: "Sin permisos." }
   if (!target) return { ok: false, error: "El usuario no es miembro." }
+  // Resetting a password grants sign-in as that account, so it needs the same target-side
+  // guards as removeMemberAction: nobody may take over the propietario, and only the
+  // propietario may reset another superadministrador.
+  if (target.role === "OWNER" && targetUserId !== session.user.id) {
+    return { ok: false, error: "No puedes restablecer la contraseña del propietario." }
+  }
+  if (target.role === "ADMIN" && caller.role !== "OWNER" && targetUserId !== session.user.id) {
+    return { ok: false, error: "Solo el propietario puede restablecer la contraseña de un administrador." }
+  }
 
   const user = await prisma.user.findUnique({ where: { id: targetUserId }, select: { emailVerified: true } })
   const hashed = await hashPassword(newPassword)
@@ -266,16 +270,18 @@ export async function deactivateMemberAction(raw: unknown): Promise<{ ok: boolea
     const deals = await tx.deal.findMany({ where: { tenantId, ownerId: targetUserId }, select: { id: true } })
     if (deals.length > 0) {
       await tx.deal.updateMany({ where: { tenantId, ownerId: targetUserId }, data: { ownerId: reassignToUserId } })
-      for (const d of deals) {
-        await recordActivity(tx, {
+      // Single INSERT — one per deal used to risk the transaction timeout for heavy advisors.
+      await recordActivities(
+        tx,
+        deals.map((d) => ({
           tenantId,
-          entity: "Deal",
+          entity: "Deal" as const,
           entityId: d.id,
-          type: "ownerChanged",
+          type: "ownerChanged" as const,
           payload: { from: targetUserId, to: reassignToUserId, reason: "deactivation" },
           userId: session.user!.id,
-        })
-      }
+        })),
+      )
     }
   })
 
@@ -337,10 +343,18 @@ export async function setMemberPinAction(raw: unknown): Promise<{ ok: boolean; e
 
   const [caller, target] = await Promise.all([
     prisma.membership.findUnique({ where: { userId_tenantId: { userId: session.user.id, tenantId } }, select: { role: true } }),
-    prisma.membership.findUnique({ where: { userId_tenantId: { userId: targetUserId, tenantId } }, select: { id: true } }),
+    prisma.membership.findUnique({ where: { userId_tenantId: { userId: targetUserId, tenantId } }, select: { id: true, role: true } }),
   ])
   if (!caller || !["OWNER", "ADMIN"].includes(caller.role)) return { ok: false, error: "Sin permisos." }
   if (!target) return { ok: false, error: "El usuario no es miembro." }
+  // The PIN identifies the author of a write and carries that member's role, so reassigning
+  // someone else's PIN is an impersonation vector — guard the target as removeMemberAction does.
+  if (target.role === "OWNER" && targetUserId !== session.user.id) {
+    return { ok: false, error: "No puedes cambiar el PIN del propietario." }
+  }
+  if (target.role === "ADMIN" && caller.role !== "OWNER" && targetUserId !== session.user.id) {
+    return { ok: false, error: "Solo el propietario puede cambiar el PIN de un administrador." }
+  }
 
   try {
     await prisma.membership.update({
@@ -372,11 +386,26 @@ export async function clearMemberPinAction(raw: unknown): Promise<{ ok: boolean;
 
   const { tenantId, targetUserId } = parsed.data
 
-  const caller = await prisma.membership.findUnique({
-    where: { userId_tenantId: { userId: session.user.id, tenantId } },
-    select: { role: true },
-  })
+  // Unlike its siblings this action used to skip the target lookup entirely, so an unknown
+  // targetUserId raised an unhandled P2025 instead of returning the documented error shape.
+  const [caller, target] = await Promise.all([
+    prisma.membership.findUnique({
+      where: { userId_tenantId: { userId: session.user.id, tenantId } },
+      select: { role: true },
+    }),
+    prisma.membership.findUnique({
+      where: { userId_tenantId: { userId: targetUserId, tenantId } },
+      select: { role: true },
+    }),
+  ])
   if (!caller || !["OWNER", "ADMIN"].includes(caller.role)) return { ok: false, error: "Sin permisos." }
+  if (!target) return { ok: false, error: "El usuario no es miembro." }
+  if (target.role === "OWNER" && targetUserId !== session.user.id) {
+    return { ok: false, error: "No puedes quitar el PIN del propietario." }
+  }
+  if (target.role === "ADMIN" && caller.role !== "OWNER" && targetUserId !== session.user.id) {
+    return { ok: false, error: "Solo el propietario puede quitar el PIN de un administrador." }
+  }
 
   await prisma.membership.update({
     where: { userId_tenantId: { userId: targetUserId, tenantId } },

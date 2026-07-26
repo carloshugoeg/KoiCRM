@@ -1,0 +1,406 @@
+# Audit Backlog — open findings
+
+Source: full static audit of `crm-core/` performed 2026-07-26 (33 findings total).
+Six findings were fixed immediately because they were safe to apply to a live system; the
+27 below were deliberately **deferred** and are recorded here so they are not lost.
+
+Each entry keeps its original `FINDING-0xx` id from the audit so cross-references stay stable.
+
+Verification baseline at time of writing: `tsc --noEmit` clean, `next lint` clean,
+`vitest run` 98/98 passing.
+
+---
+
+## Already fixed (do not re-open)
+
+| ID | Severity | Summary | Where |
+|----|----------|---------|-------|
+| FINDING-001 | CRITICAL | Stored XSS via `bgImageUrl` breaking out of the `<style>` block | `lib/branding/css-vars.ts`, `features/branding/actions.ts` |
+| FINDING-002 | CRITICAL | Cross-tenant read — 3 deal getters never checked membership | `features/deals/actions.ts` |
+| FINDING-003 | CRITICAL | ADMIN could reset the OWNER's password / reassign their PIN | `features/users/actions.ts` |
+| FINDING-009 | MEDIUM | Rate limits keyed on spoofable `x-forwarded-for` head | `lib/auth/client-ip.ts` (new) |
+| FINDING-019 | HIGH | N+1 activity INSERTs could exceed the tx timeout on offboarding | `features/activity/queries.ts` |
+| FINDING-020 | MEDIUM | Nested transaction → connection-pool exhaustion at `connection_limit=1` | `features/catalogs/queries.ts` |
+
+---
+
+## Deferred — needs a product decision
+
+### FINDING-004 · HIGH · Security
+**`force` flag is client-controlled and bypasses locked-stage rules**
+`features/deals/actions.ts:268` + `features/deals/schemas.ts:94`
+
+`force: z.boolean().default(false)` arrives in the request body and is the only gate on
+`if (targetStage.locked && !force)`. Any MEMBER can forge `force: true` and move a deal into
+a locked stage. `ganado` is incidentally protected by an independent payment-proof re-check;
+`perdido` and all other locked stages are not.
+
+**Why deferred, not fixed:** `force: true` is sent by the legitimate "Marcar como
+ganado/perdido" buttons in the detail panel (`DealDetailModal.tsx:232` →
+`handleMove(toStageId, force)`). Gating `force` on SUPERVISOR+ would break MEMBER workflows
+that work today. **Decision needed:** which roles may close a deal? Options:
+1. Restrict `force` to `canArchiveDeal` (SUPERVISOR+) — changes who can close deals.
+2. Keep MEMBER access but require an action PIN for forced transitions.
+3. Replace the boolean with explicit intent-named actions (`markWonAction` / `markLostAction`)
+   that carry their own role checks — recommended, removes the client-controlled privilege flag.
+
+### FINDING-010 · MEDIUM · Security
+**The 4-digit PIN is an authorization credential, not just an audit tag**
+`lib/auth/action-pin.ts:133-142`; `lib/auth/session-pin-lock.ts:50-53`
+
+The PIN lookup returns `actorRole`, and deal actions gate capability on it
+(`canDeleteDeal(actorRole)`), so a 4-digit secret is load-bearing for privilege. A MEMBER who
+learns an ADMIN's PIN gains ADMIN deal powers including permanent delete. The 10-attempts /
+5-minute throttle makes exhausting the 10,000-value space slow but not impossible.
+Separately, `sessionLocked` ("modo PIN") lives in a user-deletable cookie — HMAC-signed so
+unforgeable, but clearing it downgrades enforcement to "PIN only for other users' deals".
+
+**Decision needed:** was PIN intended for attribution only? If so, capability should derive
+from the *session* role and the PIN should only stamp authorship. Write this up as an ADR
+either way.
+
+### FINDING-012 · LOW · Security
+**`GET /api/join/accept` mutates state without CSRF protection**
+`app/api/join/accept/route.ts:29`
+
+A `GET` handler calls `prisma.membership.create` with no CSRF token and no per-link use cap;
+links live 90 days and are reusable without limit. The 32-byte token is unguessable, so this
+is not an auth weakness — but a logged-in victim induced to load the URL is silently enrolled
+into an attacker-controlled tenant.
+
+**Why deferred:** converting to POST breaks every join link already distributed. Needs a
+migration path (interstitial confirmation page that POSTs), plus a `maxUses` column decision.
+
+---
+
+## Deferred — needs infrastructure work or a migration
+
+### FINDING-006 · HIGH · Security
+**Production CSP still allows `'unsafe-inline'` for `script-src`**
+`next.config.mjs:8`
+
+Negates most XSS mitigation and was the reason FINDING-001 was exploitable rather than inert.
+The dev/prod split for `'unsafe-eval'` shows the intent was already there.
+
+**Why deferred:** removing `'unsafe-inline'` without a nonce strategy breaks Next.js
+framework inline scripts and would take the app down. Requires nonce propagation through
+`middleware.ts` + `next.config.mjs`. Do this in a preview deployment first.
+
+### FINDING-007 · MEDIUM · Security
+**RLS coverage gaps, and new tables default to unprotected**
+`prisma/migrations/20260502213914_rls/migration.sql` (final block)
+
+Five models carry `tenantId` but have no policy: `Membership`, `Invitation`, `JoinLink`,
+`TenantBranding`, `TenantSettings`. `Membership` is arguably deliberate (cross-tenant reads
+precede tenant context); `TenantSettings` — every storage tier, PIN setting and limit — is
+protected only by application-level `where` clauses.
+
+Worse structurally:
+```sql
+ALTER DEFAULT PRIVILEGES FOR ROLE admin_user IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;
+```
+Future tables get DML automatically but **not** RLS, so the default posture for any new
+tenant-scoped table is cross-tenant readable until someone remembers the policy.
+
+**Suggested work:** (a) add policies for `TenantSettings`, `TenantBranding`, `JoinLink`,
+`Invitation`; (b) add an integration test asserting every `tenantId`-bearing table has
+`relrowsecurity = true`, so the gap can never reappear silently; (c) ADR for the `Membership`
+exemption. Note prod migrations are applied **manually** — see `docs/ops/`.
+
+### FINDING-008 · MEDIUM · Security
+**`SET ROLE app_user` is unreliable for non-transactional queries**
+`lib/db/ensure-app-role.ts:39-46`
+
+Two defects:
+- (a) On the transaction pooler — the documented production config
+  (`:6543?pgbouncer=true&connection_limit=1`, `docs/ops/vercel-github.md:82`) — `SET ROLE
+  app_user` and the following `query(args)` are two separate statements outside any
+  transaction, so pgbouncer may assign them different backends and the query can run as the
+  connection owner.
+- (b) `if (!client) return;` silently no-ops when `registerBasePrismaClient` has not run yet —
+  fails open rather than closed.
+
+`withTenant` / `withPrismaTransaction` are **not** affected (they use `SET LOCAL ROLE` +
+`set_config` inside one pinned transaction and are correct).
+
+**Interaction with FINDING-007:** every bare `prisma.*` query probably runs with owner
+privileges in production, but no isolation is lost *today* only because those tables lack RLS.
+**The two findings mask each other — closing either one alone leaves the gap.** Sequence them
+together.
+
+### FINDING-023 · LOW · Performance
+**`DealEquipment.subcategoryKey` is unindexed**
+`prisma/schema.prisma:324-335`
+
+`@@id([dealId, subcategoryKey])` covers `dealId`-leading lookups and `@@index([categoryKey])`
+covers category filters, but `getCatalogItemUsageCount` queries
+`where: { deal: { tenantId }, subcategoryKey: key }` (`features/catalogs/queries.ts:129`) with
+no usable index → sequential scan. Confined to an admin-only settings screen.
+
+**Why deferred:** needs a migration, and prod migrations are manual. Bundle it with the
+FINDING-007 policy migration to avoid two manual applications.
+
+---
+
+## Deferred — safe but needs care / larger diff
+
+### FINDING-005 · HIGH · Security
+**Storage quota bypass via client-declared size**
+`features/attachments/actions.ts:68-88`
+
+`confirmUpload` validates the key prefix but trusts client-supplied `data.size` for both the
+quota check and `storageUsedBytes: { increment: BigInt(data.size) }`. Declaring `size: 0` for a
+large object stores it while incrementing accounting by zero, making the paid storage tier
+unenforceable. Direct revenue impact.
+
+**Fix:** read the authoritative size from S3 (`HeadObjectCommand`) instead of trusting input.
+**Why deferred:** adds a network call to the upload path; a HEAD failure must not break
+uploads for live users, so it needs a considered failure mode (retry / reconcile job) rather
+than a naive fallback to the declared size, which would preserve the bypass.
+
+### FINDING-011 · MEDIUM · Security
+**Avatar and branding uploads sit outside every guardrail**
+`app/api/upload/avatar/route.ts`, `app/api/upload/branding/route.ts`
+
+Compared with the deal-upload path these have: no `storageUsedBytes` accounting, no rate limit
+(`upload/sign` enforces 60/min), hardcoded size caps (`AVATAR_MAX_BYTES = 2MB`,
+`BRANDING_MAX_BYTES = 5MB`) instead of `TenantSettings.fileSizeMaxBytes`, and no deletion of
+the object being replaced (every re-upload orphans the previous one). Avatar returns the
+proxied `buildMediaUrl(key)` while branding returns the raw bucket `publicUrl`, and
+`{tenantId}/branding/…` is not matched by `isTenantMediaObjectKey`, so branding assets bypass
+the authenticated media proxy.
+
+Note the hardcoded caps also violate the project rule that all limits flow through
+`TenantSettings`.
+
+**Why deferred:** touching quota accounting on live upload paths needs a storage-usage
+reconciliation pass first, otherwise existing untracked objects make `storageUsedBytes` wrong
+the moment enforcement turns on.
+
+### FINDING-013 · LOW · Security
+**Attachment `url` / `mimeType` are client-controlled, stored, and rendered**
+`features/attachments/actions.ts:74-83`; `lib/storage/media-url.ts:58`
+
+`resolveStoredMediaUrl` returns the raw stored string when it matches no known key pattern, so
+an arbitrary attacker-chosen URL is rendered in the attachment UI. Exploitability is limited by
+the global `nosniff` header and `X-Frame-Options: DENY`, but it defeats the same-origin
+media-proxy design. Fix alongside FINDING-005 (same function).
+
+### FINDING-014 · HIGH · Logic
+**`deactivateMemberAction` is not atomic**
+`features/users/actions.ts` (deal reassignment inside `withTenant`, membership status change
+after it)
+
+Two independent transactions with no compensating action. If the second fails, deals are
+reassigned but the offboarded employee remains `ACTIVE` and can still sign in — a
+security-relevant outcome from a reliability defect.
+
+**Partially addressed:** the N+1 inside the transaction was fixed (FINDING-019), which removes
+the most likely cause of the second step never being reached. The atomicity gap itself remains.
+**Fix:** move the `membership.update` inside the same `withTenant` transaction (`Membership`
+has no RLS and `app_user` holds DML, so this works) — deferred only because offboarding is a
+critical low-traffic path that deserves an integration test written first.
+
+### FINDING-015 · MEDIUM · Logic
+**Early `return` inside a `withTenant` callback commits instead of aborting**
+`features/deals/actions.ts` — 8 occurrences
+
+Error signalling uses mutable outer flags (`let notFound = false`, `let createError`,
+`let validationError`) with an early `return` from the callback. An early `return` **commits**
+the transaction; only a thrown error rolls back. Today each path happens to return before
+mutating, so there is no live bug — but any future branch that mutates first will silently
+commit partial work, and each added branch is one forgotten post-transaction flag check away
+from reporting success on failure.
+
+**Fix:** adopt the tagged-throw pattern already used in `confirmUpload`
+(`features/attachments/actions.ts:69`). Mechanical but touches all 7 deal write actions —
+worth doing as its own reviewed change.
+
+### FINDING-016 · MEDIUM · Logic
+**`rateLimit` fails open**
+`lib/auth/rate-limit.ts:25-28`
+
+Catches all exceptions and returns `true`. Documented and defensible in isolation, but it is
+the only brute-force control on the credentials login path, so a transient DB fault removes
+login throttling entirely. Consider fail-closed for the signin key specifically, or an
+in-process fallback counter.
+
+### FINDING-017 · LOW · Logic
+**TOCTOU on the storage quota between presign and confirm**
+`app/api/upload/sign/route.ts:61` vs `features/attachments/actions.ts:68`
+
+Concurrent presign requests all observe the pre-increment total. `confirmUpload` re-checks
+inside its transaction, which bounds the overshoot. Residual; fix with FINDING-005.
+
+### FINDING-018 · LOW · Logic
+**`signupAction` returns success for an existing email**
+`features/users/actions.ts:39-40` (line numbers shifted after fixes)
+
+Correct anti-enumeration behaviour, but indistinguishable from real registration: a user who
+re-registers an existing address sees success, then cannot sign in with the password they chose.
+Consider a generic "check your account or contact your administrator" confirmation screen.
+
+### FINDING-021 · MEDIUM · Performance
+**Six concurrent `withTenant` transactions per clients-page render**
+`app/app/[tenantSlug]/clients/page.tsx:36-45`
+
+Six independent transactions in one `Promise.all`, each requesting its own pooled connection
+against `connection_limit=1`, so acquisition serializes and `P2024` risk rises under
+concurrency. The same block also mixes a bare `prisma.tenantSettings` call in with the
+RLS-scoped helpers.
+
+**Fix:** consolidate into a single loader, exactly as `loadPipelineKanbanData` already does for
+the pipeline page. The stats pages need the same treatment.
+
+### FINDING-022 · LOW · Performance
+**N+1 in `resolveEquipmentPairs`**
+`features/deals/actions.ts:52-58`
+
+One `isActiveSubcategoryOfCategory` query per subcategory in a nested loop inside the
+transaction. Collapse to a single `findMany({ where: { key: { in: [...] } } })` plus in-memory
+validation of the parent relationship.
+
+---
+
+## Deferred — architecture and maintainability
+
+### FINDING-024 · MEDIUM · Architecture
+**Circular dependency in the DB layer, broken by mutable runtime registries**
+`lib/db/rls.ts:1-6` ↔ `lib/db/ensure-app-role.ts:2`
+
+`rls.ts` imports `ensureAppRole` / `registerRoleEstablishedCheck` from `ensure-app-role.ts`,
+which imports `PrismaTx` back from `rls.ts`. The cycle is broken at runtime by two module-level
+registries (`registerRoleEstablishedCheck`, `registerBasePrismaClient`) rather than by
+inverting the dependency, so correctness depends on **import-evaluation order** and both
+registries degrade silently when unset (see FINDING-008b).
+
+**Fix:** extract `PrismaTx` and the role-context contract into a leaf module with no back-edge,
+and add a runtime assertion that registration occurred.
+
+### FINDING-025 · MEDIUM · Architecture · + FINDING-028 · MEDIUM · Maintainability
+**Two sources of truth for authorization policy (28 duplicated checks)**
+`lib/auth/permissions.ts:14-15` vs 28 call sites across 13 files
+
+`canManageMembers` / `canManageSettings` are used **only for UI gating** in the 8 settings
+pages. Every server-side enforcement inlines `["OWNER", "ADMIN"].includes(caller.role)` instead
+— 28 occurrences across 13 files (`app/api/upload/{branding,avatar,avatar/sign}/route.ts`,
+`features/{clients,pipeline,branding,tenants,users,catalogs,custom-fields}/…`). Two modules did
+extract the abstraction (`features/payments/policies.ts`, `features/quotes/policies.ts`); the
+rest did not.
+
+`canManageMembers = atLeast(r, "ADMIN")` is semantically identical given `OWNER: 5, ADMIN: 4`,
+so consolidation is behaviour-preserving.
+
+**This is the root cause of FINDING-003** — the inline checks omitted the target-side guard a
+shared policy function would have centralised. Highest-leverage refactor in this backlog:
+collapse all 28 to `canManageMembers(role)` and add `assertCanManageTarget(caller, target)`.
+
+### FINDING-026 · MEDIUM · Architecture
+**`phoneFormat` / `whatsappCountryCode` are dead settings — white-label is blocked**
+`features/deals/schemas.ts:3-4` (6 usages)
+
+Guatemala-specific validation is hardcoded into the domain layer:
+```ts
+const PHONE_RE = /^\d{4}-\d{4}$/
+const WA_RE = /^\+502 \d{4}-\d{4}$/
+```
+Meanwhile the correct abstraction exists and is wired end-to-end but **never read**:
+`TenantSettings.phoneFormat` / `.whatsappCountryCode` are persisted, validated in
+`features/tenants/settings.ts:15-16`, and editable in the settings UI
+(`features/tenants/components/general-settings.tsx:142-147`). Grep confirms zero validation
+consumers.
+
+Two defects in one: functionally a settings field silently does nothing (a user edits the phone
+format and observes no effect); architecturally **no non-Guatemalan tenant can create a deal at
+all**, which blocks the stated white-label V1 goal and contradicts `AGENTS.md`.
+
+**Fix:** derive the validators from tenant settings (format string → regex) and thread settings
+into the deal schemas, or drop the settings fields if GT-only is the accepted V1 scope — but
+pick one, don't leave a no-op control in the UI.
+
+### FINDING-027 · LOW · Architecture
+**`canEditDealRow` keeps dead ownership parameters**
+`lib/auth/permissions.ts:20-22`
+
+`canEditDealRow(role, _dealOwnerId, _userId)` retains two unused parameters after "embudo
+abierto" removed ownership restrictions. The comment documents this as intentional signature
+stability, but the signature advertises ownership-aware authorization that no longer exists,
+inviting callers to assume a check that is not performed. Drop the parameters and update
+callers.
+
+### FINDING-029 · MEDIUM · Maintainability
+**Test coverage is inverted relative to risk**
+`tests/unit/` (14 files), `features/*/__tests__/` (3 dirs)
+
+Tests exercise pure helpers — schemas, PIN tokens, media-URL regexes, RBAC rank arithmetic —
+while there was **no test asserting authorization behaviour** for `features/users/actions.ts`
+or the deal sub-resource getters. That is precisely why the full suite passed while
+FINDING-002 and FINDING-003 were live.
+
+**Partially addressed:** `bgImageUrl` injection coverage was added with the FINDING-001 fix
+(the previous `buildCssVars` suite tested colours only, which is how the XSS slipped through).
+
+**Still needed:** a table-driven authorization matrix — each privileged action × each caller
+role × self / other / OWNER-target / non-member — over `features/users/actions.ts`,
+`features/deals/actions.ts` getters, and the upload routes. This is the single highest-value
+test investment in the codebase.
+
+### FINDING-030 · LOW · Maintainability
+**24 sites swallow errors into empty or falsy returns**
+Representative: `features/attachments/actions.ts:24-29`
+
+`getDealAttachmentsAction` returns `[]` on authorization failure, making "access denied"
+indistinguishable from "no attachments" for both the caller and Sentry — suppressing exactly
+the signal needed to detect exploitation of access-control bugs. Log denials to Sentry even
+when returning a benign shape to the client.
+
+### FINDING-031 · LOW · Maintainability
+**Semicolon style is split; `.prettierrc` disagrees with the code**
+Repository-wide; e.g. `lib/db/client.ts` (semicolons) vs `lib/db/rls.ts` (none)
+
+Split roughly along `app/api/**` vs `features/**`, while `.prettierrc` declares `semi: true`.
+`pnpm format` would rewrite most of the repository, so `lint:check` cannot be enforced in CI
+today.
+
+**Fix:** decide the house style, run the formatter once in a dedicated commit that touches
+nothing else, then enforce it. Do **not** mix this with a behavioural change — it would bury
+the real diff.
+
+### FINDING-032 · LOW · Maintainability
+**Dead field: `createDealSchema.clientId`**
+`features/deals/schemas.ts:48`
+
+Accepted and validated but never read by `createDealAction`, which derives the client through
+`findOrCreateClient` from name/phone. A caller supplying `clientId` gets no error and no
+effect, implying an association capability that does not exist.
+
+### FINDING-033 · LOW · Maintainability
+**Empty scaffolding implies subsystems that do not exist**
+`lib/logging/`, `lib/email/` (`.gitkeep` only); `docs/adr/` (empty)
+
+`lib/logging/` suggests a logging module while the codebase actually depends on Sentry.
+`docs/adr/` is empty despite `AGENTS.md` mandating ADRs for significant decisions — so the
+deliberate trade-offs in this backlog (FINDING-010 PIN-as-authorization, FINDING-007
+`Membership` RLS exemption, FINDING-016 fail-open rate limiting) are undocumented and
+indistinguishable from oversights.
+
+---
+
+## Suggested sequencing
+
+1. **FINDING-025 / 028** — collapse the 28 duplicated role checks. Root cause of FINDING-003;
+   makes every future authorization change one edit instead of 29.
+2. **FINDING-029** — the authorization test matrix. Do this *before* the refactor above so it
+   pins current behaviour, then keep it green through the refactor.
+3. **FINDING-004** — decide the deal-closing role model and remove the client-controlled
+   `force` flag.
+4. **FINDING-005 + 011 + 013 + 017** — one coherent storage-integrity pass (reconcile usage,
+   then enforce).
+5. **FINDING-007 + 008 + 023** — one coherent RLS / least-privilege pass, one manual prod
+   migration. Write the ADRs here.
+6. **FINDING-006** — CSP nonces, validated in a preview deployment.
+7. **FINDING-014 + 015 + 021 + 022 + 024** — reliability and performance cleanup.
+8. **FINDING-026** — tenant-driven phone validation (or explicitly scope V1 to GT).
+9. **FINDING-031** — formatting, in an isolated commit.
+10. Remaining LOW items (010 write-up, 012, 016, 018, 027, 030, 032, 033) as capacity allows.
