@@ -2,13 +2,20 @@
 # Configure GitHub repository secrets (same keys as crm-core/.env.deploy.example).
 name: Deploy Production
 
+# Manual trigger only.
+#
+# This workflow needs repository secrets that have never been configured
+# (DATABASE_ADMIN_URL, VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_NAME, AUTH_URL), so it
+# failed on the "Apply database migrations" step — P1012, empty DATABASE_ADMIN_URL — on
+# every push since 2026-06-09 without ever succeeding once. Production is actually deployed
+# by Vercel's own Git integration and migrations are applied by hand, so the push trigger
+# only marked healthy commits with a red X.
+#
+# Before re-enabling the push trigger: add the secrets AND resolve the duplicate-deploy
+# conflict, since the "Deploy to Vercel" step below would run `vercel deploy --prod` on top
+# of the deployment the Vercel Git integration already creates for the same commit.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "crm-core/**"
-      - ".github/workflows/deploy-production.yml"
 
 concurrency:
   group: deploy-production
