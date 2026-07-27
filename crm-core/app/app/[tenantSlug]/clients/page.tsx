@@ -1,14 +1,9 @@
 import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
-import { listClients, getClientWithDeals, getClientKpis } from "@/features/clients/queries"
-import { getDefaultPipeline } from "@/features/pipeline/queries"
-import { withTenant } from "@/lib/db/rls"
-import { getCatalogItems, getEquipmentHierarchy } from "@/features/catalogs/queries"
-import { getTenantMembers } from "@/features/tenants/queries"
+import { loadClientsPageData } from "@/features/clients/queries"
 import { ClientSidebar } from "@/features/clients/components/ClientSidebar"
 import { ClientProfile } from "@/features/clients/components/ClientProfile"
-import { prisma } from "@/lib/db/client"
 import type { IntlSettings } from "@/lib/intl/format"
 
 interface Props {
@@ -33,16 +28,23 @@ export default async function ClientsPage({ params, searchParams }: Props) {
   const selectedClientId = searchParams.client as string | undefined
   const cursor = searchParams.cursor as string | undefined
 
-  const [{ items: clients, nextCursor }, pipeline, members, channels, equipmentHierarchy, statuses, settings] =
-    await Promise.all([
-      listClients(tenantId, { search: q, sort, cursor }),
-      withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
-      getTenantMembers(tenantId),
-      getCatalogItems(tenantId, "salesChannel", { activeOnly: true }),
-      getEquipmentHierarchy(tenantId, { activeOnly: true }),
-      getCatalogItems(tenantId, "dealStatus", { activeOnly: true }),
-      prisma.tenantSettings.findUnique({ where: { tenantId } }),
-    ])
+  const {
+    clients,
+    nextCursor,
+    pipeline,
+    members,
+    channels,
+    equipmentHierarchy,
+    statuses,
+    settings,
+    selectedClient,
+    selectedClientKpis,
+  } = await loadClientsPageData(tenantId, {
+    search: q,
+    sort,
+    cursor,
+    selectedClientId,
+  })
 
   const intlSettings: IntlSettings = {
     locale: settings?.locale ?? "es-GT",
@@ -67,12 +69,10 @@ export default async function ClientsPage({ params, searchParams }: Props) {
   )
 
   if (selectedClientId) {
-    const [clientData, kpis] = await Promise.all([
-      getClientWithDeals(tenantId, selectedClientId),
-      getClientKpis(tenantId, selectedClientId),
-    ])
+    const clientData = selectedClient
+    const kpis = selectedClientKpis
 
-    if (clientData) {
+    if (clientData && kpis) {
       const dealsList = clientData.deals.map((d) => ({
         id: d.id,
         name: d.name,

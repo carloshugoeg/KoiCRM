@@ -1,13 +1,8 @@
 import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
-import { getClientWithDeals, getClientKpis } from "@/features/clients/queries"
-import { getDefaultPipeline } from "@/features/pipeline/queries"
-import { withTenant } from "@/lib/db/rls"
-import { getCatalogItems, getEquipmentHierarchy } from "@/features/catalogs/queries"
-import { getTenantMembers } from "@/features/tenants/queries"
+import { loadClientDetailPageData } from "@/features/clients/queries"
 import { ClientProfile } from "@/features/clients/components/ClientProfile"
-import { prisma } from "@/lib/db/client"
 import type { IntlSettings } from "@/lib/intl/format"
 
 interface Props {
@@ -26,17 +21,16 @@ export default async function ClientDetailPage({ params }: Props) {
   const tenantSlug = params.tenantSlug
   const canEdit = membership.role !== "VIEWER"
 
-  const [clientData, kpis, pipeline, members, channels, equipmentHierarchy, statuses, settings] =
-    await Promise.all([
-      getClientWithDeals(tenantId, params.clientId),
-      getClientKpis(tenantId, params.clientId),
-      withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
-      getTenantMembers(tenantId),
-      getCatalogItems(tenantId, "salesChannel", { activeOnly: true }),
-      getEquipmentHierarchy(tenantId, { activeOnly: true }),
-      getCatalogItems(tenantId, "dealStatus", { activeOnly: true }),
-      prisma.tenantSettings.findUnique({ where: { tenantId } }),
-    ])
+  const {
+    client: clientData,
+    kpis,
+    pipeline,
+    members,
+    channels,
+    equipmentHierarchy,
+    statuses,
+    settings,
+  } = await loadClientDetailPageData(tenantId, params.clientId)
 
   if (!clientData) notFound()
 

@@ -37,6 +37,23 @@ export async function getCatalogItems(
   )
 }
 
+/** Catalog fetch inside an existing tenant transaction — shares the caller's RLS connection. */
+export async function getCatalogItemsInTx(
+  tx: PrismaTx,
+  tenantId: string,
+  catalogKey: CatalogKey,
+  activeOnly: boolean,
+) {
+  return tx.catalogItem.findMany({
+    where: {
+      tenantId,
+      catalogKey,
+      ...(activeOnly ? { active: true } : {}),
+    },
+    orderBy: { order: "asc" },
+  })
+}
+
 /** Validity check inside an existing tenant transaction — shares the caller's RLS connection. */
 export async function isActiveCatalogItemKeyInTx(
   tx: PrismaTx,

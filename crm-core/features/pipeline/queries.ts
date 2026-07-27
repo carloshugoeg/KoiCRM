@@ -1,5 +1,5 @@
 import { withTenant, type PrismaTx } from "@/lib/db/rls"
-import { getEquipmentHierarchyInTx, type CatalogKey } from "@/features/catalogs/queries"
+import { getCatalogItemsInTx, getEquipmentHierarchyInTx } from "@/features/catalogs/queries"
 import {
   fetchPipelineDealsInTx,
   mapPipelineDeals,
@@ -12,22 +12,6 @@ export async function getDefaultPipeline(tx: PrismaTx, tenantId: string) {
     include: {
       stages: { orderBy: { order: "asc" } },
     },
-  })
-}
-
-async function getCatalogItemsInTx(
-  tx: PrismaTx,
-  tenantId: string,
-  catalogKey: CatalogKey,
-  activeOnly: boolean,
-) {
-  return tx.catalogItem.findMany({
-    where: {
-      tenantId,
-      catalogKey,
-      ...(activeOnly ? { active: true } : {}),
-    },
-    orderBy: { order: "asc" },
   })
 }
 
