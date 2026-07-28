@@ -1,6 +1,6 @@
 import "server-only"
 import type { Role } from "@prisma/client"
-import { withTenant } from "@/lib/db/rls"
+import { withTenant, type PrismaTx } from "@/lib/db/rls"
 import {
   defaultMatrix,
   defaultPermission,
@@ -42,24 +42,31 @@ export async function permissionsForRole(
   return effective
 }
 
-/** All three layers. This is what feature code should call. */
-export async function permissionsFor(
+/**
+ * Layer 2 + 3, run on a transaction the caller already holds open. Exists so a caller that
+ * runs inside a tight per-request transaction budget (the `/app` layout, which pays for its
+ * transaction on every page — see 15889e3) can read effective permissions without opening a
+ * second concurrent `withTenant()`. `permissionsFor` is a thin wrapper around this so there is
+ * exactly one implementation of the resolution logic.
+ */
+export async function permissionsForInTx(
+  tx: PrismaTx,
   tenantId: string,
   role: Role,
   userId: string,
 ): Promise<Record<PermissionKey, boolean>> {
   if (LOCKED_ROLES.includes(role)) return defaultMatrix()[role]
 
-  const { roleRows, userRows } = await withTenant(tenantId, async (tx) => ({
-    roleRows: await tx.rolePermission.findMany({
+  const [roleRows, userRows] = await Promise.all([
+    tx.rolePermission.findMany({
       where: { tenantId, role },
       select: { key: true, allowed: true },
     }),
-    userRows: await tx.userPermission.findMany({
+    tx.userPermission.findMany({
       where: { tenantId, userId },
       select: { key: true, allowed: true },
     }),
-  }))
+  ])
 
   const effective = { ...defaultMatrix()[role] }
   for (const row of roleRows) {
@@ -69,6 +76,15 @@ export async function permissionsFor(
     if (isPermissionKey(row.key)) effective[row.key] = row.allowed
   }
   return effective
+}
+
+/** All three layers. This is what feature code should call. */
+export async function permissionsFor(
+  tenantId: string,
+  role: Role,
+  userId: string,
+): Promise<Record<PermissionKey, boolean>> {
+  return withTenant(tenantId, (tx) => permissionsForInTx(tx, tenantId, role, userId))
 }
 
 export async function can(

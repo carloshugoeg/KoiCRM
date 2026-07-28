@@ -25,7 +25,9 @@ import {
 import { globalSearchAction } from "@/features/search/actions"
 import { auth } from "@/lib/auth/auth"
 import { loadPipelineKanbanData } from "@/features/pipeline/queries"
-import { pipelineScopeFor } from "@/lib/permissions/resolve"
+import { pipelineScopeFor, permissionsForInTx, scopeFromPermissions } from "@/lib/permissions/resolve"
+import { getFollowUpAlertsInTx } from "@/features/follow-ups/queries"
+import { withTenant as withTenantRls } from "@/lib/db/rls"
 
 const mockAuth = auth as unknown as Mock<() => Promise<Session | null>>
 
@@ -299,5 +301,56 @@ describe("global search honours pipeline.viewAll for every role, not just MEMBER
     const res = await globalSearchAction(tenantId, "Ajena")
     expect(res.ok).toBe(true)
     expect(res.results?.some((r) => r.id === foreignDealId)).toBe(true)
+  })
+})
+
+/**
+ * FINDING-A fix: the `/app` layout derived its follow-up-alert owner filter from
+ * canSeeAllDeals(role) rather than the pipeline.viewAll permission — the same bypass fixed for
+ * archive/calendar/stats/listado/search above, but on the surface that runs on every single
+ * page. A SUPERVISOR whose pipeline.viewAll was switched off still got a banner alert for a
+ * deal they cannot open.
+ *
+ * layout.tsx itself can't be imported here — it (transitively) pulls in "use client" .tsx
+ * component files, and this harness's vitest config has no JSX transform for the node
+ * environment (tsconfig's "jsx": "preserve" is meant for Next.js's own SWC build). So this
+ * drives the exact transaction body the fixed layout now runs — one withTenant() holding
+ * permissionsForInTx + scopeFromPermissions + getFollowUpAlertsInTx — rather than the page
+ * component. Before the fix this composition didn't exist in the layout at all (it read
+ * canSeeAllDeals(role) instead), so reproducing it here and asserting on the result still
+ * pins the exact behaviour the layout must have.
+ */
+describe("layout follow-up alerts honour pipeline.viewAll scope", () => {
+  async function alertDealIdsForLayout(role: "SUPERVISOR" | "MEMBER", userId: string) {
+    return withTenantRls(tenantId, async (tx) => {
+      const perms = await permissionsForInTx(tx, tenantId, role, userId)
+      const scope = scopeFromPermissions(perms, userId)
+      const alerts = await getFollowUpAlertsInTx(tx, tenantId, scope.visibleToUserId ?? undefined)
+      return [...alerts.overdue, ...alerts.today, ...alerts.next7].map((fu) => fu.deal.id)
+    })
+  }
+
+  beforeAll(async () => {
+    const now = new Date()
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 9, 0, 0, 0)
+    await prismaAdmin.followUp.create({
+      data: { tenantId, dealId: foreignDealId, date: yesterday, completed: false },
+    })
+  })
+
+  it("a SUPERVISOR without pipeline.viewAll does not get the alert for a foreign deal", async () => {
+    await withTenant(tenantId, (tx) =>
+      tx.rolePermission.create({
+        data: { tenantId, role: "SUPERVISOR", key: "pipeline.viewAll", allowed: false },
+      }),
+    )
+
+    const dealIds = await alertDealIdsForLayout("SUPERVISOR", supervisorId)
+    expect(dealIds).not.toContain(foreignDealId)
+  })
+
+  it("a SUPERVISOR with pipeline.viewAll (the default) still gets the alert", async () => {
+    const dealIds = await alertDealIdsForLayout("SUPERVISOR", supervisorId)
+    expect(dealIds).toContain(foreignDealId)
   })
 })
