@@ -53,6 +53,7 @@ export function KanbanBoard({
   const [activeStageIndex, setActiveStageIndex] = useState(0)
   const slidesRef = useRef<HTMLDivElement>(null)
   const railRef = useRef<HTMLDivElement>(null)
+  const scrollRaf = useRef<number | null>(null)
 
   // Phones swipe between stages, so dnd-kit gets no sensors there: the two gestures
   // would otherwise fight over the same touch. Stage moves live in the deal modal.
@@ -87,6 +88,22 @@ export function KanbanBoard({
     const found = slides.findIndex((slide) => center < slide.getBoundingClientRect().right)
     const index = found === -1 ? slides.length - 1 : found
     setActiveStageIndex((prev) => (prev === index ? prev : index))
+  }, [])
+
+  // Every scroll frame otherwise calls getBoundingClientRect on every stage — on the phones
+  // this carousel exists for, coalesce to at most one measurement per animation frame.
+  const handleScroll = useCallback(() => {
+    if (scrollRaf.current !== null) return
+    scrollRaf.current = requestAnimationFrame(() => {
+      scrollRaf.current = null
+      syncActiveStage()
+    })
+  }, [syncActiveStage])
+
+  useEffect(() => {
+    return () => {
+      if (scrollRaf.current !== null) cancelAnimationFrame(scrollRaf.current)
+    }
   }, [])
 
   const goToStage = useCallback((index: number) => {
@@ -210,7 +227,7 @@ export function KanbanBoard({
 
         <div
           ref={slidesRef}
-          onScroll={syncActiveStage}
+          onScroll={handleScroll}
           className="flex w-full min-w-0 flex-1 min-h-0 snap-x snap-mandatory overscroll-x-contain gap-2 overflow-x-auto overflow-y-hidden px-2 pb-4 pt-2 sm:gap-3 sm:px-3 md:h-full md:min-h-[calc(100vh-180px)] md:snap-none md:gap-4 md:overflow-hidden md:px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {stages.map((stage) => (
