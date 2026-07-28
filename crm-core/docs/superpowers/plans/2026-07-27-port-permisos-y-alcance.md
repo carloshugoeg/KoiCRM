@@ -1292,48 +1292,7 @@ separate branch, and a deal ceded through DealViewer still resolves."
 - Consumes: `pipelineScopeFor` and `PipelineScope` from Task 2.
 - Produces: `loadPipelineKanbanData(tenantId, dealFilters, scope?)` — the third parameter is optional so existing callers keep compiling; when `scope.visibleToUserId` is set it is merged into `dealFilters.visibleToUserId`. `PipelineClient` gains props `canSeeTotals: boolean` and `restrictedOwnerId: string | null` (the latter only drives whether the advisor select renders).
 
-- [ ] **Step 1: Add the scope parameter to the loader, merged against `15889e3`**
-
-`main` moved `getCatalogItemsInTx` into `features/catalogs/queries.ts`; the demo version still declares it locally. Keep `main`'s import and take only the demo's scope logic.
-
-In `features/pipeline/queries.ts`, add below the existing imports:
-
-```ts
-import type { PipelineScope } from "@/lib/permissions/resolve"
-```
-
-Then replace the `loadPipelineKanbanData` signature and doc comment with:
-
-```ts
-/**
- * Loads all pipeline/kanban page data in a single DB transaction.
- * Avoids opening many parallel pool connections (Supabase session pooler limit: 15).
- *
- * `scope` comes from `pipelineScopeFor()`. When `scope.visibleToUserId` is set the query is pinned
- * to what that user may see — their own deals plus anything ceded to them. `visibleToUserId` and a
- * caller-supplied `ownerId` compose as AND in the where clause, so a member without
- * `pipeline.viewAll` can only ever narrow the result with `?owner=`, never widen it.
- */
-export async function loadPipelineKanbanData(
-  tenantId: string,
-  dealFilters: PipelineFilters,
-  scope?: PipelineScope,
-) {
-  const effectiveFilters: PipelineFilters = scope?.visibleToUserId
-    ? { ...dealFilters, visibleToUserId: scope.visibleToUserId }
-    : dealFilters
-```
-
-Inside the transaction, swap the two uses of `dealFilters` for `effectiveFilters`:
-
-```ts
-    const rawDeals = pipeline ? await fetchPipelineDealsInTx(tx, tenantId, effectiveFilters) : []
-    const deals = mapPipelineDeals(rawDeals, effectiveFilters)
-```
-
-Do **not** re-add a local `getCatalogItemsInTx`; `main` imports it from `@/features/catalogs/queries`.
-
-- [ ] **Step 2: Extend the test with the `?owner=` widening attempt**
+- [ ] **Step 1: Extend the test with the `?owner=` widening attempt**
 
 Append to `tests/integration/pipeline-scope.test.ts`, and add the import at the top of the file:
 
@@ -1378,7 +1337,7 @@ describe("loadPipelineKanbanData scope enforcement", () => {
 })
 ```
 
-- [ ] **Step 3: Run it and verify the new cases fail**
+- [ ] **Step 2: Run it and verify the new cases fail**
 
 Run:
 
@@ -1386,9 +1345,60 @@ Run:
 pnpm test:integration tests/integration/pipeline-scope.test.ts
 ```
 
-Expected: the four new cases fail until Step 1's edit is in place; with Step 1 applied they pass. Total 9 passing.
+Expected: FAIL. `loadPipelineKanbanData` still takes two parameters, so the third argument is ignored and a restricted member gets the whole funnel. The five Task 4 cases still pass.
 
-- [ ] **Step 4: Resolve the scope in the page and pass it down**
+- [ ] **Step 3: Add the scope parameter to the loader, merged against `15889e3`**
+
+`main` moved `getCatalogItemsInTx` into `features/catalogs/queries.ts`; the demo version still declares it locally. Keep `main`'s import and take only the demo's scope logic.
+
+In `features/pipeline/queries.ts`, add below the existing imports:
+
+```ts
+import type { PipelineScope } from "@/lib/permissions/resolve"
+```
+
+Then replace the `loadPipelineKanbanData` signature and doc comment with:
+
+```ts
+/**
+ * Loads all pipeline/kanban page data in a single DB transaction.
+ * Avoids opening many parallel pool connections (Supabase session pooler limit: 15).
+ *
+ * `scope` comes from `pipelineScopeFor()`. When `scope.visibleToUserId` is set the query is pinned
+ * to what that user may see — their own deals plus anything ceded to them. `visibleToUserId` and a
+ * caller-supplied `ownerId` compose as AND in the where clause, so a member without
+ * `pipeline.viewAll` can only ever narrow the result with `?owner=`, never widen it.
+ */
+export async function loadPipelineKanbanData(
+  tenantId: string,
+  dealFilters: PipelineFilters,
+  scope?: PipelineScope,
+) {
+  const effectiveFilters: PipelineFilters = scope?.visibleToUserId
+    ? { ...dealFilters, visibleToUserId: scope.visibleToUserId }
+    : dealFilters
+```
+
+Inside the transaction, swap the two uses of `dealFilters` for `effectiveFilters`:
+
+```ts
+    const rawDeals = pipeline ? await fetchPipelineDealsInTx(tx, tenantId, effectiveFilters) : []
+    const deals = mapPipelineDeals(rawDeals, effectiveFilters)
+```
+
+Do **not** re-add a local `getCatalogItemsInTx`; `main` imports it from `@/features/catalogs/queries`.
+
+- [ ] **Step 4: Run the test again and verify it passes**
+
+Run:
+
+```bash
+pnpm test:integration tests/integration/pipeline-scope.test.ts
+```
+
+Expected: 9 passing.
+
+- [ ] **Step 5: Resolve the scope in the page and pass it down**
 
 In `app/app/[tenantSlug]/pipeline/page.tsx`, add the import:
 
@@ -1412,7 +1422,7 @@ Pass `scope` as the third argument to `loadPipelineKanbanData`, and add two prop
           restrictedOwnerId={scope.visibleToUserId}
 ```
 
-- [ ] **Step 5: Copy the four presentation components**
+- [ ] **Step 6: Copy the four presentation components**
 
 ```bash
 export DEMO=/Users/carloshugo/Documents/Projects/KoiCRM-Demo/crm-core
@@ -1424,7 +1434,7 @@ cp $DEMO/features/pipeline/components/DealCard.tsx features/pipeline/components/
 
 `PipelineClient.tsx` also carries the mobile carousel wiring and the `?deal=` consumption, which Tasks 8 and 9 depend on — copying the whole file here is intentional. `KanbanBoard.tsx` is **not** copied yet; it is Task 9, and until then the board renders as it does on `main`.
 
-- [ ] **Step 6: Type-check, lint, run the full suite**
+- [ ] **Step 7: Type-check, lint, run the full suite**
 
 Run:
 
@@ -1439,7 +1449,7 @@ mkdir -p features/pipeline/hooks
 cp $DEMO/features/pipeline/hooks/use-narrow-viewport.ts features/pipeline/hooks/
 ```
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add features/pipeline "app/app/[tenantSlug]/pipeline/page.tsx" tests/integration/pipeline-scope.test.ts
@@ -2097,14 +2107,57 @@ In `lib/storage/s3-health.ts`, inside its own `new S3Client({...})` call, after 
 
 - [ ] **Step 3: Add MinIO to compose**
 
-Copy the service block from the demo's `docker-compose.yml`:
+In `docker-compose.yml`, add these two services after the existing `db` service, keeping the same two-space indentation under `services:`. Leave the `${DB_PORT:-5435}` line as it already is — it is present in this working tree.
 
-```bash
-export DEMO=/Users/carloshugo/Documents/Projects/KoiCRM-Demo/crm-core
-diff $DEMO/docker-compose.yml docker-compose.yml
+```yaml
+  # Local object storage for development. Stands in for Cloudflare R2 so file uploads
+  # work without R2 credentials. Both upload routes call putObject server-side, so there
+  # is no browser CORS surface. Production keeps using R2 — this only runs locally.
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # One-shot: create the bucket and make objects publicly readable, so the URLs
+  # stored in the database render directly in the browser.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_USER: ${MINIO_USER:-minioadmin}
+      MINIO_PASSWORD: ${MINIO_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-koicrm-local}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $$MINIO_USER $$MINIO_PASSWORD &&
+      mc mb --ignore-existing local/$$MINIO_BUCKET &&
+      mc anonymous set download local/$$MINIO_BUCKET &&
+      echo 'minio bucket ready'
+      "
+    restart: "no"
 ```
 
-Apply the MinIO service and its volume to `docker-compose.yml`. Leave the `${DB_PORT:-5435}` line as it already is — it is present in this working tree.
+Then add the volume to the existing `volumes:` block at the bottom of the file, so it reads:
+
+```yaml
+volumes:
+  pgdata:
+  miniodata:
+```
 
 - [ ] **Step 4: Verify both clients read the same flag**
 
