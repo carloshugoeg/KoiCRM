@@ -136,7 +136,27 @@ describe("getOpenOpportunities", () => {
   })
 
   it("computes days open from the creation date", async () => {
+    const MS_PER_DAY = 86_400_000
+    const openMineCreatedAt = new Date("2026-01-01T00:00:00Z").getTime()
+
+    // Bracket the query call with two Date.now() reads. The query computes
+    // `now` internally somewhere between `before` and `after`, so the true
+    // expected value is guaranteed to fall in [minExpected, maxExpected].
+    // In the overwhelming majority of runs before/after floor to the same
+    // day and the range collapses to a single value, giving an exact check.
+    // A plain `toBe` against a `Date.now()` read taken in the test would
+    // flake once a day: openMine's createdAt sits exactly on a UTC midnight,
+    // so the query's whole-day floor ticks over at exactly 00:00:00Z, and a
+    // test run straddling that instant could see the test's `now` and the
+    // query's internal `now` land on opposite sides of the boundary.
+    const before = Date.now()
     const rows = await getOpenOpportunities({ tenantId, ownerId: mineId })
-    expect(rows[0].daysOpen).toBeGreaterThan(0)
+    const after = Date.now()
+
+    const minExpected = Math.floor((before - openMineCreatedAt) / MS_PER_DAY)
+    const maxExpected = Math.floor((after - openMineCreatedAt) / MS_PER_DAY)
+
+    expect(rows[0].daysOpen).toBeGreaterThanOrEqual(minExpected)
+    expect(rows[0].daysOpen).toBeLessThanOrEqual(maxExpected)
   })
 })
