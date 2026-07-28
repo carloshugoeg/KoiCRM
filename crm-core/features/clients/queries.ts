@@ -150,21 +150,31 @@ export async function getClientWithDeals(tenantId: string, clientId: string, vis
   return withTenant(tenantId, (tx) => getClientWithDealsInTx(tx, tenantId, clientId, visibleToUserId))
 }
 
+/**
+ * `visibleToUserId` restricts the KPI counts to what that user may see — their own deals plus
+ * anything ceded to them, the same rule `getClientWithDealsInTx` already applies to the deal
+ * list on this same screen. Without it a restricted member sees a KPI card ("Oportunidades",
+ * "Ganadas", "Valor ganado") counting every deal the client has ever had while the list right
+ * below it shows only the ones they can open — a leak of a colleague's deal count/value, and
+ * visibly incoherent with the list.
+ */
 export async function getClientKpisInTx(
   tx: PrismaTx,
   tenantId: string,
   clientId: string,
-  dateRange?: { from: Date; to: Date }
+  dateRange?: { from: Date; to: Date },
+  visibleToUserId?: string,
 ) {
   const dateFilter = dateRange ? { createdAt: { gte: dateRange.from, lte: dateRange.to } } : {}
+  const visibilityFilter = visibleToUserId ? dealVisibilityWhere(visibleToUserId) : {}
 
   const [allDeals, wonDeals] = await Promise.all([
     tx.deal.findMany({
-      where: { tenantId, clientId, ...dateFilter },
+      where: { tenantId, clientId, ...dateFilter, ...visibilityFilter },
       select: { id: true, isArchived: true, stage: { select: { key: true } }, value: true },
     }),
     tx.deal.findMany({
-      where: { tenantId, clientId, stage: { key: "ganado" }, ...dateFilter },
+      where: { tenantId, clientId, stage: { key: "ganado" }, ...dateFilter, ...visibilityFilter },
       select: { value: true },
     }),
   ])
@@ -182,9 +192,10 @@ export async function getClientKpisInTx(
 export async function getClientKpis(
   tenantId: string,
   clientId: string,
-  dateRange?: { from: Date; to: Date }
+  dateRange?: { from: Date; to: Date },
+  visibleToUserId?: string,
 ) {
-  return withTenant(tenantId, (tx) => getClientKpisInTx(tx, tenantId, clientId, dateRange))
+  return withTenant(tenantId, (tx) => getClientKpisInTx(tx, tenantId, clientId, dateRange, visibleToUserId))
 }
 
 /**
@@ -240,7 +251,7 @@ export async function loadClientsPageData(
       const selected = opts.selectedClientId
         ? await Promise.all([
             getClientWithDealsInTx(tx, tenantId, opts.selectedClientId, opts.visibleToUserId),
-            getClientKpisInTx(tx, tenantId, opts.selectedClientId),
+            getClientKpisInTx(tx, tenantId, opts.selectedClientId, undefined, opts.visibleToUserId),
           ])
         : null
 
@@ -264,7 +275,7 @@ export async function loadClientDetailPageData(tenantId: string, clientId: strin
       const [chrome, client, kpis] = await Promise.all([
         loadClientPageChromeInTx(tx, tenantId),
         getClientWithDealsInTx(tx, tenantId, clientId, visibleToUserId),
-        getClientKpisInTx(tx, tenantId, clientId),
+        getClientKpisInTx(tx, tenantId, clientId, undefined, visibleToUserId),
       ])
       return { ...chrome, client, kpis }
     },

@@ -28,6 +28,7 @@ import { loadPipelineKanbanData } from "@/features/pipeline/queries"
 import { pipelineScopeFor, permissionsForInTx, scopeFromPermissions } from "@/lib/permissions/resolve"
 import { getFollowUpAlertsInTx } from "@/features/follow-ups/queries"
 import { withTenant as withTenantRls } from "@/lib/db/rls"
+import { getClientKpis, loadClientDetailPageData, loadClientsPageData } from "@/features/clients/queries"
 
 const mockAuth = auth as unknown as Mock<() => Promise<Session | null>>
 
@@ -42,6 +43,7 @@ let supervisorId: string
 let ownDealId: string
 let foreignDealId: string
 let cededDealId: string
+let clientId: string
 
 beforeAll(async () => {
   await cleanDatabase()
@@ -83,6 +85,22 @@ beforeAll(async () => {
       iconKey: "circle",
     },
   })
+  const wonStage = await prismaAdmin.pipelineStage.create({
+    data: {
+      tenantId,
+      pipelineId: pipeline.id,
+      order: 1,
+      key: "ganado",
+      label: "Ganado",
+      color: "#22c55e",
+      iconKey: "check",
+    },
+  })
+
+  const client = await prismaAdmin.client.create({
+    data: { tenantId, name: "Cliente Scope" },
+  })
+  clientId = client.id
 
   const own = await prismaAdmin.deal.create({
     data: {
@@ -90,6 +108,7 @@ beforeAll(async () => {
       tenantId,
       pipelineId: pipeline.id,
       stageId: stage.id,
+      clientId,
       ownerId: memberId,
       name: "Propia",
       channelKey: "web",
@@ -99,12 +118,16 @@ beforeAll(async () => {
   })
   ownDealId = own.id
 
+  // In the "won" stage (not `stage`/"nuevo") so it doubles as the fixture proving the client
+  // KPI won-count/won-total leak, without adding a fourth deal that would perturb every other
+  // test in this file that asserts on the exact set of tenant deals.
   const foreign = await prismaAdmin.deal.create({
     data: {
       id: makeCuid(),
       tenantId,
       pipelineId: pipeline.id,
-      stageId: stage.id,
+      stageId: wonStage.id,
+      clientId,
       ownerId: otherId,
       name: "Ajena",
       channelKey: "web",
@@ -122,6 +145,7 @@ beforeAll(async () => {
       tenantId,
       pipelineId: pipeline.id,
       stageId: stage.id,
+      clientId,
       ownerId: otherId,
       name: "Cedida",
       channelKey: "web",
@@ -130,6 +154,7 @@ beforeAll(async () => {
     },
   })
   cededDealId = ceded.id
+
   await prismaAdmin.dealViewer.create({
     data: { tenantId, dealId: cededDealId, userId: memberId },
   })
@@ -352,5 +377,67 @@ describe("layout follow-up alerts honour pipeline.viewAll scope", () => {
   it("a SUPERVISOR with pipeline.viewAll (the default) still gets the alert", async () => {
     const dealIds = await alertDealIdsForLayout("SUPERVISOR", supervisorId)
     expect(dealIds).toContain(foreignDealId)
+  })
+})
+
+/**
+ * FINDING-B fix: getClientKpisInTx counted every deal a client ever had with no visibility
+ * filter, even though getClientWithDealsInTx already scoped the deal list right below it on
+ * the same screen. A restricted member saw a KPI card ("Oportunidades"/"Ganadas"/"Valor
+ * ganado") counting a colleague's deals — including won totals — while the list underneath
+ * showed only what they could open.
+ */
+describe("client KPI cards honour pipeline.viewAll scope", () => {
+  beforeEach(async () => {
+    await withTenant(tenantId, (tx) => tx.rolePermission.deleteMany({ where: { tenantId } }))
+  })
+
+  it("getClientKpis scoped to a restricted member matches the visible deal list, ceded deal included", async () => {
+    const scope = await pipelineScopeFor(tenantId, "MEMBER", memberId)
+    expect(scope.visibleToUserId).toBe(memberId)
+
+    const kpis = await getClientKpis(tenantId, clientId, undefined, scope.visibleToUserId ?? undefined)
+
+    // Visible to memberId: ownDealId (100) + cededDealId (300). foreignDealId (won, 200) belongs
+    // to otherId and was never ceded — it must not be counted, including in wonCount/totalValue.
+    expect(kpis.totalOpps).toBe(2)
+    expect(kpis.activeOpps).toBe(2)
+    expect(kpis.wonCount).toBe(0)
+    expect(kpis.totalValue).toBe(0)
+  })
+
+  it("counts every deal, including the won one, once pipeline.viewAll is granted", async () => {
+    await withTenant(tenantId, (tx) =>
+      tx.rolePermission.create({
+        data: { tenantId, role: "MEMBER", key: "pipeline.viewAll", allowed: true },
+      }),
+    )
+    const scope = await pipelineScopeFor(tenantId, "MEMBER", memberId)
+    expect(scope.visibleToUserId).toBeNull()
+
+    const kpis = await getClientKpis(tenantId, clientId, undefined, scope.visibleToUserId ?? undefined)
+    expect(kpis.totalOpps).toBe(3)
+    expect(kpis.wonCount).toBe(1)
+    expect(kpis.totalValue).toBe(200)
+  })
+
+  it("loadClientDetailPageData wires visibleToUserId into the KPI card, not just the deal list", async () => {
+    const scope = await pipelineScopeFor(tenantId, "MEMBER", memberId)
+    const { client, kpis } = await loadClientDetailPageData(tenantId, clientId, scope.visibleToUserId ?? undefined)
+
+    expect(client?.deals.map((d) => d.id).sort()).toEqual([ownDealId, cededDealId].sort())
+    expect(kpis.totalOpps).toBe(client?.deals.length)
+    expect(kpis.wonCount).toBe(0)
+  })
+
+  it("loadClientsPageData's selected-client KPI card is scoped the same way as its deal list", async () => {
+    const scope = await pipelineScopeFor(tenantId, "MEMBER", memberId)
+    const { selectedClient, selectedClientKpis } = await loadClientsPageData(tenantId, {
+      selectedClientId: clientId,
+      visibleToUserId: scope.visibleToUserId ?? undefined,
+    })
+
+    expect(selectedClient?.deals.map((d) => d.id).sort()).toEqual([ownDealId, cededDealId].sort())
+    expect(selectedClientKpis?.totalOpps).toBe(selectedClient?.deals.length)
   })
 })
