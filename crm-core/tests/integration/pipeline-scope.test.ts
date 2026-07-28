@@ -27,6 +27,8 @@ import { getDealNotesAction } from "@/features/notes/actions"
 import { getDealAttachmentsAction } from "@/features/attachments/actions"
 import { auth } from "@/lib/auth/auth"
 import { loadPipelineKanbanData } from "@/features/pipeline/queries"
+import { getArchivedDeals, getPipelineDeals } from "@/features/deals/queries"
+import { getCalendarFollowUps } from "@/features/calendar/queries"
 import { pipelineScopeFor } from "@/lib/permissions/resolve"
 import { getClientKpis, loadClientDetailPageData, loadClientsPageData, listClients } from "@/features/clients/queries"
 import { loadTenantLayoutData } from "@/app/app/[tenantSlug]/layout-data"
@@ -539,5 +541,116 @@ describe("client KPI cards honour pipeline.viewAll scope", () => {
     const { items } = await listClients(tenantId, { visibleToUserId: scope.visibleToUserId ?? undefined })
     const row = items.find((c) => c.id === clientId)
     expect(row?._count.deals).toBe(3)
+  })
+})
+
+/**
+ * FINDING-6 test coverage: the previous wave's Finding 3 (archive/calendar/stats-listado/search
+ * bypassing pipeline.viewAll via canSeeAllDeals instead of the permission) was exercised only
+ * through globalSearchAction. These cover the other two query paths directly —
+ * getArchivedDeals (archive) and getPipelineDeals (stats/listado reuses the funnel's own
+ * query). Calendar is covered too: getCalendarFollowUps is cheap to call directly, no page
+ * render needed — but note its owner filter is a plain `ownerId` equality, not
+ * dealVisibilityWhere, so unlike the other three it would not surface a *ceded* deal to a
+ * restricted viewer even when it should. That's a pre-existing product inconsistency, not an
+ * over-exposure, so it's flagged in the report rather than fixed here; the assertion below only
+ * checks what this finding is about — that a foreign deal's follow-up does not leak.
+ */
+describe("archive, listado and calendar query paths honour pipeline.viewAll", () => {
+  let archivedForeignDealId: string
+
+  beforeAll(async () => {
+    const stage = await prismaAdmin.pipelineStage.findFirstOrThrow({ where: { tenantId, key: "nuevo" } })
+    const archived = await prismaAdmin.deal.create({
+      data: {
+        id: makeCuid(),
+        tenantId,
+        pipelineId: stage.pipelineId,
+        stageId: stage.id,
+        clientId,
+        ownerId: otherId,
+        name: "Archivada ajena",
+        channelKey: "web",
+        statusKey: "active",
+        value: 400,
+        isArchived: true,
+      },
+    })
+    archivedForeignDealId = archived.id
+
+    // Dated "now" rather than a fixed offset so it always lands in the current month's
+    // window, regardless of which day of the month the suite happens to run on.
+    await prismaAdmin.followUp.create({
+      data: { tenantId, dealId: foreignDealId, date: new Date(), completed: false },
+    })
+  })
+
+  it("getArchivedDeals excludes a foreign deal for a SUPERVISOR without pipeline.viewAll", async () => {
+    await withTenant(tenantId, (tx) =>
+      tx.rolePermission.create({
+        data: { tenantId, role: "SUPERVISOR", key: "pipeline.viewAll", allowed: false },
+      }),
+    )
+    const scope = await pipelineScopeFor(tenantId, "SUPERVISOR", supervisorId)
+    const { deals } = await getArchivedDeals(tenantId, undefined, 50, scope.visibleToUserId ?? undefined)
+    expect(deals.map((d) => d.id)).not.toContain(archivedForeignDealId)
+  })
+
+  it("getArchivedDeals includes it once pipeline.viewAll is restored (the default)", async () => {
+    const scope = await pipelineScopeFor(tenantId, "SUPERVISOR", supervisorId)
+    const { deals } = await getArchivedDeals(tenantId, undefined, 50, scope.visibleToUserId ?? undefined)
+    expect(deals.map((d) => d.id)).toContain(archivedForeignDealId)
+  })
+
+  it("getPipelineDeals (stats/listado's query path) excludes a foreign deal for a SUPERVISOR without pipeline.viewAll", async () => {
+    await withTenant(tenantId, (tx) =>
+      tx.rolePermission.create({
+        data: { tenantId, role: "SUPERVISOR", key: "pipeline.viewAll", allowed: false },
+      }),
+    )
+    const scope = await pipelineScopeFor(tenantId, "SUPERVISOR", supervisorId)
+    const deals = await getPipelineDeals(tenantId, { visibleToUserId: scope.visibleToUserId ?? undefined })
+    const ids = deals.map((d) => d.id)
+    // supervisorId owns nothing and nothing was ceded to them, so a correctly scoped call
+    // returns none of the tenant's deals — not just a filtered subset. That is what
+    // distinguishes this from the pre-fix bug, which ignored the scope value entirely for
+    // SUPERVISOR and returned every deal regardless of pipeline.viewAll.
+    expect(ids).not.toContain(foreignDealId)
+    expect(ids).toEqual([])
+  })
+
+  it("getPipelineDeals includes the foreign deal once pipeline.viewAll is restored (the default)", async () => {
+    const scope = await pipelineScopeFor(tenantId, "SUPERVISOR", supervisorId)
+    const deals = await getPipelineDeals(tenantId, { visibleToUserId: scope.visibleToUserId ?? undefined })
+    expect(deals.map((d) => d.id)).toContain(foreignDealId)
+  })
+
+  it("getCalendarFollowUps does not surface a foreign deal's follow-up for a SUPERVISOR without pipeline.viewAll", async () => {
+    await withTenant(tenantId, (tx) =>
+      tx.rolePermission.create({
+        data: { tenantId, role: "SUPERVISOR", key: "pipeline.viewAll", allowed: false },
+      }),
+    )
+    const now = new Date()
+    const scope = await pipelineScopeFor(tenantId, "SUPERVISOR", supervisorId)
+    const followUps = await getCalendarFollowUps(
+      tenantId,
+      now.getFullYear(),
+      now.getMonth(),
+      scope.visibleToUserId ?? undefined,
+    )
+    expect(followUps.map((fu) => fu.deal.id)).not.toContain(foreignDealId)
+  })
+
+  it("getCalendarFollowUps surfaces it once pipeline.viewAll is restored (the default)", async () => {
+    const now = new Date()
+    const scope = await pipelineScopeFor(tenantId, "SUPERVISOR", supervisorId)
+    const followUps = await getCalendarFollowUps(
+      tenantId,
+      now.getFullYear(),
+      now.getMonth(),
+      scope.visibleToUserId ?? undefined,
+    )
+    expect(followUps.map((fu) => fu.deal.id)).toContain(foreignDealId)
   })
 })
