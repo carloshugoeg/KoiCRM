@@ -1,20 +1,21 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   DndContext,
-  DragEndEvent,
   PointerSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
   DragOverlay,
-  DragStartEvent,
+  type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core"
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable"
 import { toast } from "sonner"
 import { KanbanColumn } from "@/features/pipeline/components/KanbanColumn"
 import { DealCard, type DealCardData } from "@/features/pipeline/components/DealCard"
+import { useNarrowViewport } from "@/features/pipeline/hooks/use-narrow-viewport"
 import { moveDealAction } from "@/features/deals/actions"
 import { useActionPin } from "@/features/auth/pin-gate"
 import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
@@ -29,9 +30,9 @@ interface KanbanBoardProps {
   initialDeals: DealCardData[]
   settings: IntlSettings
   equipmentLabels?: Record<string, string>
+  onDealClick: (dealId: string) => void
   /** When false, per-stage money totals stay hidden (each card keeps its own value). */
   canSeeTotals?: boolean
-  onDealClick: (dealId: string) => void
 }
 
 export function KanbanBoard({
@@ -41,23 +42,68 @@ export function KanbanBoard({
   initialDeals,
   settings,
   equipmentLabels,
+  onDealClick,
   // Fail closed: an omitted prop must hide totals, not reveal them.
   canSeeTotals = false,
-  onDealClick,
 }: KanbanBoardProps) {
   const { guard } = useActionPin()
   const [deals, setDeals] = useState(initialDeals)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [movingDealId, setMovingDealId] = useState<string | null>(null)
+  const [activeStageIndex, setActiveStageIndex] = useState(0)
+  const slidesRef = useRef<HTMLDivElement>(null)
+  const railRef = useRef<HTMLDivElement>(null)
+
+  // Phones swipe between stages, so dnd-kit gets no sensors there: the two gestures
+  // would otherwise fight over the same touch. Stage moves live in the deal modal.
+  const isNarrow = useNarrowViewport()
+  const pointerSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
+  const noSensors = useSensors()
+  const sensors = isNarrow ? noSensors : pointerSensors
 
   useEffect(() => {
     setDeals(initialDeals)
   }, [initialDeals])
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  )
+  /** Scrolls `child` to the centre of its scroll container. */
+  function centerChild(container: HTMLElement, child: HTMLElement, behavior: ScrollBehavior) {
+    const box = container.getBoundingClientRect()
+    const target = child.getBoundingClientRect()
+    const delta = target.left + target.width / 2 - (box.left + box.width / 2)
+    container.scrollBy({ left: delta, behavior })
+  }
+
+  /** Index of the slide currently filling the viewport (only ever scrolls on mobile). */
+  const syncActiveStage = useCallback(() => {
+    const el = slidesRef.current
+    if (!el) return
+    const slides = Array.from(el.children) as HTMLElement[]
+    if (slides.length === 0) return
+    const box = el.getBoundingClientRect()
+    const center = box.left + box.width / 2
+    const found = slides.findIndex((slide) => center < slide.getBoundingClientRect().right)
+    const index = found === -1 ? slides.length - 1 : found
+    setActiveStageIndex((prev) => (prev === index ? prev : index))
+  }, [])
+
+  const goToStage = useCallback((index: number) => {
+    const el = slidesRef.current
+    const slide = el?.children[index] as HTMLElement | undefined
+    if (!el || !slide) return
+    centerChild(el, slide, "smooth")
+    setActiveStageIndex(index)
+  }, [])
+
+  // Keep the selected pill in view as the user swipes through the stages.
+  useEffect(() => {
+    const rail = railRef.current
+    const pill = rail?.children[activeStageIndex] as HTMLElement | undefined
+    if (!rail || !pill) return
+    centerChild(rail, pill, "smooth")
+  }, [activeStageIndex])
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as string)
@@ -122,20 +168,66 @@ export function KanbanBoard({
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex h-full w-full min-w-0 gap-2 overflow-hidden px-2 pb-4 pt-2 sm:gap-3 sm:px-3 md:gap-4 md:px-4 min-h-[calc(100vh-180px)]">
-        {stages.map((stage) => (
-          <KanbanColumn
-            key={stage.id}
-            stage={stage}
-            deals={deals.filter((d) => d.stageId === stage.id)}
-            settings={settings}
-            equipmentLabels={equipmentLabels}
-            onDealClick={onDealClick}
-            movingDealId={movingDealId}
-            draggingDeal={activeId ? deals.find((d) => d.id === activeId) : undefined}
-            canSeeTotals={canSeeTotals}
-          />
-        ))}
+      <div className="flex h-full min-w-0 flex-col">
+        {/* Stage rail — mobile only: shows the current stage and jumps between them. */}
+        <div
+          ref={railRef}
+          role="group"
+          aria-label="Etapas del embudo"
+          className="flex shrink-0 gap-2 overflow-x-auto px-3 pb-3 md:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {stages.map((stage, index) => {
+            const isActive = index === activeStageIndex
+            const count = deals.filter((d) => d.stageId === stage.id).length
+            return (
+              <button
+                key={stage.id}
+                type="button"
+                aria-current={isActive ? "true" : undefined}
+                onClick={() => goToStage(index)}
+                className="flex h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-[11px] font-black uppercase tracking-wider transition-colors"
+                style={
+                  isActive
+                    ? { background: stage.color, borderColor: stage.color, color: "#ffffff" }
+                    : { background: "#ffffff", borderColor: "#e2e8f0", color: "#64748b" }
+                }
+              >
+                <span className="max-w-[9rem] truncate">{stage.label}</span>
+                <span
+                  className="flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold"
+                  style={
+                    isActive
+                      ? { background: "rgba(255,255,255,0.25)", color: "#ffffff" }
+                      : { background: "#f1f5f9", color: "#475569" }
+                  }
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        <div
+          ref={slidesRef}
+          onScroll={syncActiveStage}
+          className="flex w-full min-w-0 flex-1 min-h-0 snap-x snap-mandatory overscroll-x-contain gap-2 overflow-x-auto overflow-y-hidden px-2 pb-4 pt-2 sm:gap-3 sm:px-3 md:h-full md:min-h-[calc(100vh-180px)] md:snap-none md:gap-4 md:overflow-hidden md:px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {stages.map((stage) => (
+            <KanbanColumn
+              key={stage.id}
+              stage={stage}
+              deals={deals.filter((d) => d.stageId === stage.id)}
+              settings={settings}
+              equipmentLabels={equipmentLabels}
+              onDealClick={onDealClick}
+              movingDealId={movingDealId}
+              draggingDeal={activeId ? deals.find((d) => d.id === activeId) : undefined}
+              canSeeTotals={canSeeTotals}
+              dragDisabled={isNarrow}
+            />
+          ))}
+        </div>
       </div>
 
       <DragOverlay>
