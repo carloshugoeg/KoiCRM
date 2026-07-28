@@ -12,6 +12,7 @@ import {
   Archive,
   BarChart2,
   Droplets,
+  FileText,
   type LucideIcon,
 } from "lucide-react"
 import { useTenant } from "@/lib/tenant/context"
@@ -63,6 +64,7 @@ export function TenantHeader({
   const navItems: { href: string; label: string; icon: LucideIcon; badge?: number }[] = [
     { href: `${base}/pipeline`, label: "Embudo", icon: LayoutDashboard },
     { href: `${base}/clients`, label: "Clientes", icon: Users, badge: clientsCount },
+    { href: `${base}/reports`, label: "Reportes", icon: FileText },
     { href: `${base}/calendar`, label: "Calendario", icon: Calendar },
     { href: `${base}/archive`, label: "Archivo", icon: Archive },
     ...(canViewStats
