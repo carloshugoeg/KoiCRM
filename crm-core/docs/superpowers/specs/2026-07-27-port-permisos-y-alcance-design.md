@@ -36,6 +36,8 @@ Volume: 24 modified files (~1,049 insertions) plus ~1,270 lines of new files.
 | MinIO dev service | **Port** | Lets any dev exercise uploads without R2 credentials. Production never sees it. |
 | `DB_PORT` in compose | **Already present** in this working tree | Default stays 5435, so the integration harness is unaffected. |
 | `VIEWER` defaults | **Keep `pipeline.viewAll: true`, no totals** | A `VIEWER` owns no deals, so a restricted read-only role would render an empty funnel. |
+| How a restricted member's scope is expressed | **Reuse the existing `visibleToUserId` mechanism**, not strict `ownerId` | The repo already has `dealVisibilityWhere(userId)` — owned **or ceded via `DealViewer`** — used by `stats/listado`, `getDeal`, `getArchivedDeals` and search. The demo pinned on `ownerId` alone, which would make a ceded opportunity vanish from the advisor's funnel while still appearing in archive, search and stats. |
+| `clients.viewAll` | **Drop from the catalogue** | Declared, labelled and rendered as a toggle in the matrix, but no query or page reads it. It defaults to `true` everywhere so nobody notices today; the moment an admin turns it off, nothing happens. A switch that lies is worse than no switch. Re-add it when client scoping exists. |
 | Demo scaffolding | **Excluded from every commit, not deleted** | Already sitting uncommitted in this working tree; it stays there. |
 
 ---
@@ -87,14 +89,15 @@ no exceptions inherits their role.
 
 ### Permission catalogue
 
-Five keys, defined once in `PERMISSION_DEFS` — label, description and grouping travel with the key,
+Four keys, defined once in `PERMISSION_DEFS` — label, description and grouping travel with the key,
 so adding a permission is a single-file change that surfaces in the settings matrix automatically.
+Every key in the catalogue must have a consumer; `clients.viewAll` came from the demo with none and
+is dropped rather than shipped inert.
 
 | Key | Superadmin | Admin | Supervisor | Asesor | Solo lectura |
 |---|---|---|---|---|---|
 | `pipeline.viewAll` | yes | yes | yes | **no** | yes |
 | `pipeline.viewTotals` | yes | yes | yes | **no** | no |
-| `clients.viewAll` | yes | yes | yes | yes | yes |
 | `reports.viewAll` | yes | yes | yes | no | no |
 | `stats.viewTotals` | yes | yes | yes | no | no |
 
@@ -108,6 +111,9 @@ so adding a permission is a single-file change that surfaces in the settings mat
 | `permissionMatrix(tenantId)` | 1+2, all roles | settings screen |
 | `memberPermissions(tenantId, members)` | 1+2+3, all members | per-person exceptions screen |
 | `pipelineScopeFor(tenantId, role, userId)` | 1+2+3 | pipeline queries and `getDealSummaryAction` |
+
+`pipelineScopeFor` returns `{ visibleToUserId: string | null, canSeeTotals: boolean }`. The field is
+named after the filter it feeds, so the call site cannot mistake it for strict ownership.
 
 `memberPermissions` reads the whole tenant's rows in one pass rather than one query per member.
 Every read goes through `withTenant`, as required for RLS-protected tables.
@@ -185,12 +191,14 @@ SELECT "id", 'MEMBER', 'pipeline.viewAll', true, NOW() FROM "Tenant";
 
 ## Funnel scope
 
-`pipelineScopeFor` returns `{ ownerId, canSeeTotals }`. When `ownerId` is non-null, callers must
-pin the query to that owner.
+`pipelineScopeFor` returns `{ visibleToUserId, canSeeTotals }`. When `visibleToUserId` is non-null,
+callers must pin the query to what that user may see — their own deals plus anything ceded to them
+through `DealViewer`, which is exactly what the existing `dealVisibilityWhere` fragment expresses.
 
 - `loadPipelineKanbanData(tenantId, dealFilters, scope?)` merges the scope into the filters
   **before** building the `where`, so a member without `pipeline.viewAll` cannot widen it by
-  hand-crafting `?owner=`. The restriction lives in SQL, not in the client.
+  hand-crafting `?owner=`. The restriction lives in SQL, not in the client. `visibleToUserId` and
+  `ownerId` compose as `AND`, so a hostile `?owner=` can only ever narrow the visible set.
 - `canSeeTotals: false` hides **aggregates only** — per-stage totals and the `KpiBar`. Each deal's
   own value stays on its card. This is a deliberate product decision, not an oversight.
 - The "Asesor" select in `FilterBar` is not rendered for a restricted member.
@@ -207,8 +215,10 @@ Touched: `app/app/[tenantSlug]/pipeline/page.tsx`, `features/pipeline/queries.ts
 `getDealSummaryAction` was written for the open funnel and returned any deal to any member. The
 new `?deal=<id>` deep link calls it with a caller-supplied id, so a restricted advisor could read
 another advisor's opportunity by editing the URL. The fix resolves `pipelineScopeFor` **server-side**
-and returns the same "Oportunidad no encontrada." message on a scope miss — no oracle distinguishing
-"exists but not yours" from "does not exist".
+and passes `visibleToUserId` into the existing `getDeal(tenantId, dealId, visibleToUserId)` overload,
+so the restriction is applied in the same query that fetches the deal. An out-of-scope deal comes back
+as `null` and takes the ordinary "Oportunidad no encontrada." path — no separate branch, and no oracle
+distinguishing "exists but not yours" from "does not exist".
 
 ### 2. Wrong permission key in reports
 
@@ -315,8 +325,11 @@ Full coverage, in two tiers.
   a hostile `UserPermission` row present.
 - `permissionsForRole` ignores `UserPermission` rows; `permissionsFor` honours them.
 - `memberPermissions` reports the correct `inherited` baseline and `overrideCount`.
-- `pipelineScopeFor` maps `pipeline.viewAll` → `ownerId` and `pipeline.viewTotals` → `canSeeTotals`.
+- `pipelineScopeFor` maps `pipeline.viewAll` → `visibleToUserId` and `pipeline.viewTotals` →
+  `canSeeTotals`.
 - `isPermissionKey` rejects an unknown key, so a stale row cannot inject an arbitrary field.
+- Catalogue integrity: every key in `PERMISSION_KEYS` has a `PERMISSION_DEFS` entry and a default
+  for all five roles. This is what would have caught `clients.viewAll` shipping without a consumer.
 
 ### Integration — `tests/integration/`, run by `pnpm test:integration` (`app_user` harness, Postgres on :5435)
 
@@ -326,8 +339,10 @@ Full coverage, in two tiers.
 - A `MEMBER` without `pipeline.viewAll` receives only their own deals from
   `loadPipelineKanbanData`, **including when `dealFilters.ownerId` names someone else** — the
   `?owner=` widening attempt.
-- `getDealSummaryAction` returns the not-found error for a deal owned by someone else, and succeeds
-  for the caller's own.
+- That same member **does** receive a deal ceded to them through `DealViewer`, so the funnel agrees
+  with archive, search and `stats/listado`.
+- `getDealSummaryAction` returns the not-found error for a deal owned by someone else, succeeds for
+  the caller's own, and succeeds for one ceded to them.
 - The backfill: a tenant created before the migration resolves `pipeline.viewAll = true` for
   `MEMBER`; a tenant created after it resolves `false`.
 - Reports scope keys off `reports.viewAll`, and is unaffected by toggling `pipeline.viewAll`.
@@ -346,18 +361,23 @@ matrix while signed in.
 
 ## Delivery
 
-Branch `feat/permissions-and-scope` off `15889e3`, committed in dependency order:
+Branch `feat/permissions-and-scope` off `15889e3`, committed in dependency order. Each commit
+carries its own tests rather than deferring them to a final pass:
 
-1. Permission foundation — schema, both migrations including the backfill, `lib/permissions/*`,
-   `features/permissions/*`, settings route, nav entry.
-2. The two defect fixes.
-3. Funnel scope.
-4. Reports.
-5. Per-panel stats filters.
-6. Clients → open opportunity.
-7. Mobile funnel.
-8. Storage flag + MinIO.
-9. Tests.
+1. Schema, both migrations including the backfill, RLS coverage.
+2. Permission catalogue and three-layer resolution.
+3. Permissions settings screen and its two server actions.
+4. Deep-link authorization fix.
+5. Funnel scope.
+6. Reports.
+7. Per-panel stats filters.
+8. Clients → open opportunity.
+9. Mobile funnel.
+10. Equipment icon resolution fix.
+11. Storage flag + MinIO.
+
+The task-by-task breakdown lives in
+[`../plans/2026-07-27-port-permisos-y-alcance.md`](../plans/2026-07-27-port-permisos-y-alcance.md).
 
 Demo scaffolding stays uncommitted throughout. `docker-compose.yml` is committed (it carries
 `DB_PORT` and MinIO); `package.json` and the root `README.md` are **not**, since their only pending
