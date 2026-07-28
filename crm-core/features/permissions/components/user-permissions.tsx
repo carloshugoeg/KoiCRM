@@ -8,9 +8,9 @@ import { setUserPermissionAction } from "@/features/permissions/actions"
 import {
   LOCKED_ROLES,
   PERMISSION_DEFS,
-  ROLE_LABELS,
   type PermissionKey,
 } from "@/lib/permissions/defaults"
+import { ROLE_LABELS } from "@/lib/auth/permissions"
 import { avatarColor, avatarInitials } from "@/lib/utils/avatar-color"
 import { toastErrorFromResult, toastMessages } from "@/lib/ui/toast-messages"
 import { cn } from "@/lib/utils"

@@ -16,14 +16,6 @@ export type PermissionKey = (typeof PERMISSION_KEYS)[number]
 
 export const ROLES: Role[] = ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"]
 
-export const ROLE_LABELS: Record<Role, string> = {
-  OWNER: "Superadmin",
-  ADMIN: "Admin",
-  SUPERVISOR: "Supervisor",
-  MEMBER: "Asesor",
-  VIEWER: "Solo lectura",
-}
-
 export interface PermissionDef {
   key: PermissionKey
   group: string

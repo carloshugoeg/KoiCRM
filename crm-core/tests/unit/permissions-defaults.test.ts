@@ -3,12 +3,16 @@ import {
   PERMISSION_KEYS,
   PERMISSION_DEFS,
   ROLES,
-  ROLE_LABELS,
   LOCKED_ROLES,
   defaultMatrix,
   defaultPermission,
   isPermissionKey,
 } from "@/lib/permissions/defaults"
+// ROLE_LABELS is authoritative in lib/auth/permissions (the Usuarios screen's source), not
+// duplicated here — lib/permissions/defaults used to keep its own copy that disagreed with it
+// (OWNER/ADMIN rendered differently on the Permisos screen than on the Usuarios screen right
+// next to it in settings). This test now guards against that map reappearing out of sync.
+import { ROLE_LABELS } from "@/lib/auth/permissions"
 
 describe("permission catalogue integrity", () => {
   it("gives every key exactly one definition", () => {
@@ -26,6 +30,10 @@ describe("permission catalogue integrity", () => {
 
   it("labels every role", () => {
     for (const role of ROLES) expect(ROLE_LABELS[role]).toBeTruthy()
+  })
+
+  it("gives every locked role the identical label, since they resolve to identical access", () => {
+    for (const role of LOCKED_ROLES) expect(ROLE_LABELS[role]).toBe("Superadministrador")
   })
 
   it("does not carry clients.viewAll, which has no consumer", () => {

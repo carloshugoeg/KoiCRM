@@ -8,19 +8,28 @@ import { setRolePermissionAction } from "@/features/permissions/actions"
 import {
   LOCKED_ROLES,
   PERMISSION_DEFS,
-  ROLE_LABELS,
-  ROLES,
   type PermissionDef,
   type PermissionKey,
   type PermissionMatrix,
 } from "@/lib/permissions/defaults"
+import { ROLE_LABELS } from "@/lib/auth/permissions"
 import { toastErrorFromResult, toastMessages } from "@/lib/ui/toast-messages"
 
-const LOCKED_ROLE_LABELS = ROLES.filter((role) => LOCKED_ROLES.includes(role))
-  .map((role) => ROLE_LABELS[role])
-  .join(" y ")
+/**
+ * Columns to render in the matrix — distinct from ROLES (which stays at all five roles for
+ * defaultMatrix() and the catalogue-integrity test). OWNER never reaches this screen
+ * (ASSIGNABLE_ROLES excludes it) and OWNER/ADMIN are both in LOCKED_ROLES with identical full
+ * access, so they collapse into a single locked "Superadministrador" column here instead of
+ * two adjacent columns that always toggled together and, once their labels matched, would
+ * have read as an outright duplicate.
+ */
+const MATRIX_COLUMNS: Role[] = ["ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"]
 
-const LOCKED_HINT = `${LOCKED_ROLE_LABELS} siempre tienen acceso completo.`
+const LOCKED_COLUMNS = MATRIX_COLUMNS.filter((role) => LOCKED_ROLES.includes(role))
+const LOCKED_ROLE_LABELS = LOCKED_COLUMNS.map((role) => ROLE_LABELS[role]).join(" y ")
+const LOCKED_IS_SINGULAR = LOCKED_COLUMNS.length === 1
+
+const LOCKED_HINT = `${LOCKED_ROLE_LABELS} siempre ${LOCKED_IS_SINGULAR ? "tiene" : "tienen"} acceso completo.`
 
 /** PERMISSION_DEFS in catalogue order, agrupados por sección. */
 function groupDefs(): Array<{ group: string; defs: PermissionDef[] }> {
@@ -113,7 +122,7 @@ export function PermissionsSettings({ tenantId, matrix: initialMatrix, canManage
               <th className="sticky left-0 z-10 w-[220px] bg-background px-3 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Permiso
               </th>
-              {ROLES.map((role) => (
+              {MATRIX_COLUMNS.map((role) => (
                 <th
                   key={role}
                   scope="col"
@@ -130,7 +139,7 @@ export function PermissionsSettings({ tenantId, matrix: initialMatrix, canManage
                 <tr className="border-b border-border/60 bg-muted/40">
                   <th
                     scope="colgroup"
-                    colSpan={ROLES.length + 1}
+                    colSpan={MATRIX_COLUMNS.length + 1}
                     className="px-3 py-1.5 text-left"
                   >
                     <span className="sticky left-3 inline-block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -149,7 +158,7 @@ export function PermissionsSettings({ tenantId, matrix: initialMatrix, canManage
                         {def.description}
                       </span>
                     </th>
-                    {ROLES.map((role) => {
+                    {MATRIX_COLUMNS.map((role) => {
                       const locked = LOCKED_ROLES.includes(role)
                       const checked = locked || matrix[role][def.key]
                       const busy = pending === `${role}:${def.key}`
@@ -182,8 +191,9 @@ export function PermissionsSettings({ tenantId, matrix: initialMatrix, canManage
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Las columnas de {LOCKED_ROLE_LABELS} no se pueden editar: siempre tienen acceso
-        completo a todo el espacio de trabajo.
+        {LOCKED_IS_SINGULAR ? "La columna" : "Las columnas"} de {LOCKED_ROLE_LABELS} no{" "}
+        {LOCKED_IS_SINGULAR ? "se puede" : "se pueden"} editar: siempre{" "}
+        {LOCKED_IS_SINGULAR ? "tiene" : "tienen"} acceso completo a todo el espacio de trabajo.
       </p>
     </div>
   )
