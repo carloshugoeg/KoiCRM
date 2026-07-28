@@ -9,6 +9,9 @@ function getClient(): S3Client {
     _client = new S3Client({
       region: process.env.S3_REGION ?? "auto",
       endpoint: process.env.S3_ENDPOINT!,
+      // MinIO (local S3-compatible storage) addresses buckets by path, not by subdomain.
+      // Left off for R2, which keeps its default virtual-host addressing.
+      forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true",
       credentials: {
         accessKeyId: process.env.S3_ACCESS_KEY_ID!,
         secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
