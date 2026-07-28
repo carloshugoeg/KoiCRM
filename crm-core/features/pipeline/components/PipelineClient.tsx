@@ -154,12 +154,13 @@ export function PipelineClient({
 
     let cancelled = false
     setLoadingDeal(true)
+    // The server is the source of truth for scope (getDealSummaryAction resolves it against
+    // pipelineScopeFor, "owned or ceded"); a deal outside the caller's scope simply comes
+    // back !ok, indistinguishable from a missing one.
     void getDealSummaryAction({ tenantId, dealId: selectedDealId }).then((res) => {
       if (cancelled) return
       setLoadingDeal(false)
-      // A deal outside the member's scope is treated as if it did not exist.
-      const inScope = !restrictedOwnerId || res.deal?.ownerId === restrictedOwnerId
-      if (res.ok && res.deal && inScope) {
+      if (res.ok && res.deal) {
         setFetchedDeal(res.deal)
       } else {
         // A stale deep link just resolves to nothing; a click inside the board is a real error.
@@ -174,7 +175,7 @@ export function PipelineClient({
     return () => {
       cancelled = true
     }
-  }, [selectedDealId, dealCards, tenantId, restrictedOwnerId, clearDealParam])
+  }, [selectedDealId, dealCards, tenantId, clearDealParam])
 
   const closeDealModal = useCallback(() => {
     setSelectedDealId(null)
