@@ -33,7 +33,7 @@ import { isActiveCatalogItemKeyInTx, isActiveSubcategoryOfCategory } from "@/fea
 import type { PrismaTx } from "@/lib/db/rls"
 import { z } from "zod"
 import { getDeal } from "@/features/deals/queries"
-import { assertDealInScope, requireDealReaderInScope } from "@/features/deals/guards"
+import { assertDealInScope, assertDealInScopeInTx, requireDealReaderInScope } from "@/features/deals/guards"
 
 /**
  * Validates an equipo-de-interés selection and flattens it into (categoría, subcategoría) rows.
@@ -186,6 +186,13 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
   await withTenant(tenantId, async (tx) => {
     const existing = await tx.deal.findUnique({ where: { id: dealId, tenantId } })
     if (!existing) { notFound = true; return }
+    // A restricted actor may not write to a deal they cannot see — the deep link and the PIN
+    // actor swap both let a caller name a foreign dealId directly. Out-of-scope takes the same
+    // "not found" path as a missing deal, so it isn't an existence oracle.
+    if (!(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      notFound = true
+      return
+    }
 
     if (fields.ownerId && fields.ownerId !== existing.ownerId) {
       const ownerMembership = await tx.membership.findUnique({
@@ -264,6 +271,10 @@ export async function moveDealAction(raw: unknown): Promise<{ ok: boolean; error
     ])
 
     if (!deal) { moveError = "Oportunidad no encontrada."; return }
+    if (!(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      moveError = "Oportunidad no encontrada."
+      return
+    }
     if (!targetStage) { moveError = "Etapa no encontrada."; return }
     if (targetStage.locked && !force) {
       if (targetStage.key === "ganado") {
@@ -330,6 +341,10 @@ export async function archiveDealAction(raw: unknown): Promise<{ ok: boolean; er
   await withTenant(tenantId, async (tx) => {
     const deal = await tx.deal.findUnique({ where: { id: dealId, tenantId } })
     if (!deal) { notFound = true; return }
+    if (!(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      notFound = true
+      return
+    }
     await tx.deal.update({ where: { id: dealId, tenantId }, data: { isArchived: true } })
     await recordActivity(tx, {
       tenantId,
@@ -365,6 +380,10 @@ export async function updateDealFieldAction(raw: unknown): Promise<{ ok: boolean
       select: { value: true, statusKey: true, phone: true, whatsapp: true, email: true, name: true, company: true },
     })
     if (!deal) { notFound = true; return }
+    if (!(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      notFound = true
+      return
+    }
     await tx.deal.update({ where: { id: dealId, tenantId }, data: { [field]: value } })
     if (field === "value") {
       await recordActivity(tx, {
@@ -399,6 +418,10 @@ export async function transferDealAction(raw: unknown): Promise<{ ok: boolean; e
   await withTenant(tenantId, async (tx) => {
     const existing = await tx.deal.findUnique({ where: { id: dealId, tenantId }, select: { ownerId: true } })
     if (!existing) { notFound = true; return }
+    if (!(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      notFound = true
+      return
+    }
     if (existing.ownerId === toUserId) { validationError = "La oportunidad ya pertenece a ese asesor."; return }
 
     const targetMembership = await tx.membership.findUnique({
@@ -440,6 +463,12 @@ export async function deleteDealAction(raw: unknown): Promise<{ ok: boolean; err
   await withTenant(tenantId, async (tx) => {
     const existing = await tx.deal.findUnique({ where: { id: dealId, tenantId }, select: { id: true, name: true } })
     if (!existing) { notFound = true; return }
+    // canDeleteDeal is ADMIN+, a LOCKED_ROLES member, so this is a same-tx no-op in practice —
+    // kept for defense in depth and so no deal-write action skips the scope check.
+    if (!(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      notFound = true
+      return
+    }
     await tx.deal.delete({ where: { id: dealId, tenantId } })
     await recordActivity(tx, {
       tenantId,
