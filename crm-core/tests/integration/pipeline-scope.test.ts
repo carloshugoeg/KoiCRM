@@ -34,6 +34,7 @@ import { getCalendarFollowUps } from "@/features/calendar/queries"
 import { pipelineScopeFor } from "@/lib/permissions/resolve"
 import { getClientKpis, loadClientDetailPageData, loadClientsPageData, listClients } from "@/features/clients/queries"
 import { loadTenantLayoutData } from "@/app/app/[tenantSlug]/layout-data"
+import { loadAlertsPageData } from "@/app/app/[tenantSlug]/stats/alerts/page-data"
 
 const mockAuth = auth as unknown as Mock<() => Promise<Session | null>>
 
@@ -863,5 +864,67 @@ describe("deal write actions honour the caller's scope", () => {
       const res = await updateQuote(tenantId, { id: foreignQuoteId, number: "Q-REGRESSION" })
       expect(res.ok).toBe(true)
     })
+  })
+})
+
+/**
+ * stats/alerts passed the raw ?<panel>.owner= search parameter straight to getFollowUpAlerts
+ * and never resolved pipelineScopeFor, so with no owner filter it applied no visibility
+ * predicate and returned every follow-up in the tenant — deal name, company, stage and the
+ * follow-up's free-text note. That is row-level data (the same reasoning that scopes
+ * stats/listado), so it must respect pipeline.viewAll too.
+ *
+ * loadAlertsPageData is page.tsx's data load pulled into a plain `.ts` module, the same
+ * reason layout-data.ts exists (see loadTenantLayoutData above) — the node test runner has no
+ * JSX transform, so a test can't import page.tsx itself.
+ */
+describe("stats/alerts page data honours pipeline.viewAll scope", () => {
+  beforeAll(async () => {
+    await prismaAdmin.followUp.create({
+      data: { tenantId, dealId: foreignDealId, date: new Date(), note: "Alerta ajena", completed: false },
+    })
+    await prismaAdmin.followUp.create({
+      data: { tenantId, dealId: cededDealId, date: new Date(), note: "Alerta cedida", completed: false },
+    })
+  })
+
+  function todayNotes(data: Awaited<ReturnType<typeof loadAlertsPageData>>) {
+    return data.hoy.today.map((fu) => fu.note)
+  }
+
+  it("a member without pipeline.viewAll does not receive an alert for a foreign deal", async () => {
+    const data = await loadAlertsPageData(tenantId, "MEMBER", memberId, {}, {})
+    expect(todayNotes(data)).not.toContain("Alerta ajena")
+  })
+
+  it("a member without pipeline.viewAll still receives an alert for a deal ceded to them", async () => {
+    const data = await loadAlertsPageData(tenantId, "MEMBER", memberId, {}, {})
+    expect(todayNotes(data)).toContain("Alerta cedida")
+  })
+
+  it("cannot widen the result with a hand-crafted owner parameter naming a colleague", async () => {
+    const data = await loadAlertsPageData(
+      tenantId,
+      "MEMBER",
+      memberId,
+      { vencidos: otherId, hoy: otherId, proximos: otherId },
+      {},
+    )
+    expect(data.canSeeAll).toBe(false)
+    expect(todayNotes(data)).not.toContain("Alerta ajena")
+    // The crafted param is discarded outright, not merely narrowed — the caller's own scope
+    // still surfaces their ceded deal's alert even though they asked for someone else's.
+    expect(todayNotes(data)).toContain("Alerta cedida")
+  })
+
+  it("returns the foreign deal's alert once pipeline.viewAll is granted", async () => {
+    await withTenant(tenantId, (tx) =>
+      tx.rolePermission.create({
+        data: { tenantId, role: "MEMBER", key: "pipeline.viewAll", allowed: true },
+      }),
+    )
+    const data = await loadAlertsPageData(tenantId, "MEMBER", memberId, {}, {})
+    expect(data.canSeeAll).toBe(true)
+    expect(todayNotes(data)).toContain("Alerta ajena")
   })
 })

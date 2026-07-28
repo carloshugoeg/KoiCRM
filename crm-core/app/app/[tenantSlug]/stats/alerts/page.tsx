@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
-import { getFollowUpAlerts, type FollowUpAlert } from "@/features/follow-ups/queries"
+import type { FollowUpAlert } from "@/features/follow-ups/queries"
 import { parseDate } from "@/lib/intl/format"
 import { getStatsFilterOptions } from "@/features/stats/queries"
 import { readPanelFilters } from "@/features/stats/panel-filters"
@@ -12,6 +12,7 @@ import type {
 } from "@/features/stats/panel-filters"
 import { PanelFilters } from "@/features/stats/components/PanelFilters"
 import { Badge } from "@/components/ui/badge"
+import { loadAlertsPageData } from "./page-data"
 
 interface Props {
   params: { tenantSlug: string }
@@ -38,11 +39,11 @@ function AlertRow({ fu }: { fu: FollowUpAlert }) {
 }
 
 function AlertSection({
-  title, count, items, emptyText, countClass, panelId, options, values,
+  title, count, items, emptyText, countClass, panelId, options, values, canSeeAll,
 }: {
   title: string; count: number; items: FollowUpAlert[]
   emptyText: string; countClass: string
-  panelId: string; options: StatsFilterOptions; values: PanelFilterValues
+  panelId: string; options: StatsFilterOptions; values: PanelFilterValues; canSeeAll: boolean
 }) {
   return (
     <section>
@@ -51,7 +52,12 @@ function AlertSection({
           <h2 className="text-sm font-semibold">{title}</h2>
           <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${countClass}`}>{count}</span>
         </div>
-        <PanelFilters panelId={panelId} keys={ALERT_FILTERS} options={options} values={values} />
+        {/* Asesores (and any role with pipeline.viewAll off) only ever see their own scope, so
+            the advisor filter has nothing to offer them — hidden the same way calendar hides
+            its owner select for a restricted caller. */}
+        {canSeeAll && (
+          <PanelFilters panelId={panelId} keys={ALERT_FILTERS} options={options} values={values} />
+        )}
       </div>
       {items.length === 0 ? (
         <p className="text-xs text-muted-foreground">{emptyText}</p>
@@ -73,7 +79,7 @@ export default async function AlertsPage({ params, searchParams }: Props) {
   const resolved = await resolveTenant(params.tenantSlug, session)
   if (!resolved) notFound()
 
-  const { tenant } = resolved
+  const { tenant, membership } = resolved
   const tenantId = tenant.id
   const from = parseDate(searchParams.from)
   const to = parseDate(searchParams.to)
@@ -82,22 +88,21 @@ export default async function AlertsPage({ params, searchParams }: Props) {
   const hoyValues = readPanelFilters(searchParams, "hoy", ALERT_FILTERS)
   const proximosValues = readPanelFilters(searchParams, "proximos", ALERT_FILTERS)
 
+  // loadAlertsPageData opens one tenant transaction for the permission read and all three
+  // bucket queries; sequenced ahead of getStatsFilterOptions' own transaction so we never hold
+  // two open at once on a small connection pool (see 15889e3, and stats/listado's own comment
+  // to the same effect). A restricted caller's owner params are discarded inside it —
+  // scope.visibleToUserId always wins over a hand-crafted ?<panel>.owner=, the same rule
+  // stats/listado applies to the funnel.
+  const { canSeeAll, vencidos, hoy, proximos } = await loadAlertsPageData(
+    tenantId,
+    membership.role,
+    session.user.id,
+    { vencidos: vencidosValues.owner, hoy: hoyValues.owner, proximos: proximosValues.owner },
+    { from, to },
+  )
+
   const options = await getStatsFilterOptions(tenantId)
-
-  // Sections that share an asesor filter share a single round trip. The "asesor" filter now
-  // resolves through dealVisibilityWhere (owned or ceded), so picking an advisor here surfaces
-  // what they're working on — including deals ceded to them — consistent with cesión
-  // transferring the work everywhere else in the app.
-  const cache = new Map<string, Awaited<ReturnType<typeof getFollowUpAlerts>>>()
-  async function alertsFor(ownerId?: string) {
-    const key = ownerId ?? ""
-    if (!cache.has(key)) cache.set(key, await getFollowUpAlerts(tenantId, ownerId, { from, to }))
-    return cache.get(key)!
-  }
-
-  const vencidos = await alertsFor(vencidosValues.owner)
-  const hoy = await alertsFor(hoyValues.owner)
-  const proximos = await alertsFor(proximosValues.owner)
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-6">
@@ -108,13 +113,13 @@ export default async function AlertsPage({ params, searchParams }: Props) {
       <div className="space-y-8">
         <AlertSection title="Vencidos" count={vencidos.overdue.length} items={vencidos.overdue}
           emptyText="No hay seguimientos vencidos." countClass="bg-red-100 text-red-700"
-          panelId="vencidos" options={options} values={vencidosValues} />
+          panelId="vencidos" options={options} values={vencidosValues} canSeeAll={canSeeAll} />
         <AlertSection title="Para hoy" count={hoy.today.length} items={hoy.today}
           emptyText="No hay seguimientos programados para hoy." countClass="bg-orange-100 text-orange-700"
-          panelId="hoy" options={options} values={hoyValues} />
+          panelId="hoy" options={options} values={hoyValues} canSeeAll={canSeeAll} />
         <AlertSection title="Próximos 7 días" count={proximos.next7.length} items={proximos.next7}
           emptyText="No hay seguimientos en los próximos 7 días." countClass="bg-blue-100 text-blue-700"
-          panelId="proximos" options={options} values={proximosValues} />
+          panelId="proximos" options={options} values={proximosValues} canSeeAll={canSeeAll} />
       </div>
     </div>
   )
