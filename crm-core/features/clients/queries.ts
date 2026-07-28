@@ -2,6 +2,7 @@ import { withTenant, type PrismaTx } from "@/lib/db/rls"
 import type { Prisma } from "@prisma/client"
 import { getCatalogItemsInTx, getEquipmentHierarchyInTx } from "@/features/catalogs/queries"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
+import { dealVisibilityWhere } from "@/features/deals/queries"
 
 export type ClientWithDealCount = Awaited<ReturnType<typeof listClients>>["items"][number]
 
@@ -111,12 +112,26 @@ export async function listClients(
   return withTenant(tenantId, (tx) => listClientsInTx(tx, tenantId, opts))
 }
 
-export async function getClientWithDealsInTx(tx: PrismaTx, tenantId: string, clientId: string) {
+/**
+ * `visibleToUserId` restricts the deal list (and therefore the "Abrir" deep link on each row)
+ * to what that user may see — their own deals plus anything ceded to them, same rule as the
+ * funnel. Without it a restricted member sees every deal a client has ever had, including a
+ * colleague's name, stage and value, on a page that predates the permission system.
+ */
+export async function getClientWithDealsInTx(
+  tx: PrismaTx,
+  tenantId: string,
+  clientId: string,
+  visibleToUserId?: string,
+) {
   return tx.client.findUnique({
     where: { id: clientId, tenantId },
     include: {
       deals: {
-        where: { isArchived: false },
+        where: {
+          isArchived: false,
+          ...(visibleToUserId ? dealVisibilityWhere(visibleToUserId) : {}),
+        },
         include: {
           stage: true,
           owner: { select: { id: true, name: true, email: true } },
@@ -131,8 +146,8 @@ export async function getClientWithDealsInTx(tx: PrismaTx, tenantId: string, cli
   })
 }
 
-export async function getClientWithDeals(tenantId: string, clientId: string) {
-  return withTenant(tenantId, (tx) => getClientWithDealsInTx(tx, tenantId, clientId))
+export async function getClientWithDeals(tenantId: string, clientId: string, visibleToUserId?: string) {
+  return withTenant(tenantId, (tx) => getClientWithDealsInTx(tx, tenantId, clientId, visibleToUserId))
 }
 
 export async function getClientKpisInTx(
@@ -206,6 +221,8 @@ export async function loadClientsPageData(
     sort?: "name" | "recent"
     cursor?: string
     selectedClientId?: string
+    /** Restricts the selected client's deal list — see getClientWithDealsInTx. */
+    visibleToUserId?: string
   },
 ) {
   return withTenant(
@@ -222,7 +239,7 @@ export async function loadClientsPageData(
 
       const selected = opts.selectedClientId
         ? await Promise.all([
-            getClientWithDealsInTx(tx, tenantId, opts.selectedClientId),
+            getClientWithDealsInTx(tx, tenantId, opts.selectedClientId, opts.visibleToUserId),
             getClientKpisInTx(tx, tenantId, opts.selectedClientId),
           ])
         : null
@@ -240,13 +257,13 @@ export async function loadClientsPageData(
 }
 
 /** Same chrome as the clients list page, for the standalone client detail route. */
-export async function loadClientDetailPageData(tenantId: string, clientId: string) {
+export async function loadClientDetailPageData(tenantId: string, clientId: string, visibleToUserId?: string) {
   return withTenant(
     tenantId,
     async (tx) => {
       const [chrome, client, kpis] = await Promise.all([
         loadClientPageChromeInTx(tx, tenantId),
-        getClientWithDealsInTx(tx, tenantId, clientId),
+        getClientWithDealsInTx(tx, tenantId, clientId, visibleToUserId),
         getClientKpisInTx(tx, tenantId, clientId),
       ])
       return { ...chrome, client, kpis }

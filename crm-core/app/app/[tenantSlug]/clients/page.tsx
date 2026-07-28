@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
+import { pipelineScopeFor } from "@/lib/permissions/resolve"
 import { loadClientsPageData } from "@/features/clients/queries"
 import { ClientSidebar } from "@/features/clients/components/ClientSidebar"
 import { ClientProfile } from "@/features/clients/components/ClientProfile"
@@ -28,6 +29,10 @@ export default async function ClientsPage({ params, searchParams }: Props) {
   const selectedClientId = searchParams.client as string | undefined
   const cursor = searchParams.cursor as string | undefined
 
+  // Sequenced ahead of loadClientsPageData's single transaction rather than alongside it, so
+  // this route still opens its queries one at a time (matches the fan-out fix in 15889e3).
+  const scope = await pipelineScopeFor(tenantId, membership.role, session.user.id)
+
   const {
     clients,
     nextCursor,
@@ -44,6 +49,7 @@ export default async function ClientsPage({ params, searchParams }: Props) {
     sort,
     cursor,
     selectedClientId,
+    visibleToUserId: scope.visibleToUserId ?? undefined,
   })
 
   const intlSettings: IntlSettings = {
