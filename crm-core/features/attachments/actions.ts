@@ -2,12 +2,14 @@
 
 import { auth } from "@/lib/auth/auth";
 import { withTenant } from "@/lib/db/rls";
-import { requireRole } from "@/lib/auth/rbac";
+import { getUserRole } from "@/lib/auth/rbac";
 import { deleteObject } from "@/lib/storage/s3";
-import { Prisma } from "@prisma/client";
+import type { Role } from "@prisma/client";
 import { ConfirmUploadSchema, DeleteAttachmentSchema } from "./schemas";
 import { listDealAttachments } from "./queries";
-import { requireDealReaderInScope } from "@/features/deals/guards";
+import { requireDealReaderInScope, assertDealInScopeInTx } from "@/features/deals/guards";
+
+const ATTACHMENT_EDITOR_ROLES: readonly Role[] = ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"];
 
 export interface DealAttachmentDTO {
   id: string;
@@ -47,9 +49,8 @@ export async function confirmUpload(tenantId: string, input: unknown) {
   if (!session?.user?.id) {
     return { ok: false as const, error: "Unauthorized", code: "unauthorized" };
   }
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"]);
-  } catch {
+  const role = await getUserRole(session, tenantId);
+  if (!role || !ATTACHMENT_EDITOR_ROLES.includes(role)) {
     return { ok: false as const, error: "Unauthorized", code: "unauthorized" };
   }
 
@@ -64,9 +65,19 @@ export async function confirmUpload(tenantId: string, input: unknown) {
     return { ok: false as const, error: "Invalid key", code: "invalid_input" };
   }
 
-  // Fix 3: Re-enforce quota inside the transaction to prevent race conditions
+  // Fix 3: Re-enforce quota inside the transaction to prevent race conditions. The scope check
+  // (when the attachment is tied to a deal) runs in the same transaction — a restricted caller
+  // cannot attach a file to a deal they cannot see, and gets the same "not found" shape as
+  // naming a deal that doesn't exist.
   try {
     const attachment = await withTenant(tenantId, async (tx) => {
+      if (data.dealId) {
+        const inScope = await assertDealInScopeInTx(tx, tenantId, role, session.user.id, data.dealId);
+        if (!inScope) {
+          throw Object.assign(new Error("not_found"), { code: "not_found" });
+        }
+      }
+
       const settings = await tx.tenantSettings.findUniqueOrThrow({
         where: { tenantId },
       });
@@ -96,6 +107,9 @@ export async function confirmUpload(tenantId: string, input: unknown) {
 
     return { ok: true as const, data: attachment };
   } catch (e) {
+    if (e instanceof Error && (e as { code?: string }).code === "not_found") {
+      return { ok: false as const, error: "Deal not found", code: "not_found" };
+    }
     if (
       e instanceof Error &&
       (e as { code?: string }).code === "storage_limit_exceeded"
@@ -115,9 +129,8 @@ export async function deleteAttachment(tenantId: string, attachmentId: string) {
   if (!session?.user?.id) {
     return { ok: false as const, error: "Unauthorized", code: "unauthorized" };
   }
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER"]);
-  } catch {
+  const role = await getUserRole(session, tenantId);
+  if (!role || !ATTACHMENT_EDITOR_ROLES.includes(role)) {
     return { ok: false as const, error: "Unauthorized", code: "unauthorized" };
   }
 
@@ -126,13 +139,21 @@ export async function deleteAttachment(tenantId: string, attachmentId: string) {
     return { ok: false as const, error: "Invalid input", code: "invalid_input" };
   }
 
-  // Fix 1 & 2: Capture key inside transaction, call deleteObject AFTER commit
+  // Fix 1 & 2: Capture key inside transaction, call deleteObject AFTER commit. The scope check
+  // (for a deal attachment) runs in the same transaction, right alongside the lookup it already
+  // needed for `att.size` — an out-of-scope attachment is rejected the same way as one that
+  // doesn't exist, so a foreign attachment id isn't an existence oracle.
   let keyToDelete: string;
   try {
     keyToDelete = await withTenant(tenantId, async (tx) => {
-      const att = await tx.attachment.findUniqueOrThrow({
+      const att = await tx.attachment.findUnique({
         where: { id: attachmentId, tenantId },
       });
+      if (!att) throw Object.assign(new Error("not_found"), { code: "not_found" });
+      if (att.dealId) {
+        const inScope = await assertDealInScopeInTx(tx, tenantId, role, session.user.id, att.dealId);
+        if (!inScope) throw Object.assign(new Error("not_found"), { code: "not_found" });
+      }
       await tx.attachment.delete({ where: { id: attachmentId } });
       await tx.tenantSettings.update({
         where: { tenantId },
@@ -141,11 +162,7 @@ export async function deleteAttachment(tenantId: string, attachmentId: string) {
       return att.key;
     });
   } catch (e) {
-    // Fix 2: Only handle P2025 (not found); rethrow everything else
-    if (
-      e instanceof Prisma.PrismaClientKnownRequestError &&
-      e.code === "P2025"
-    ) {
+    if (e instanceof Error && (e as { code?: string }).code === "not_found") {
       return { ok: false as const, error: "Not found", code: "not_found" };
     }
     throw e;
