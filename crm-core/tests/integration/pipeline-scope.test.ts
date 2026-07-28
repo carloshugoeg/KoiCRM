@@ -28,7 +28,7 @@ import { getDealAttachmentsAction } from "@/features/attachments/actions"
 import { auth } from "@/lib/auth/auth"
 import { loadPipelineKanbanData } from "@/features/pipeline/queries"
 import { pipelineScopeFor } from "@/lib/permissions/resolve"
-import { getClientKpis, loadClientDetailPageData, loadClientsPageData } from "@/features/clients/queries"
+import { getClientKpis, loadClientDetailPageData, loadClientsPageData, listClients } from "@/features/clients/queries"
 import { loadTenantLayoutData } from "@/app/app/[tenantSlug]/layout-data"
 
 const mockAuth = auth as unknown as Mock<() => Promise<Session | null>>
@@ -512,5 +512,32 @@ describe("client KPI cards honour pipeline.viewAll scope", () => {
 
     expect(selectedClient?.deals.map((d) => d.id).sort()).toEqual([ownDealId, cededDealId].sort())
     expect(selectedClientKpis?.totalOpps).toBe(selectedClient?.deals.length)
+  })
+
+  /**
+   * FINDING-3 (this wave): listClientsInTx counted every deal with no visibility filter at
+   * all, even though the KPI card and deal list right next to it on the same screen (tested
+   * above) were already scoped. A restricted member saw "N oportunidades" in the sidebar for
+   * a client whose opened profile showed a smaller number for that same client.
+   */
+  it("listClients' sidebar _count.deals matches the visible deal list, not every deal the client has", async () => {
+    const scope = await pipelineScopeFor(tenantId, "MEMBER", memberId)
+    const { items } = await listClients(tenantId, { visibleToUserId: scope.visibleToUserId ?? undefined })
+    const row = items.find((c) => c.id === clientId)
+    // Visible to memberId: ownDealId + cededDealId. foreignDealId belongs to otherId and was
+    // never ceded, so it must not be counted even though the client has 3 deals total.
+    expect(row?._count.deals).toBe(2)
+  })
+
+  it("listClients' sidebar _count.deals counts every deal once pipeline.viewAll is granted", async () => {
+    await withTenant(tenantId, (tx) =>
+      tx.rolePermission.create({
+        data: { tenantId, role: "MEMBER", key: "pipeline.viewAll", allowed: true },
+      }),
+    )
+    const scope = await pipelineScopeFor(tenantId, "MEMBER", memberId)
+    const { items } = await listClients(tenantId, { visibleToUserId: scope.visibleToUserId ?? undefined })
+    const row = items.find((c) => c.id === clientId)
+    expect(row?._count.deals).toBe(3)
   })
 })

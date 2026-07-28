@@ -62,12 +62,20 @@ export async function countClients(tenantId: string) {
   return withTenant(tenantId, (tx) => countClientsInTx(tx, tenantId))
 }
 
+/**
+ * `visibleToUserId` restricts the `_count.deals` figure the sidebar renders as "N
+ * oportunidades" to what that user may see — their own deals plus anything ceded to them, the
+ * same rule `getClientWithDealsInTx` and `getClientKpisInTx` already apply on this same
+ * screen. Without it a restricted member sees "8 oportunidades" in the list next to a client
+ * whose opened profile shows "Oportunidades: 2" for that same client — a leak of a colleague's
+ * deal count baked into the sidebar every member sees, regardless of role.
+ */
 export async function listClientsInTx(
   tx: PrismaTx,
   tenantId: string,
-  opts: { search?: string; sort?: "name" | "recent"; cursor?: string; limit?: number } = {}
+  opts: { search?: string; sort?: "name" | "recent"; cursor?: string; limit?: number; visibleToUserId?: string } = {}
 ) {
-  const { search, sort = "name", cursor, limit = CLIENTS_PAGE_SIZE } = opts
+  const { search, sort = "name", cursor, limit = CLIENTS_PAGE_SIZE, visibleToUserId } = opts
 
   const where: Prisma.ClientWhereInput = { tenantId }
   if (search) {
@@ -90,7 +98,12 @@ export async function listClientsInTx(
     include: {
       _count: {
         select: {
-          deals: { where: { isArchived: false } },
+          deals: {
+            where: {
+              isArchived: false,
+              ...(visibleToUserId ? dealVisibilityWhere(visibleToUserId) : {}),
+            },
+          },
         },
       },
     },
@@ -107,7 +120,7 @@ export async function listClientsInTx(
 
 export async function listClients(
   tenantId: string,
-  opts: { search?: string; sort?: "name" | "recent"; cursor?: string; limit?: number } = {}
+  opts: { search?: string; sort?: "name" | "recent"; cursor?: string; limit?: number; visibleToUserId?: string } = {}
 ) {
   return withTenant(tenantId, (tx) => listClientsInTx(tx, tenantId, opts))
 }
@@ -245,6 +258,7 @@ export async function loadClientsPageData(
           search: opts.search,
           sort: opts.sort,
           cursor: opts.cursor,
+          visibleToUserId: opts.visibleToUserId,
         }),
       ])
 
