@@ -78,12 +78,24 @@ export async function permissionsForInTx(
   return effective
 }
 
-/** All three layers. This is what feature code should call. */
+/**
+ * All three layers. This is what feature code should call.
+ *
+ * Short-circuits LOCKED_ROLES (OWNER/ADMIN) before opening the transaction — not just inside
+ * it, the way permissionsForInTx does. permissionsForInTx's check runs after its caller has
+ * already paid for BEGIN + ensureAppRole + set_config, so a wrapper that opens withTenant
+ * unconditionally still burns a full transaction on a pooled connection for an administrator
+ * who was always going to get the default matrix back. This repo took a production P2028
+ * outage from exactly that kind of pooled-connection pressure — see 15889e3 — and this wave
+ * added pipelineScopeFor (which calls permissionsFor) to six more surfaces, so the difference
+ * is no longer academic.
+ */
 export async function permissionsFor(
   tenantId: string,
   role: Role,
   userId: string,
 ): Promise<Record<PermissionKey, boolean>> {
+  if (LOCKED_ROLES.includes(role)) return defaultMatrix()[role]
   return withTenant(tenantId, (tx) => permissionsForInTx(tx, tenantId, role, userId))
 }
 
