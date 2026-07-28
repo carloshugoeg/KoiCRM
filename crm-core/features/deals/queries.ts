@@ -19,7 +19,7 @@ export interface PipelineFilters {
 }
 
 /** Prisma `where` fragment that limits deals to those a user can see (owned or ceded to them). */
-function dealVisibilityWhere(userId: string): Prisma.DealWhereInput {
+export function dealVisibilityWhere(userId: string): Prisma.DealWhereInput {
   return {
     OR: [{ ownerId: userId }, { viewers: { some: { userId } } }],
   }
