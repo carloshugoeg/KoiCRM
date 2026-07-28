@@ -255,8 +255,10 @@ their count equivalents — the panel stays useful instead of going hollow.
 New: `features/stats/panel-filters.ts`, `components/PanelFilters.tsx`, `components/StatsPanel.tsx`.
 Modified: `features/stats/queries.ts` and all seven `stats/` pages.
 
-**Behaviour change:** on `stats/alerts` the query parameter moves from `?owner=` to `?alerts.owner=`.
-Nothing in the app linked that way, but a hand-saved link would stop applying its filter.
+**Behaviour change:** `stats/alerts` loses its page-wide `?owner=`. It carries three panels, and
+each namespaces its own — `?vencidos.owner=`, `?hoy.owner=`, `?proximos.owner=`. Nothing in the app
+linked that way, but a hand-saved link would stop applying its filter, and there is no single
+parameter that filters all three panels at once any more.
 
 ### Clients → open opportunity
 
