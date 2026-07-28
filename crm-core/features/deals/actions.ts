@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
 import { resolveActionActor } from "@/lib/auth/action-pin"
+import { pipelineScopeFor } from "@/lib/permissions/resolve"
 import {
   requireRole,
   getUserRole,
@@ -481,8 +482,13 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
   const role = await getUserRole(session, tenantId)
   if (!role) return { ok: false, error: "Acceso denegado." }
 
-  // Embudo abierto: every member can view any deal.
-  const d = await getDeal(tenantId, dealId)
+  // Deal visibility is permission-driven: a role without pipeline.viewAll sees only what is
+  // theirs or ceded to them. Enforced here rather than only in the UI, because this action is
+  // reachable directly — the pipeline ?deal=<id> deep link calls it with an arbitrary id.
+  // Passing the scope into getDeal applies the restriction in the same query that fetches the
+  // deal, so an out-of-scope id takes the ordinary not-found path and is not an existence oracle.
+  const scope = await pipelineScopeFor(tenantId, role, session.user.id)
+  const d = await getDeal(tenantId, dealId, scope.visibleToUserId ?? undefined)
   if (!d) return { ok: false, error: "Oportunidad no encontrada." }
 
   return {
