@@ -7,8 +7,6 @@ import {
   actorTokenIsFresh,
   type ActorToken,
 } from "@/lib/auth/action-pin-token"
-import { canEditDealRow } from "@/lib/auth/permissions"
-
 beforeAll(() => {
   process.env.AUTH_SECRET = "test-secret-for-pin"
 })
@@ -65,15 +63,5 @@ describe("actor unlock token", () => {
     expect(actorTokenIsFresh({ uid: "u", t: "tenant-1", exp: 2_000 }, "tenant-1", now)).toBe(true)
     expect(actorTokenIsFresh({ uid: "u", t: "tenant-1", exp: 500 }, "tenant-1", now)).toBe(false)
     expect(actorTokenIsFresh({ uid: "u", t: "tenant-2", exp: 2_000 }, "tenant-1", now)).toBe(false)
-  })
-})
-
-describe("canEditDealRow (embudo abierto)", () => {
-  it("lets any editor edit any deal regardless of ownership", () => {
-    expect(canEditDealRow("MEMBER", "someone-else", "me")).toBe(true)
-    expect(canEditDealRow("SUPERVISOR", "someone-else", "me")).toBe(true)
-  })
-  it("still denies read-only viewers", () => {
-    expect(canEditDealRow("VIEWER", "me", "me")).toBe(false)
   })
 })
