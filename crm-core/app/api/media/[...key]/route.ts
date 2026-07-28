@@ -6,8 +6,7 @@ import { withTenant } from "@/lib/db/rls"
 import { getObject } from "@/lib/storage/s3"
 import { isTenantMediaObjectKey, isDealObjectKey } from "@/lib/storage/media-url"
 import { LOCKED_ROLES } from "@/lib/permissions/defaults"
-import { permissionsForInTx, scopeFromPermissions } from "@/lib/permissions/resolve"
-import { dealVisibilityWhere } from "@/features/deals/queries"
+import { assertDealInScopeInTx } from "@/features/deals/guards"
 
 type Props = { params: { key: string[] } }
 
@@ -44,15 +43,9 @@ async function callerCanSeeDealAttachment(
     // getClientWithDealsInTx), only the deals under them are scoped — so membership is enough.
     if (!attachment.dealId) return true
 
-    const perms = await permissionsForInTx(tx, tenantId, role, userId)
-    const scope = scopeFromPermissions(perms, userId)
-    if (!scope.visibleToUserId) return true
-
-    const deal = await tx.deal.findFirst({
-      where: { id: attachment.dealId, tenantId, ...dealVisibilityWhere(scope.visibleToUserId) },
-      select: { id: true },
-    })
-    return !!deal
+    // Same scope check every deal-read guard uses, run on this function's own open transaction
+    // instead of re-inlining permissionsForInTx + scopeFromPermissions + the deal lookup here.
+    return assertDealInScopeInTx(tx, tenantId, role, userId, attachment.dealId)
   })
 }
 
