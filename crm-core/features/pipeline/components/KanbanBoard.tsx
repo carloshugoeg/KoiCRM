@@ -41,7 +41,8 @@ export function KanbanBoard({
   initialDeals,
   settings,
   equipmentLabels,
-  canSeeTotals = true,
+  // Fail closed: an omitted prop must hide totals, not reveal them.
+  canSeeTotals = false,
   onDealClick,
 }: KanbanBoardProps) {
   const { guard } = useActionPin()

@@ -44,7 +44,8 @@ export function KanbanColumn({
   onDealClick,
   movingDealId,
   draggingDeal,
-  canSeeTotals = true,
+  // Fail closed: an omitted prop must hide the total, not reveal it.
+  canSeeTotals = false,
   dragDisabled = false,
 }: KanbanColumnProps) {
   const dropHint =
