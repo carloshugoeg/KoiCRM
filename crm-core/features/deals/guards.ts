@@ -1,7 +1,7 @@
 import "server-only"
 import type { Role } from "@prisma/client"
 import type { Session } from "next-auth"
-import { withTenant } from "@/lib/db/rls"
+import { withTenant, type PrismaTx } from "@/lib/db/rls"
 import { getUserRole, UnauthorizedError } from "@/lib/auth/rbac"
 import { permissionsForInTx, scopeFromPermissions } from "@/lib/permissions/resolve"
 import { LOCKED_ROLES } from "@/lib/permissions/defaults"
@@ -16,13 +16,42 @@ import { dealVisibilityWhere } from "@/features/deals/queries"
 export const DEAL_READER_ROLES = ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"] as const
 
 /**
+ * Same check as assertDealInScope, run on a transaction the caller already holds open. Exists
+ * so a write action that already pays for its own withTenant() (the mutation itself, or an
+ * existence lookup it needs anyway) can fold the scope check into that transaction instead of
+ * opening a second one — the same reasoning as permissionsForInTx, and the same fix pattern as
+ * 15889e3. assertDealInScope is a thin wrapper around this so there is exactly one
+ * implementation of the check, shared by every read and write guard.
+ */
+export async function assertDealInScopeInTx(
+  tx: PrismaTx,
+  tenantId: string,
+  role: Role,
+  userId: string,
+  dealId: string,
+): Promise<boolean> {
+  if (LOCKED_ROLES.includes(role)) return true
+
+  const perms = await permissionsForInTx(tx, tenantId, role, userId)
+  const scope = scopeFromPermissions(perms, userId)
+  if (!scope.visibleToUserId) return true
+
+  const found = await tx.deal.findFirst({
+    where: { id: dealId, tenantId, ...dealVisibilityWhere(scope.visibleToUserId) },
+    select: { id: true },
+  })
+  return !!found
+}
+
+/**
  * Resolves the caller's pipeline scope and reports whether `dealId` is reachable under it —
  * their own deal, one ceded to them via DealViewer, or (when pipeline.viewAll is granted)
  * any deal in the tenant. The single guard every deal-read action funnels through (deal
  * summary, activity, follow-ups, quotes, payments, notes, attachments), so a restricted
  * member can't read a colleague's data just by supplying a foreign dealId — these are server
  * actions, directly invokable, and several of them print deal ids into the client profile's
- * markup.
+ * markup. Deal-write actions that don't already hold a transaction open use this too; ones
+ * that do should call assertDealInScopeInTx directly on their own tx instead.
  *
  * Runs the permission read and the deal lookup on one transaction, not two — this used to open
  * pipelineScopeFor's own withTenant() and then a second withTenant() for the deal lookup, so a
@@ -40,18 +69,7 @@ export async function assertDealInScope(
   dealId: string,
 ): Promise<boolean> {
   if (LOCKED_ROLES.includes(role)) return true
-
-  return withTenant(tenantId, async (tx) => {
-    const perms = await permissionsForInTx(tx, tenantId, role, userId)
-    const scope = scopeFromPermissions(perms, userId)
-    if (!scope.visibleToUserId) return true
-
-    const found = await tx.deal.findFirst({
-      where: { id: dealId, tenantId, ...dealVisibilityWhere(scope.visibleToUserId) },
-      select: { id: true },
-    })
-    return !!found
-  })
+  return withTenant(tenantId, (tx) => assertDealInScopeInTx(tx, tenantId, role, userId, dealId))
 }
 
 /**
