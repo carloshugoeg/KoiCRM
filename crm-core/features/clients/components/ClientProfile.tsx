@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { toast } from "sonner"
 import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
-import { Phone, MessageCircle, Mail, Plus } from "lucide-react"
+import Link from "next/link"
+import { Phone, MessageCircle, Mail, Plus, ArrowUpRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -213,6 +214,20 @@ export function ClientProfile({
                 </div>
                 <Badge variant="outline" className="text-xs shrink-0">{d.stageLabel}</Badge>
                 <p className="text-sm font-semibold shrink-0">{formatCurrency(d.value, settings)}</p>
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="h-11 shrink-0 px-2 text-xs sm:h-8"
+                >
+                  <Link
+                    href={`/app/${tenantSlug}/pipeline?deal=${encodeURIComponent(d.id)}`}
+                    title={`Abrir ${d.name} en el embudo`}
+                  >
+                    Abrir
+                    <ArrowUpRight className="ml-1 h-3.5 w-3.5" aria-hidden />
+                  </Link>
+                </Button>
               </div>
             ))}
           </div>
