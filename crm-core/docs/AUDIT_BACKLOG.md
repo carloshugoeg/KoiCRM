@@ -21,6 +21,73 @@ Verification baseline at time of writing: `tsc --noEmit` clean, `next lint` clea
 | FINDING-009 | MEDIUM | Rate limits keyed on spoofable `x-forwarded-for` head | `lib/auth/client-ip.ts` (new) |
 | FINDING-019 | HIGH | N+1 activity INSERTs could exceed the tx timeout on offboarding | `features/activity/queries.ts` |
 | FINDING-020 | MEDIUM | Nested transaction → connection-pool exhaustion at `connection_limit=1` | `features/catalogs/queries.ts` |
+| FINDING-027 | LOW | `canEditDealRow` dead ownership parameters — function deleted outright once write paths adopted the read scope (see FINDING-035 below) | `lib/auth/permissions.ts` (removed) |
+
+---
+
+## Resolved — product decisions
+
+These three were recorded as open product decisions earlier in the permissions-and-scope port.
+All three have since been decided and implemented; kept here (rather than folded into the
+table above) so the reasoning behind each call stays on the record, not just the outcome.
+
+### FINDING-034 · MEDIUM · Security — RESOLVED
+**Follow-up alerts and the calendar use strict ownership, not the deal-visibility rule**
+`features/follow-ups/queries.ts:62`; `features/calendar/queries.ts:19`
+
+`pipeline.viewAll` resolves to `visibleToUserId`, which the rest of the app expands to
+"owned **or** ceded via `DealViewer`" through `dealVisibilityWhere`. These two still filter on
+`ownerId` alone, so a deal ceded to an advisor shows up in their funnel, archive, search,
+reports and stats — and its follow-up disappears from their calendar and their alert banner.
+
+**Decision:** cesión transfers the work — a ceded deal's follow-ups belong to whoever it was
+ceded to, the same as every other read surface, not to its original owner. The calendar's
+"personal agenda" framing loses to consistency: a deal that shows up on someone's funnel but
+not their calendar was the actual bug, not a deliberate split.
+
+**Implemented:** `getFollowUpAlertsInTx` and `getCalendarFollowUps` now filter through
+`dealVisibilityWhere` instead of bare `ownerId`. Covered by
+`tests/integration/pipeline-scope.test.ts` ("cesión — follow-ups and the calendar follow the
+deal, not the owner").
+
+### FINDING-035 · MEDIUM · Security — RESOLVED
+**Write paths are role-gated while read paths are now scope-gated**
+`features/deals/actions.ts` (update/move/field writers); `app/api/upload/deal/route.ts:80-88`
+
+After the permission port, reading a deal honours `pipeline.viewAll`, but writing one still
+only asked `canEditDeal(role)`: any in-tenant `dealId` was accepted. A restricted MEMBER who
+obtained a foreign deal id could not read it and could still edit it.
+
+**Decision:** writes adopt the same scope as reads. The PIN's authorship record is not a
+substitute for an authorization check — it says who acted, not who was allowed to.
+
+**Implemented:** across 23 write paths, funnelled through `assertDealInScope` /
+`assertDealInScopeInTx` (`features/deals/guards.ts`), the same guard the read actions already
+used. `canEditDealRow` — which had carried unused ownership parameters since "embudo abierto"
+removed ownership restrictions (former FINDING-027, above) — was deleted rather than updated,
+since the scope guard replaced what it was gesturing at. Covered by
+`tests/integration/pipeline-scope.test.ts` ("deal write actions honour the caller's scope").
+
+### FINDING-036 · LOW · Security — RESOLVED
+**Stats panels other than `listado` aggregate every deal in the tenant**
+`app/app/[tenantSlug]/stats/{resumen,embudo,canal,equipo,productos}/page.tsx`
+
+`stats/listado` honours `pipeline.viewAll`; the other five aggregate the whole tenant for
+anyone who can reach `/stats` (SUPERVISOR and above, enforced by `stats/layout.tsx:19`).
+`stats.viewTotals` hides the money but not the counts.
+
+**Decision:** intentional, not a gap. `/stats` is already a Supervisor+ management view, and
+counts/totals are aggregate figures, not individual records — a tenant-wide deal count doesn't
+disclose what any one colleague is working on the way a named list of opportunities would.
+The separation between `stats.*` and `pipeline.*` in the design spec is deliberate: aggregate
+panels stay tenant-wide; anything that lists individual deals must still scope by
+`pipeline.viewAll`, because that is functionally the funnel by another name.
+
+**Implemented:** `stats/listado` was already scoped. `stats/alerts` — a row-level panel
+(follow-ups carry `deal.name`, `deal.company`, `deal.stage` and a free-text note) that had been
+missed — is now scoped the same way, via `app/app/[tenantSlug]/stats/alerts/page-data.ts`.
+Covered by `tests/integration/pipeline-scope.test.ts` ("stats/alerts page data honours
+pipeline.viewAll scope").
 
 ---
 
@@ -71,47 +138,24 @@ into an attacker-controlled tenant.
 **Why deferred:** converting to POST breaks every join link already distributed. Needs a
 migration path (interstitial confirmation page that POSTs), plus a `maxUses` column decision.
 
+### FINDING-037 · LOW · Security
+**Write scope is evaluated against the action-PIN actor, not the session user**
+`lib/auth/action-pin.ts` (`resolveActionActor`); `features/deals/guards.ts`
+
+When a tenant has PINs enabled, `resolveActionActor` determines whose role — and therefore
+whose `pipeline.viewAll` / scope — governs a write, not whoever is signed into the browser. On
+a shared terminal, a write's scope follows whoever last entered their PIN. This is the same
+shape as the pre-existing `canEditDeal(actorRole)` check (the PIN actor's role has always
+gated write capability), and it is what makes the write-scope model from FINDING-035 coherent —
+scope has to follow the same actor authorship already follows, or the two would disagree about
+who is acting. Not a bug: this surfaced in review as a property nobody had explicitly signed
+off on, so it is recorded here as a decision rather than left to be rediscovered from the code.
+
+**Decision needed:** none functionally — current behaviour is correct given how the PIN model
+works. Write it up as an ADR (see FINDING-033's note on undocumented deliberate trade-offs) so
+a future reader finds the reasoning here instead of re-deriving it.
+
 ---
-
-### FINDING-034 · MEDIUM · Security
-**Follow-up alerts and the calendar use strict ownership, not the deal-visibility rule**
-`features/follow-ups/queries.ts:62`; `features/calendar/queries.ts:19`
-
-`pipeline.viewAll` resolves to `visibleToUserId`, which the rest of the app expands to
-"owned **or** ceded via `DealViewer`" through `dealVisibilityWhere`. These two still filter on
-`ownerId` alone, so a deal ceded to an advisor shows up in their funnel, archive, search,
-reports and stats — and its follow-up disappears from their calendar and their alert banner.
-
-Predates the permission work; the port made it visible by giving the two systems a shared
-vocabulary. **Decision needed:** should a ceded deal's follow-ups belong to the person the
-deal was ceded to, or stay with its owner? "Cesión" implies the former, but the calendar has
-always read as a personal agenda, so this is a product call rather than a bug fix.
-
-### FINDING-035 · MEDIUM · Security
-**Write paths are role-gated while read paths are now scope-gated**
-`features/deals/actions.ts` (update/move/field writers); `app/api/upload/deal/route.ts:80-88`
-
-After the permission port, reading a deal honours `pipeline.viewAll`, but writing one still
-only asks `canEditDeal(role)`: any in-tenant `dealId` is accepted. A restricted MEMBER who
-obtains a foreign deal id cannot read it and can still edit it.
-
-Consistent with the pre-existing "embudo abierto" write model, and the action PIN still records
-who made every write, so this is not a silent change. **Decision needed:** should the write
-path adopt the same scope, or is the PIN's authorship record the intended control? Recorded
-here so the asymmetry is a decision rather than an oversight.
-
-### FINDING-036 · LOW · Security
-**Stats panels other than `listado` aggregate every deal in the tenant**
-`app/app/[tenantSlug]/stats/{resumen,embudo,canal,equipo,productos}/page.tsx`
-
-`stats/listado` honours `pipeline.viewAll`; the other five aggregate the whole tenant for
-anyone who can reach `/stats` (SUPERVISOR and above, enforced by `stats/layout.tsx:19`).
-`stats.viewTotals` hides the money but not the counts.
-
-Arguably correct — the `stats.*` keys are deliberately separate from `pipeline.*` in the
-design spec — but it means a supervisor with `pipeline.viewAll` off still sees team-wide
-aggregates. **Decision needed:** confirm that separation is intended, or add a
-`stats.viewAll`.
 
 ## Deferred — needs infrastructure work or a migration
 
@@ -359,16 +403,6 @@ all**, which blocks the stated white-label V1 goal and contradicts `AGENTS.md`.
 into the deal schemas, or drop the settings fields if GT-only is the accepted V1 scope — but
 pick one, don't leave a no-op control in the UI.
 
-### FINDING-027 · LOW · Architecture
-**`canEditDealRow` keeps dead ownership parameters**
-`lib/auth/permissions.ts:20-22`
-
-`canEditDealRow(role, _dealOwnerId, _userId)` retains two unused parameters after "embudo
-abierto" removed ownership restrictions. The comment documents this as intentional signature
-stability, but the signature advertises ownership-aware authorization that no longer exists,
-inviting callers to assume a check that is not performed. Drop the parameters and update
-callers.
-
 ### FINDING-029 · MEDIUM · Maintainability
 **Test coverage is inverted relative to risk**
 `tests/unit/` (14 files), `features/*/__tests__/` (3 dirs)
@@ -443,4 +477,5 @@ indistinguishable from oversights.
 7. **FINDING-014 + 015 + 021 + 022 + 024** — reliability and performance cleanup.
 8. **FINDING-026** — tenant-driven phone validation (or explicitly scope V1 to GT).
 9. **FINDING-031** — formatting, in an isolated commit.
-10. Remaining LOW items (010 write-up, 012, 016, 018, 027, 030, 032, 033) as capacity allows.
+10. Remaining LOW items (010 write-up, 012, 016, 018, 030, 032, 033, 037 write-up) as capacity
+    allows.
