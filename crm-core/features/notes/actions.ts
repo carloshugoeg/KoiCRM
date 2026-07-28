@@ -8,7 +8,7 @@ import { resolveActionActor } from "@/lib/auth/action-pin"
 import { recordActivity } from "@/features/activity/queries"
 import { addNoteSchema, deleteNoteSchema } from "@/features/notes/schemas"
 import { getDealNotes, getClientNotes } from "@/features/notes/queries"
-import { requireDealReaderInScope } from "@/features/deals/guards"
+import { requireDealReaderInScope, assertDealInScopeInTx } from "@/features/deals/guards"
 
 export async function addNoteAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
   const parsed = addNoteSchema.safeParse(raw)
@@ -21,7 +21,15 @@ export async function addNoteAction(raw: unknown): Promise<{ ok: boolean; error?
   const { actorUserId, actorRole } = actor.actor
   if (!canEditDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
 
+  // Client-only notes (dealId undefined) have no deal scope to enforce — clients are visible
+  // tenant-wide, only the deals under them are scoped. A note attached to a deal is checked in
+  // the same transaction as the write.
+  let notFound = false
   await withTenant(tenantId, async (tx) => {
+    if (dealId && !(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      notFound = true
+      return
+    }
     await tx.note.create({
       data: {
         tenantId,
@@ -42,6 +50,7 @@ export async function addNoteAction(raw: unknown): Promise<{ ok: boolean; error?
       })
     }
   })
+  if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
 
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
   revalidatePath(`/app/${tenantSlug}/clients`, "page")
@@ -63,7 +72,18 @@ export async function deleteNoteAction(raw: unknown): Promise<{ ok: boolean; err
   if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
   if (!canEditDeal(actor.actor.actorRole)) return { ok: false, error: "Acceso denegado." }
 
-  await withTenant(tenantId, (tx) => tx.note.delete({ where: { id: noteId } }))
+  let notFound = false
+  await withTenant(tenantId, async (tx) => {
+    if (
+      note.dealId &&
+      !(await assertDealInScopeInTx(tx, tenantId, actor.actor.actorRole, actor.actor.actorUserId, note.dealId))
+    ) {
+      notFound = true
+      return
+    }
+    await tx.note.delete({ where: { id: noteId } })
+  })
+  if (notFound) return { ok: false, error: "Nota no encontrada." }
 
   revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
   revalidatePath(`/app/${tenantSlug}/clients`, "page")
