@@ -25,10 +25,9 @@ import {
 import { globalSearchAction } from "@/features/search/actions"
 import { auth } from "@/lib/auth/auth"
 import { loadPipelineKanbanData } from "@/features/pipeline/queries"
-import { pipelineScopeFor, permissionsForInTx, scopeFromPermissions } from "@/lib/permissions/resolve"
-import { getFollowUpAlertsInTx } from "@/features/follow-ups/queries"
-import { withTenant as withTenantRls } from "@/lib/db/rls"
+import { pipelineScopeFor } from "@/lib/permissions/resolve"
 import { getClientKpis, loadClientDetailPageData, loadClientsPageData } from "@/features/clients/queries"
+import { loadTenantLayoutData } from "@/app/app/[tenantSlug]/layout-data"
 
 const mockAuth = auth as unknown as Mock<() => Promise<Session | null>>
 
@@ -336,23 +335,20 @@ describe("global search honours pipeline.viewAll for every role, not just MEMBER
  * page. A SUPERVISOR whose pipeline.viewAll was switched off still got a banner alert for a
  * deal they cannot open.
  *
- * layout.tsx itself can't be imported here — it (transitively) pulls in "use client" .tsx
+ * layout.tsx itself still can't be imported here — it (transitively) pulls in "use client" .tsx
  * component files, and this harness's vitest config has no JSX transform for the node
- * environment (tsconfig's "jsx": "preserve" is meant for Next.js's own SWC build). So this
- * drives the exact transaction body the fixed layout now runs — one withTenant() holding
- * permissionsForInTx + scopeFromPermissions + getFollowUpAlertsInTx — rather than the page
- * component. Before the fix this composition didn't exist in the layout at all (it read
- * canSeeAllDeals(role) instead), so reproducing it here and asserting on the result still
- * pins the exact behaviour the layout must have.
+ * environment (tsconfig's "jsx": "preserve" is meant for Next.js's own SWC build). But its data
+ * load is a plain .ts module (app/app/[tenantSlug]/layout-data.ts) that both the layout and
+ * this test import, so this now drives the real function instead of a reproduction of its
+ * body — reverting the layout's scope wiring back to canSeeAllDeals(role) lives entirely
+ * inside loadTenantLayoutData, so that revert makes this test fail directly (verified by hand
+ * — see the finding-5 section of the final report for what reverting to canSeeAllDeals(role)
+ * does to these two tests).
  */
 describe("layout follow-up alerts honour pipeline.viewAll scope", () => {
   async function alertDealIdsForLayout(role: "SUPERVISOR" | "MEMBER", userId: string) {
-    return withTenantRls(tenantId, async (tx) => {
-      const perms = await permissionsForInTx(tx, tenantId, role, userId)
-      const scope = scopeFromPermissions(perms, userId)
-      const alerts = await getFollowUpAlertsInTx(tx, tenantId, scope.visibleToUserId ?? undefined)
-      return [...alerts.overdue, ...alerts.today, ...alerts.next7].map((fu) => fu.deal.id)
-    })
+    const { followUpAlerts: alerts } = await loadTenantLayoutData(tenantId, role, userId)
+    return [...alerts.overdue, ...alerts.today, ...alerts.next7].map((fu) => fu.deal.id)
   }
 
   beforeAll(async () => {

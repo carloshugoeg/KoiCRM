@@ -3,13 +3,10 @@ import { auth } from "@/lib/auth/auth"
 import { checkTenantEmbudoAccess } from "@/lib/tenant/access"
 import { resolveTenant, getUserMemberships } from "@/lib/tenant/resolve"
 import { canSeeAllDeals } from "@/lib/auth/rbac"
-import { permissionsForInTx, scopeFromPermissions } from "@/lib/permissions/resolve"
 import { TenantProvider } from "@/lib/tenant/context"
 import { TenantHeader } from "@/components/app/tenant-header"
 import { buildCssVars } from "@/lib/branding/css-vars"
-import { withTenant } from "@/lib/db/rls"
-import { countClientsInTx } from "@/features/clients/queries"
-import { getFollowUpAlertsInTx } from "@/features/follow-ups/queries"
+import { loadTenantLayoutData } from "./layout-data"
 import {
   countFollowUpBannerItems,
   toFollowUpBannerItems,
@@ -43,20 +40,11 @@ export default async function TenantLayout({ children, params }: Props) {
 
   const tenantId = resolved.tenant.id
 
-  // One transaction for the whole layout. This runs on every /app page, so any fan-out here is
-  // paid by every request before the page's own queries even start. permissionsForInTx runs on
-  // this same connection rather than opening a second withTenant() — see permissionsFor's
-  // docstring — so the alert owner filter can be derived from pipeline.viewAll instead of the
-  // role-based canSeeAllDeals() bypass without doubling this route's transaction cost.
+  // One transaction for the whole layout — see loadTenantLayoutData's docstring. This runs on
+  // every /app page, so any fan-out here is paid by every request before the page's own
+  // queries even start.
   const [{ clientsCount, followUpAlerts }, sessionPin] = await Promise.all([
-    withTenant(tenantId, async (tx) => {
-      const perms = await permissionsForInTx(tx, tenantId, resolved.membership.role, session.user.id)
-      const scope = scopeFromPermissions(perms, session.user.id)
-      return {
-        clientsCount: await countClientsInTx(tx, tenantId),
-        followUpAlerts: await getFollowUpAlertsInTx(tx, tenantId, scope.visibleToUserId ?? undefined),
-      }
-    }),
+    loadTenantLayoutData(tenantId, resolved.membership.role, session.user.id),
     getSessionPinLockStatusAction(tenantId),
   ])
 
