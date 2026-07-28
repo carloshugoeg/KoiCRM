@@ -7,6 +7,7 @@ import { deleteObject } from "@/lib/storage/s3";
 import { Prisma } from "@prisma/client";
 import { ConfirmUploadSchema, DeleteAttachmentSchema } from "./schemas";
 import { listDealAttachments } from "./queries";
+import { requireDealReaderInScope } from "@/features/deals/guards";
 
 export interface DealAttachmentDTO {
   id: string;
@@ -23,7 +24,11 @@ export async function getDealAttachmentsAction(
   const session = await auth();
   if (!session?.user?.id) return [];
   try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"]);
+    // listDealAttachments filters {tenantId, dealId} alone — without the scope check below,
+    // any tenant member could read a colleague's attachment list (and the file `url`s it
+    // returns) by supplying a foreign dealId. Same guard as the deal-read actions in
+    // features/deals/actions.ts.
+    await requireDealReaderInScope(session, session.user.id, tenantId, dealId);
   } catch {
     return [];
   }

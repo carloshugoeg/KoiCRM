@@ -23,6 +23,8 @@ import {
   getPaymentsForDealAction,
 } from "@/features/deals/actions"
 import { globalSearchAction } from "@/features/search/actions"
+import { getDealNotesAction } from "@/features/notes/actions"
+import { getDealAttachmentsAction } from "@/features/attachments/actions"
 import { auth } from "@/lib/auth/auth"
 import { loadPipelineKanbanData } from "@/features/pipeline/queries"
 import { pipelineScopeFor } from "@/lib/permissions/resolve"
@@ -293,6 +295,81 @@ describe("deal-read actions honour the caller's scope", () => {
     await expect(getDealFollowUpsAction(tenantId, foreignDealId)).resolves.toBeInstanceOf(Array)
     await expect(getQuotesForDealAction(tenantId, foreignDealId)).resolves.toBeInstanceOf(Array)
     await expect(getPaymentsForDealAction(tenantId, foreignDealId)).resolves.toBeInstanceOf(Array)
+  })
+})
+
+/**
+ * FINDING-1 fix (this wave): getDealNotesAction and getDealAttachmentsAction had the identical
+ * shape as the four actions above — gated on tenant membership only, with the underlying
+ * queries filtering {tenantId, dealId} alone — but were missed by the previous wave. A
+ * restricted member could read a colleague's free-text sales notes (with author names) or
+ * attachment list (including file `url`s) by supplying a foreign dealId. Both now funnel
+ * through the same requireDealReaderInScope guard.
+ *
+ * Fixture notes/attachments are created on foreignDealId (not the caller's) and cededDealId
+ * (ceded to the caller) so the assertions prove data is actually withheld/served, not just
+ * that an empty result happens to come back either way.
+ */
+describe("notes and attachments honour the caller's scope", () => {
+  beforeAll(async () => {
+    await prismaAdmin.note.create({
+      data: { tenantId, dealId: foreignDealId, text: "Nota ajena" },
+    })
+    await prismaAdmin.note.create({
+      data: { tenantId, dealId: cededDealId, text: "Nota cedida" },
+    })
+    await prismaAdmin.attachment.create({
+      data: {
+        tenantId,
+        dealId: foreignDealId,
+        key: `${tenantId}/deals/${foreignDealId}/ajeno.pdf`,
+        url: `/api/media/${tenantId}/deals/${foreignDealId}/ajeno.pdf`,
+        mimeType: "application/pdf",
+        size: 100,
+      },
+    })
+    await prismaAdmin.attachment.create({
+      data: {
+        tenantId,
+        dealId: cededDealId,
+        key: `${tenantId}/deals/${cededDealId}/cedido.pdf`,
+        url: `/api/media/${tenantId}/deals/${cededDealId}/cedido.pdf`,
+        mimeType: "application/pdf",
+        size: 100,
+      },
+    })
+  })
+
+  it("getDealNotesAction refuses a deal outside the caller's scope", async () => {
+    await expect(getDealNotesAction(tenantId, foreignDealId)).rejects.toThrow()
+  })
+
+  it("getDealNotesAction still serves notes for a deal ceded to the caller", async () => {
+    const notes = await getDealNotesAction(tenantId, cededDealId)
+    expect(notes.map((n) => n.text)).toContain("Nota cedida")
+  })
+
+  it("getDealAttachmentsAction withholds attachments for a deal outside the caller's scope", async () => {
+    const rows = await getDealAttachmentsAction(tenantId, foreignDealId)
+    expect(rows).toEqual([])
+  })
+
+  it("getDealAttachmentsAction still serves attachments for a deal ceded to the caller", async () => {
+    const rows = await getDealAttachmentsAction(tenantId, cededDealId)
+    expect(rows.some((r) => r.url.includes("cedido.pdf"))).toBe(true)
+  })
+
+  it("both resolve the foreign deal's data once the role is granted pipeline.viewAll", async () => {
+    await withTenant(tenantId, (tx) =>
+      tx.rolePermission.create({
+        data: { tenantId, role: "MEMBER", key: "pipeline.viewAll", allowed: true },
+      }),
+    )
+    const notes = await getDealNotesAction(tenantId, foreignDealId)
+    expect(notes.map((n) => n.text)).toContain("Nota ajena")
+
+    const rows = await getDealAttachmentsAction(tenantId, foreignDealId)
+    expect(rows.some((r) => r.url.includes("ajeno.pdf"))).toBe(true)
   })
 })
 

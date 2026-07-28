@@ -8,6 +8,7 @@ import { resolveActionActor } from "@/lib/auth/action-pin"
 import { recordActivity } from "@/features/activity/queries"
 import { addNoteSchema, deleteNoteSchema } from "@/features/notes/schemas"
 import { getDealNotes, getClientNotes } from "@/features/notes/queries"
+import { requireDealReaderInScope } from "@/features/deals/guards"
 
 export async function addNoteAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
   const parsed = addNoteSchema.safeParse(raw)
@@ -72,7 +73,10 @@ export async function deleteNoteAction(raw: unknown): Promise<{ ok: boolean; err
 export async function getDealNotesAction(tenantId: string, dealId: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error("No autenticado.")
-  await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"])
+  // getDealNotes filters {tenantId, dealId} alone — without the scope check below, any tenant
+  // member could read a colleague's free-text sales notes (with author names) by supplying a
+  // foreign dealId. Same guard as the deal-read actions in features/deals/actions.ts.
+  await requireDealReaderInScope(session, session.user.id, tenantId, dealId)
   return getDealNotes(tenantId, dealId)
 }
 

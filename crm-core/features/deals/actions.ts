@@ -1,20 +1,16 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { Prisma, type Role } from "@prisma/client"
-import type { Session } from "next-auth"
+import { Prisma } from "@prisma/client"
 import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
 import { resolveActionActor } from "@/lib/auth/action-pin"
-import { pipelineScopeFor } from "@/lib/permissions/resolve"
 import {
-  requireRole,
   getUserRole,
   canCreateDeal,
   canEditDeal,
   canArchiveDeal,
   canDeleteDeal,
-  UnauthorizedError,
 } from "@/lib/auth/rbac"
 import { generateDealId } from "@/lib/id/deal-id"
 import { ownerInitials } from "@/lib/utils/avatar-color"
@@ -36,7 +32,8 @@ import { getDefaultPipeline } from "@/features/pipeline/queries"
 import { isActiveCatalogItemKeyInTx, isActiveSubcategoryOfCategory } from "@/features/catalogs/queries"
 import type { PrismaTx } from "@/lib/db/rls"
 import { z } from "zod"
-import { getDeal, dealVisibilityWhere } from "@/features/deals/queries"
+import { getDeal } from "@/features/deals/queries"
+import { assertDealInScope, requireDealReaderInScope } from "@/features/deals/guards"
 
 /**
  * Validates an equipo-de-interés selection and flattens it into (categoría, subcategoría) rows.
@@ -460,32 +457,6 @@ export async function deleteDealAction(raw: unknown): Promise<{ ok: boolean; err
   return { ok: true }
 }
 
-/**
- * Resolves the caller's pipeline scope and reports whether `dealId` is reachable under it —
- * their own deal, one ceded to them via DealViewer, or (when pipeline.viewAll is granted)
- * any deal in the tenant. The single guard every deal-read action below funnels through, so
- * a restricted member can't read a colleague's summary, quotes, payments, follow-ups or
- * activity log just by supplying a foreign dealId — these are server actions, directly
- * invokable, and this branch prints deal ids into the client profile's markup.
- */
-async function assertDealInScope(
-  tenantId: string,
-  role: Role,
-  userId: string,
-  dealId: string,
-): Promise<boolean> {
-  const scope = await pipelineScopeFor(tenantId, role, userId)
-  if (!scope.visibleToUserId) return true
-
-  const found = await withTenant(tenantId, (tx) =>
-    tx.deal.findFirst({
-      where: { id: dealId, tenantId, ...dealVisibilityWhere(scope.visibleToUserId!) },
-      select: { id: true },
-    })
-  )
-  return !!found
-}
-
 export async function getDealSummaryAction(raw: unknown): Promise<{
   ok: boolean
   error?: string
@@ -546,35 +517,6 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
       quoteCount: d._count.quotes,
       paymentCount: d._count.payments,
     },
-  }
-}
-
-/**
- * `tenantId` arrives from the client and is what withTenant() feeds to
- * set_config('app.tenant_id'), so RLS cannot vouch for it — every reader below must
- * confirm the caller is actually a member of that tenant first. Without this a removed
- * member keeps read access to the workspace they were offboarded from.
- */
-const DEAL_READER_ROLES = ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"] as const
-
-/**
- * Membership alone isn't enough — `dealId` is caller-supplied, and DEAL_READER_ROLES admits
- * every role, so without a scope check any tenant member could read any other member's deal
- * data by supplying a foreign id. requireRole keeps its existing "Acceso denegado." failure
- * shape for a non-member; assertDealInScope fails the same way (UnauthorizedError) for a
- * member whose scope doesn't reach this deal, so the two "no access" paths are
- * indistinguishable to the caller.
- */
-async function requireDealReaderInScope(
-  session: Session | null,
-  userId: string,
-  tenantId: string,
-  dealId: string,
-): Promise<void> {
-  await requireRole(session, tenantId, [...DEAL_READER_ROLES])
-  const role = await getUserRole(session, tenantId)
-  if (!role || !(await assertDealInScope(tenantId, role, userId, dealId))) {
-    throw new UnauthorizedError()
   }
 }
 
