@@ -15,7 +15,14 @@ vi.mock("@/lib/auth/auth", () => ({ auth: vi.fn() }))
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 
 // Import AFTER mocks.
-import { getDealSummaryAction } from "@/features/deals/actions"
+import {
+  getDealSummaryAction,
+  getDealActivityAction,
+  getDealFollowUpsAction,
+  getQuotesForDealAction,
+  getPaymentsForDealAction,
+} from "@/features/deals/actions"
+import { globalSearchAction } from "@/features/search/actions"
 import { auth } from "@/lib/auth/auth"
 import { loadPipelineKanbanData } from "@/features/pipeline/queries"
 import { pipelineScopeFor } from "@/lib/permissions/resolve"
@@ -29,6 +36,7 @@ function makeCuid(): string {
 let tenantId: string
 let memberId: string
 let otherId: string
+let supervisorId: string
 let ownDealId: string
 let foreignDealId: string
 let cededDealId: string
@@ -51,6 +59,12 @@ beforeAll(async () => {
   otherId = other.id
   await prismaAdmin.membership.create({
     data: { userId: otherId, tenantId, role: "MEMBER", status: "ACTIVE" },
+  })
+
+  const supervisor = await prismaAdmin.user.create({ data: { email: `valeria-${Date.now()}@test.com` } })
+  supervisorId = supervisor.id
+  await prismaAdmin.membership.create({
+    data: { userId: supervisorId, tenantId, role: "SUPERVISOR", status: "ACTIVE" },
   })
 
   const pipeline = await prismaAdmin.pipeline.create({
@@ -196,5 +210,94 @@ describe("loadPipelineKanbanData scope enforcement", () => {
     const scope = await pipelineScopeFor(tenantId, "SUPERVISOR", memberId)
     const { deals } = await loadPipelineKanbanData(tenantId, { ownerId: otherId }, scope)
     expect(deals.map((d) => d.id).sort()).toEqual([foreignDealId, cededDealId].sort())
+  })
+})
+
+/**
+ * FINDING-1 fix: getDealActivityAction, getDealFollowUpsAction, getQuotesForDealAction and
+ * getPaymentsForDealAction previously gated on tenant membership only — a restricted member
+ * could read a colleague's quotes, payments, follow-ups or activity log by supplying a
+ * foreign dealId, since the underlying queries filter on {tenantId, dealId} alone. They now
+ * funnel through the same assertDealInScope guard as getDealSummaryAction.
+ */
+describe("deal-read actions honour the caller's scope", () => {
+  it("getDealActivityAction refuses a deal outside the caller's scope", async () => {
+    await expect(getDealActivityAction(tenantId, foreignDealId)).rejects.toThrow()
+  })
+
+  it("getDealActivityAction still serves the caller's own deal", async () => {
+    await expect(getDealActivityAction(tenantId, ownDealId)).resolves.toHaveProperty("items")
+  })
+
+  it("getDealActivityAction still serves a deal ceded to the caller", async () => {
+    await expect(getDealActivityAction(tenantId, cededDealId)).resolves.toHaveProperty("items")
+  })
+
+  it("getDealFollowUpsAction refuses a deal outside the caller's scope", async () => {
+    await expect(getDealFollowUpsAction(tenantId, foreignDealId)).rejects.toThrow()
+  })
+
+  it("getDealFollowUpsAction still serves a deal ceded to the caller", async () => {
+    await expect(getDealFollowUpsAction(tenantId, cededDealId)).resolves.toBeInstanceOf(Array)
+  })
+
+  it("getQuotesForDealAction refuses a deal outside the caller's scope", async () => {
+    await expect(getQuotesForDealAction(tenantId, foreignDealId)).rejects.toThrow()
+  })
+
+  it("getQuotesForDealAction still serves a deal ceded to the caller", async () => {
+    await expect(getQuotesForDealAction(tenantId, cededDealId)).resolves.toBeInstanceOf(Array)
+  })
+
+  it("getPaymentsForDealAction refuses a deal outside the caller's scope", async () => {
+    await expect(getPaymentsForDealAction(tenantId, foreignDealId)).rejects.toThrow()
+  })
+
+  it("getPaymentsForDealAction still serves a deal ceded to the caller", async () => {
+    await expect(getPaymentsForDealAction(tenantId, cededDealId)).resolves.toBeInstanceOf(Array)
+  })
+
+  it("all four resolve the foreign deal once the role is granted pipeline.viewAll", async () => {
+    await withTenant(tenantId, (tx) =>
+      tx.rolePermission.create({
+        data: { tenantId, role: "MEMBER", key: "pipeline.viewAll", allowed: true },
+      }),
+    )
+    await expect(getDealActivityAction(tenantId, foreignDealId)).resolves.toHaveProperty("items")
+    await expect(getDealFollowUpsAction(tenantId, foreignDealId)).resolves.toBeInstanceOf(Array)
+    await expect(getQuotesForDealAction(tenantId, foreignDealId)).resolves.toBeInstanceOf(Array)
+    await expect(getPaymentsForDealAction(tenantId, foreignDealId)).resolves.toBeInstanceOf(Array)
+  })
+})
+
+/**
+ * FINDING-3 fix: archive, calendar, stats/listado and global search gated deal visibility on
+ * canSeeAllDeals(role) (atLeast(role, "SUPERVISOR")) instead of the pipeline.viewAll
+ * permission. For a SUPERVISOR whose pipeline.viewAll has been switched off, that was a
+ * straight bypass — the funnel narrows but these surfaces kept returning every deal in the
+ * tenant. globalSearchAction is the cheapest of the four to drive here: it is already a
+ * plain "use server" action reachable with the same auth-mock harness as the tests above, no
+ * page render or router mocking required.
+ */
+describe("global search honours pipeline.viewAll for every role, not just MEMBER", () => {
+  it("a SUPERVISOR without pipeline.viewAll cannot search up a colleague's deal", async () => {
+    await withTenant(tenantId, (tx) =>
+      tx.rolePermission.create({
+        data: { tenantId, role: "SUPERVISOR", key: "pipeline.viewAll", allowed: false },
+      }),
+    )
+    mockAuth.mockResolvedValue({ user: { id: supervisorId } } as Session)
+
+    const res = await globalSearchAction(tenantId, "Ajena")
+    expect(res.ok).toBe(true)
+    expect(res.results?.some((r) => r.id === foreignDealId)).toBe(false)
+  })
+
+  it("a SUPERVISOR with pipeline.viewAll (the default) can still find it", async () => {
+    mockAuth.mockResolvedValue({ user: { id: supervisorId } } as Session)
+
+    const res = await globalSearchAction(tenantId, "Ajena")
+    expect(res.ok).toBe(true)
+    expect(res.results?.some((r) => r.id === foreignDealId)).toBe(true)
   })
 })
