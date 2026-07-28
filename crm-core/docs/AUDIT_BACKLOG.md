@@ -73,6 +73,46 @@ migration path (interstitial confirmation page that POSTs), plus a `maxUses` col
 
 ---
 
+### FINDING-034 · MEDIUM · Security
+**Follow-up alerts and the calendar use strict ownership, not the deal-visibility rule**
+`features/follow-ups/queries.ts:62`; `features/calendar/queries.ts:19`
+
+`pipeline.viewAll` resolves to `visibleToUserId`, which the rest of the app expands to
+"owned **or** ceded via `DealViewer`" through `dealVisibilityWhere`. These two still filter on
+`ownerId` alone, so a deal ceded to an advisor shows up in their funnel, archive, search,
+reports and stats — and its follow-up disappears from their calendar and their alert banner.
+
+Predates the permission work; the port made it visible by giving the two systems a shared
+vocabulary. **Decision needed:** should a ceded deal's follow-ups belong to the person the
+deal was ceded to, or stay with its owner? "Cesión" implies the former, but the calendar has
+always read as a personal agenda, so this is a product call rather than a bug fix.
+
+### FINDING-035 · MEDIUM · Security
+**Write paths are role-gated while read paths are now scope-gated**
+`features/deals/actions.ts` (update/move/field writers); `app/api/upload/deal/route.ts:80-88`
+
+After the permission port, reading a deal honours `pipeline.viewAll`, but writing one still
+only asks `canEditDeal(role)`: any in-tenant `dealId` is accepted. A restricted MEMBER who
+obtains a foreign deal id cannot read it and can still edit it.
+
+Consistent with the pre-existing "embudo abierto" write model, and the action PIN still records
+who made every write, so this is not a silent change. **Decision needed:** should the write
+path adopt the same scope, or is the PIN's authorship record the intended control? Recorded
+here so the asymmetry is a decision rather than an oversight.
+
+### FINDING-036 · LOW · Security
+**Stats panels other than `listado` aggregate every deal in the tenant**
+`app/app/[tenantSlug]/stats/{resumen,embudo,canal,equipo,productos}/page.tsx`
+
+`stats/listado` honours `pipeline.viewAll`; the other five aggregate the whole tenant for
+anyone who can reach `/stats` (SUPERVISOR and above, enforced by `stats/layout.tsx:19`).
+`stats.viewTotals` hides the money but not the counts.
+
+Arguably correct — the `stats.*` keys are deliberately separate from `pipeline.*` in the
+design spec — but it means a supervisor with `pipeline.viewAll` off still sees team-wide
+aggregates. **Decision needed:** confirm that separation is intended, or add a
+`stats.viewAll`.
+
 ## Deferred — needs infrastructure work or a migration
 
 ### FINDING-006 · HIGH · Security
