@@ -12,6 +12,7 @@ import {
   Wind,
   Activity,
   Star,
+  ShieldCheck,
 } from "lucide-react"
 
 export const PRESET_COLORS = [
@@ -32,6 +33,7 @@ export const PRESET_COLORS = [
 export const SETTINGS_NAV = [
   { label: "Apariencia", section: "appearance", icon: Palette },
   { label: "Usuarios", section: "users", icon: Users },
+  { label: "Permisos", section: "permissions", icon: ShieldCheck },
   { label: "Equipos", section: "equipment", icon: Package },
   { label: "Origen de leads", section: "origen", icon: Megaphone },
   { label: "Embudo", section: "pipeline", icon: Columns },
