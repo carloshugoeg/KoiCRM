@@ -84,7 +84,10 @@ export default async function AlertsPage({ params, searchParams }: Props) {
 
   const options = await getStatsFilterOptions(tenantId)
 
-  // Sections that share an asesor filter share a single round trip.
+  // Sections that share an asesor filter share a single round trip. The "asesor" filter now
+  // resolves through dealVisibilityWhere (owned or ceded), so picking an advisor here surfaces
+  // what they're working on — including deals ceded to them — consistent with cesión
+  // transferring the work everywhere else in the app.
   const cache = new Map<string, Awaited<ReturnType<typeof getFollowUpAlerts>>>()
   async function alertsFor(ownerId?: string) {
     const key = ownerId ?? ""

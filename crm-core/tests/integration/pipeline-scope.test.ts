@@ -550,11 +550,10 @@ describe("client KPI cards honour pipeline.viewAll scope", () => {
  * through globalSearchAction. These cover the other two query paths directly —
  * getArchivedDeals (archive) and getPipelineDeals (stats/listado reuses the funnel's own
  * query). Calendar is covered too: getCalendarFollowUps is cheap to call directly, no page
- * render needed — but note its owner filter is a plain `ownerId` equality, not
- * dealVisibilityWhere, so unlike the other three it would not surface a *ceded* deal to a
- * restricted viewer even when it should. That's a pre-existing product inconsistency, not an
- * over-exposure, so it's flagged in the report rather than fixed here; the assertion below only
- * checks what this finding is about — that a foreign deal's follow-up does not leak.
+ * render needed. Its cesión coverage (a *ceded* deal's follow-up must surface, not just a
+ * foreign one being withheld) lives in the "cesión" describe block below, alongside the same
+ * check for the layout's follow-up alerts — this block only checks what FINDING-6 is about,
+ * that a foreign deal's follow-up does not leak.
  */
 describe("archive, listado and calendar query paths honour pipeline.viewAll", () => {
   let archivedForeignDealId: string
@@ -652,5 +651,49 @@ describe("archive, listado and calendar query paths honour pipeline.viewAll", ()
       scope.visibleToUserId ?? undefined,
     )
     expect(followUps.map((fu) => fu.deal.id)).toContain(foreignDealId)
+  })
+})
+
+/**
+ * Product decision: cesión transfers the work, so the follow-up should follow the deal.
+ * Before this fix, getCalendarFollowUps and getFollowUpAlertsInTx filtered on strict
+ * deal.ownerId instead of dealVisibilityWhere (owned or ceded) — a follow-up on a deal ceded
+ * to memberId (cededDealId, owned by otherId) appeared on otherId's calendar/alert banner and
+ * never on memberId's, even though memberId is the one who can open, edit and act on it
+ * everywhere else in the app.
+ */
+describe("cesión — follow-ups and the calendar follow the deal, not the owner", () => {
+  beforeAll(async () => {
+    // Dated "now" so it lands in both getCalendarFollowUps' current-month window and
+    // getFollowUpAlertsInTx' "today" bucket — the same shape as the pre-existing foreignDealId
+    // follow-up created above, so the two fixtures are directly comparable.
+    await prismaAdmin.followUp.create({
+      data: { tenantId, dealId: cededDealId, date: new Date(), completed: false },
+    })
+  })
+
+  it("getCalendarFollowUps surfaces a ceded deal's follow-up to the member it was ceded to", async () => {
+    const now = new Date()
+    const scope = await pipelineScopeFor(tenantId, "MEMBER", memberId)
+    expect(scope.visibleToUserId).toBe(memberId)
+
+    const followUps = await getCalendarFollowUps(
+      tenantId,
+      now.getFullYear(),
+      now.getMonth(),
+      scope.visibleToUserId ?? undefined,
+    )
+    const dealIds = followUps.map((fu) => fu.deal.id)
+    expect(dealIds).toContain(cededDealId)
+    // otherId owns foreignDealId; it was never ceded to memberId, so it must stay out of
+    // memberId's calendar even though both follow-ups fall in the same month.
+    expect(dealIds).not.toContain(foreignDealId)
+  })
+
+  it("the layout's follow-up alerts surface a ceded deal's follow-up to the member it was ceded to", async () => {
+    const { followUpAlerts: alerts } = await loadTenantLayoutData(tenantId, "MEMBER", memberId)
+    const dealIds = [...alerts.overdue, ...alerts.today, ...alerts.next7].map((fu) => fu.deal.id)
+    expect(dealIds).toContain(cededDealId)
+    expect(dealIds).not.toContain(foreignDealId)
   })
 })

@@ -36,8 +36,8 @@ export default async function CalendarPage({ params, searchParams }: Props) {
   const year = searchParams.year ? parseInt(searchParams.year as string, 10) : now.getFullYear()
   const month =
     searchParams.month !== undefined ? parseInt(searchParams.month as string, 10) : now.getMonth()
-  // Asesores (and any role with pipeline.viewAll off) only see their own calendar; supervisors/
-  // superadmins with the permission may filter by advisor.
+  // Asesores (and any role with pipeline.viewAll off) only see their own calendar plus
+  // anything ceded to them; supervisors/superadmins with the permission may filter by advisor.
   const ownerId = canSeeAll ? (searchParams.owner as string | undefined) : (scope.visibleToUserId ?? undefined)
 
   const [followUps, members, pipeline, settings] = await Promise.all([
