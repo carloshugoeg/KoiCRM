@@ -13,6 +13,10 @@ import {
   Activity,
   Star,
   ShieldCheck,
+  Sun,
+  ShowerHead,
+  Wrench,
+  Lightbulb,
 } from "lucide-react"
 
 export const PRESET_COLORS = [
@@ -43,20 +47,35 @@ export const SETTINGS_NAV = [
   icon: LucideIcon
 }>
 
-/** Demo EQUIP_BASE_ICONS — icon by equipment label prefix */
+/** Icon by equipment label prefix. Longest matching prefix wins, so a specific
+ *  entry ("Calentadores solares") beats a generic one ("Calentador"). */
 export const EQUIPMENT_ICONS: Record<string, LucideIcon> = {
+  "Calentadores solares": Sun,
+  "Calentadores eléctricos": Zap,
+  "Calentador solar": Sun,
+  Drenaje: ShowerHead,
+  Drenajes: ShowerHead,
+  Accesorios: Wrench,
+  Repuesto: Wrench,
+  Mantenimiento: Wrench,
+  Kit: Wrench,
   Bomba: Waves,
   Jacuzzi: Droplets,
   Sauna: Thermometer,
   Calentador: Zap,
   Filtro: Wind,
   Hidrojet: Activity,
+  Iluminacion: Lightbulb,
+  Iluminación: Lightbulb,
+  Otros: Package,
+  General: Package,
 }
 
+const EQUIPMENT_ICON_KEYS = Object.keys(EQUIPMENT_ICONS).sort((a, b) => b.length - a.length)
+
 export function equipmentIcon(label: string): LucideIcon {
-  const match = Object.keys(EQUIPMENT_ICONS).find((k) =>
-    label.toLowerCase().startsWith(k.toLowerCase()),
-  )
+  const target = label.toLowerCase()
+  const match = EQUIPMENT_ICON_KEYS.find((k) => target.startsWith(k.toLowerCase()))
   return (match && EQUIPMENT_ICONS[match]) || Star
 }
 
