@@ -29,6 +29,8 @@ interface KanbanBoardProps {
   initialDeals: DealCardData[]
   settings: IntlSettings
   equipmentLabels?: Record<string, string>
+  /** When false, per-stage money totals stay hidden (each card keeps its own value). */
+  canSeeTotals?: boolean
   onDealClick: (dealId: string) => void
 }
 
@@ -39,6 +41,7 @@ export function KanbanBoard({
   initialDeals,
   settings,
   equipmentLabels,
+  canSeeTotals = true,
   onDealClick,
 }: KanbanBoardProps) {
   const { guard } = useActionPin()
@@ -129,6 +132,7 @@ export function KanbanBoard({
             onDealClick={onDealClick}
             movingDealId={movingDealId}
             draggingDeal={activeId ? deals.find((d) => d.id === activeId) : undefined}
+            canSeeTotals={canSeeTotals}
           />
         ))}
       </div>

@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
-import { Plus, Printer } from "lucide-react"
+import { Plus, Printer, SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { KanbanBoard } from "@/features/pipeline/components/KanbanBoard"
 import { FilterBar } from "@/features/pipeline/components/FilterBar"
 import { KpiBar } from "@/features/pipeline/components/KpiBar"
@@ -33,6 +34,10 @@ interface PipelineClientProps {
   currentFilters: PipelineFiltersParams
   intlSettings: IntlSettings
   currentUserId: string
+  /** False hides aggregate money (stage totals + KPIs); each card keeps its own value. */
+  canSeeTotals: boolean
+  /** Non-null when the member only sees their own deals (pipeline.viewAll off). */
+  restrictedOwnerId: string | null
   canCreate: boolean
   canEdit: boolean
   canArchive: boolean
@@ -77,6 +82,8 @@ export function PipelineClient({
   currentFilters,
   intlSettings,
   currentUserId,
+  canSeeTotals,
+  restrictedOwnerId,
   canCreate,
   canEdit,
   canArchive,
@@ -88,6 +95,11 @@ export function PipelineClient({
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null)
   const [fetchedDeal, setFetchedDeal] = useState<DealSummary | null>(null)
   const [loadingDeal, setLoadingDeal] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  // Deep-link bookkeeping: the id already consumed, and the one opened from the URL
+  // (a bad deep link closes quietly instead of shouting at the user).
+  const consumedDealParam = useRef<string | null>(null)
+  const deepLinkedDealId = useRef<string | null>(null)
 
   const dealCards: DealCardData[] = useMemo(() => deals.map((d) => ({
     ...d,
@@ -114,10 +126,17 @@ export function PipelineClient({
     router.replace(`/app/${tenantSlug}/pipeline${qs ? `?${qs}` : ""}`)
   }, [router, searchParams, tenantSlug])
 
+  // `?deal=<id>` deep link: open that deal once, then drop the param so closing the
+  // modal cannot re-open it. Unknown or out-of-scope ids simply open nothing.
+  const dealParam = searchParams.get("deal")
   useEffect(() => {
-    const dealId = searchParams.get("deal")
-    if (dealId) setSelectedDealId(dealId)
-  }, [searchParams])
+    if (!dealParam) return
+    if (consumedDealParam.current === dealParam) return
+    consumedDealParam.current = dealParam
+    deepLinkedDealId.current = dealParam
+    setSelectedDealId(dealParam)
+    clearDealParam()
+  }, [dealParam, clearDealParam])
 
   useEffect(() => {
     if (!selectedDealId) {
@@ -138,10 +157,15 @@ export function PipelineClient({
     void getDealSummaryAction({ tenantId, dealId: selectedDealId }).then((res) => {
       if (cancelled) return
       setLoadingDeal(false)
-      if (res.ok && res.deal) {
+      // A deal outside the member's scope is treated as if it did not exist.
+      const inScope = !restrictedOwnerId || res.deal?.ownerId === restrictedOwnerId
+      if (res.ok && res.deal && inScope) {
         setFetchedDeal(res.deal)
       } else {
-        toast.error(toastErrorFromResult(res.error, toastMessages.deal.notFound))
+        // A stale deep link just resolves to nothing; a click inside the board is a real error.
+        if (deepLinkedDealId.current !== selectedDealId) {
+          toast.error(toastErrorFromResult(res.error, toastMessages.deal.notFound))
+        }
         setSelectedDealId(null)
         clearDealParam()
       }
@@ -150,7 +174,7 @@ export function PipelineClient({
     return () => {
       cancelled = true
     }
-  }, [selectedDealId, dealCards, tenantId, clearDealParam])
+  }, [selectedDealId, dealCards, tenantId, restrictedOwnerId, clearDealParam])
 
   const closeDealModal = useCallback(() => {
     setSelectedDealId(null)
@@ -176,8 +200,8 @@ export function PipelineClient({
   return (
     <PinProvider>
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-[#f8faff]">
-      <div className="flex items-center gap-5 px-6 py-4 border-b border-indigo-500/10 bg-white/80 backdrop-blur-sm sticky top-0 z-10 flex-wrap">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 px-3 py-3 border-b border-indigo-500/10 bg-white/80 backdrop-blur-sm sticky top-0 z-10 flex-wrap md:gap-5 md:px-6 md:py-4">
+        <div className="hidden items-center gap-3 md:flex">
           <Button
             size="sm"
             className="rounded-full bg-[#4f46e5] hover:bg-[#4338ca] text-white shadow-md shadow-indigo-500/20 px-6 h-10 font-bold tracking-wide"
@@ -198,20 +222,37 @@ export function PipelineClient({
           </Button>
         </div>
 
-        <FilterBar
-          members={members}
-          channels={channels}
-          equipmentHierarchy={equipmentHierarchy}
-          currentFilters={currentFilters}
-          tenantSlug={tenantSlug}
-        />
+        {/* Mobile: filters collapse behind a toggle so the board keeps the screen. */}
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-expanded={filtersOpen}
+          className="h-11 rounded-full border border-slate-200 bg-white px-4 text-xs font-bold text-slate-600 shadow-sm md:hidden"
+          onClick={() => setFiltersOpen((p) => !p)}
+        >
+          <SlidersHorizontal className="mr-1.5 h-4 w-4" />
+          Filtros
+        </Button>
 
-        <div className="ml-auto">
-          <KpiBar totalPipeline={totalPipeline} totalWon={totalWon} settings={intlSettings} />
+        <div className={cn("w-full md:block md:w-auto", filtersOpen ? "block" : "hidden")}>
+          <FilterBar
+            members={members}
+            channels={channels}
+            equipmentHierarchy={equipmentHierarchy}
+            currentFilters={currentFilters}
+            tenantSlug={tenantSlug}
+            showOwnerFilter={restrictedOwnerId === null}
+          />
         </div>
+
+        {canSeeTotals && (
+          <div className="ml-auto">
+            <KpiBar totalPipeline={totalPipeline} totalWon={totalWon} settings={intlSettings} />
+          </div>
+        )}
       </div>
 
-      <div className="min-w-0 flex-1 overflow-hidden pt-4 px-2">
+      <div className="min-w-0 flex-1 overflow-hidden pt-3 px-0 md:pt-4 md:px-2">
         <KanbanBoard
           tenantId={tenantId}
           tenantSlug={tenantSlug}
@@ -219,9 +260,23 @@ export function PipelineClient({
           initialDeals={dealCards}
           settings={intlSettings}
           equipmentLabels={equipmentLabels}
+          canSeeTotals={canSeeTotals}
           onDealClick={(dealId) => setSelectedDealId(dealId)}
         />
       </div>
+
+      {/* Quick add — thumb-reachable on phones; desktop keeps the header button. */}
+      {canCreate && (
+        <button
+          type="button"
+          onClick={() => setNewDealOpen(true)}
+          aria-label="Nueva oportunidad"
+          className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/30 transition-colors active:bg-[#4338ca] md:hidden"
+          style={{ bottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      )}
 
       {loadingDeal && selectedDealId && !modalDeal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">

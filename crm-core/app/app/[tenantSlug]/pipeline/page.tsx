@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
 import { loadPipelineKanbanData } from "@/features/pipeline/queries"
 import { pipelineFiltersSchema } from "@/features/pipeline/schemas"
+import { pipelineScopeFor } from "@/lib/permissions/resolve"
 import { canEditDeal, canArchiveDeal, canDeleteDeal, canCreateDeal } from "@/lib/auth/rbac"
 import { PipelineClient } from "@/features/pipeline/components/PipelineClient"
 import { PrintReport } from "@/features/pipeline/components/PrintReport"
@@ -41,17 +42,26 @@ export default async function PipelinePage({ params, searchParams }: Props) {
   const cookieStore = cookies()
   const includeArchived = readShowArchivedFromCookieHeader(cookieStore.toString())
 
+  // Permission scope: `visibleToUserId` pins the query to what this member may see (their own
+  // deals plus anything ceded to them), `canSeeTotals` controls only the aggregate money
+  // (per-stage totals + KPIs), never each deal's value.
+  const scope = await pipelineScopeFor(tenantId, membership.role, session.user.id)
+
   const { pipeline, members, channels, equipmentHierarchy, statuses, settings, deals } =
-    await loadPipelineKanbanData(tenantId, {
-      ownerId: filters.owner,
-      channelKey: filters.channel,
-      equipmentCategoryKey: filters.equipmentCategory,
-      equipmentSubcategoryKey: filters.equipmentSubcategory,
-      alerts: filters.alerts,
-      from: filters.from ? new Date(filters.from) : undefined,
-      to: filters.to ? new Date(filters.to) : undefined,
-      includeArchived,
-    })
+    await loadPipelineKanbanData(
+      tenantId,
+      {
+        ownerId: filters.owner,
+        channelKey: filters.channel,
+        equipmentCategoryKey: filters.equipmentCategory,
+        equipmentSubcategoryKey: filters.equipmentSubcategory,
+        alerts: filters.alerts,
+        from: filters.from ? new Date(filters.from) : undefined,
+        to: filters.to ? new Date(filters.to) : undefined,
+        includeArchived,
+      },
+      scope,
+    )
 
   if (!pipeline) {
     return (
@@ -163,6 +173,8 @@ export default async function PipelinePage({ params, searchParams }: Props) {
           canEdit={canEdit}
           canArchive={canArchiveDeal(membership.role)}
           canDelete={canDeleteDeal(membership.role)}
+          canSeeTotals={scope.canSeeTotals}
+          restrictedOwnerId={scope.visibleToUserId}
         />
       </div>
       <PrintReport

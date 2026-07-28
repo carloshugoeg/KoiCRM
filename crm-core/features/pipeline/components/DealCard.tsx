@@ -49,6 +49,7 @@ interface DealCardProps {
   isCompact?: boolean       // column-driven compact mode; undefined = legacy internal-toggle
   isHighlighted?: boolean   // column-driven highlight glow
   onOpenDetail?: () => void // separate callback for opening the modal
+  dragDisabled?: boolean    // mobile: swipe owns the touch gesture, so drag is off
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -89,8 +90,12 @@ export function DealCard({
   isCompact,
   isHighlighted,
   onOpenDetail,
+  dragDisabled = false,
 }: DealCardProps) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id })
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: deal.id,
+    disabled: dragDisabled,
+  })
   const [isExpanded, setIsExpanded] = useState(false)
 
   const sc = stageColor ?? "#6366f1"
@@ -132,7 +137,9 @@ export function DealCard({
       }}
       {...listeners}
       {...attributes}
-      className="relative w-full max-w-full min-w-0 box-border rounded-xl border cursor-grab active:cursor-grabbing select-none overflow-hidden focus-visible:outline-none transition-shadow duration-300 hover:-translate-y-0.5"
+      className={`relative w-full max-w-full min-w-0 box-border rounded-xl border select-none overflow-hidden focus-visible:outline-none transition-shadow duration-300 hover:-translate-y-0.5 ${
+        dragDisabled ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
+      }`}
       onMouseEnter={(e) => {
         if (!isDragging && !isHighlighted) {
           (e.currentTarget as HTMLDivElement).style.boxShadow =
@@ -290,7 +297,7 @@ export function DealCard({
                 e.stopPropagation()
                 ;(onOpenDetail ?? onClick)()
               }}
-              className="mt-2 w-full py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-md text-xs font-bold transition-colors cursor-pointer"
+              className="mt-2 w-full min-h-[44px] py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-md text-xs font-bold transition-colors cursor-pointer"
             >
               Ver detalle
             </button>

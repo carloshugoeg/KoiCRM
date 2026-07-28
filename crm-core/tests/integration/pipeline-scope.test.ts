@@ -17,6 +17,8 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 // Import AFTER mocks.
 import { getDealSummaryAction } from "@/features/deals/actions"
 import { auth } from "@/lib/auth/auth"
+import { loadPipelineKanbanData } from "@/features/pipeline/queries"
+import { pipelineScopeFor } from "@/lib/permissions/resolve"
 
 const mockAuth = auth as unknown as Mock<() => Promise<Session | null>>
 
@@ -160,5 +162,39 @@ describe("getDealSummaryAction deep-link authorization", () => {
     )
     const res = await getDealSummaryAction({ tenantId, dealId: foreignDealId })
     expect(res.ok).toBe(true)
+  })
+})
+
+describe("loadPipelineKanbanData scope enforcement", () => {
+  it("returns the member's own deals plus what was ceded to them, and nothing else", async () => {
+    const scope = await pipelineScopeFor(tenantId, "MEMBER", memberId)
+    const { deals } = await loadPipelineKanbanData(tenantId, {}, scope)
+    expect(deals.map((d) => d.id).sort()).toEqual([ownDealId, cededDealId].sort())
+  })
+
+  it("cannot be widened by a hand-crafted ?owner= naming someone else", async () => {
+    const scope = await pipelineScopeFor(tenantId, "MEMBER", memberId)
+    const { deals } = await loadPipelineKanbanData(tenantId, { ownerId: otherId }, scope)
+    const ids = deals.map((d) => d.id)
+    expect(ids).not.toContain(foreignDealId)
+    // ownerId narrows within the visible set: the ceded deal is owned by otherId.
+    expect(ids).toEqual([cededDealId])
+  })
+
+  it("returns the whole funnel once pipeline.viewAll is granted", async () => {
+    await withTenant(tenantId, (tx) =>
+      tx.rolePermission.create({
+        data: { tenantId, role: "MEMBER", key: "pipeline.viewAll", allowed: true },
+      }),
+    )
+    const scope = await pipelineScopeFor(tenantId, "MEMBER", memberId)
+    const { deals } = await loadPipelineKanbanData(tenantId, {}, scope)
+    expect(deals.map((d) => d.id).sort()).toEqual([ownDealId, foreignDealId, cededDealId].sort())
+  })
+
+  it("still honours an explicit ?owner= for an unrestricted role", async () => {
+    const scope = await pipelineScopeFor(tenantId, "SUPERVISOR", memberId)
+    const { deals } = await loadPipelineKanbanData(tenantId, { ownerId: otherId }, scope)
+    expect(deals.map((d) => d.id).sort()).toEqual([foreignDealId, cededDealId].sort())
   })
 })
