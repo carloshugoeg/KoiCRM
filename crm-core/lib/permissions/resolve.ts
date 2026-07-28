@@ -171,14 +171,27 @@ export interface PipelineScope {
   canSeeTotals: boolean
 }
 
+/**
+ * Pure half of pipelineScopeFor — derives scope from an already-resolved permission record.
+ * Exists so a caller that has already paid for one permissionsFor() transaction (e.g.
+ * stats/listado, which also needs stats.viewTotals) can get the same visibility rule without
+ * opening a second one just to recompute it.
+ */
+export function scopeFromPermissions(
+  perms: Record<PermissionKey, boolean>,
+  userId: string,
+): PipelineScope {
+  return {
+    visibleToUserId: perms["pipeline.viewAll"] ? null : userId,
+    canSeeTotals: perms["pipeline.viewTotals"],
+  }
+}
+
 export async function pipelineScopeFor(
   tenantId: string,
   role: Role,
   userId: string,
 ): Promise<PipelineScope> {
   const perms = await permissionsFor(tenantId, role, userId)
-  return {
-    visibleToUserId: perms["pipeline.viewAll"] ? null : userId,
-    canSeeTotals: perms["pipeline.viewTotals"],
-  }
+  return scopeFromPermissions(perms, userId)
 }

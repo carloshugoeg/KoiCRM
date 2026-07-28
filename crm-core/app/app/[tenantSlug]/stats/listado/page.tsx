@@ -1,8 +1,7 @@
 import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
-import { canSeeAllDeals } from "@/lib/auth/rbac"
-import { permissionsFor } from "@/lib/permissions/resolve"
+import { permissionsFor, scopeFromPermissions } from "@/lib/permissions/resolve"
 import { getPipelineDeals } from "@/features/deals/queries"
 import { getStatsFilterOptions } from "@/features/stats/queries"
 import { readPanelFilters } from "@/features/stats/panel-filters"
@@ -29,7 +28,6 @@ export default async function ListadoPage({ params, searchParams }: Props) {
 
   const { tenant, membership } = resolved
   const tenantId = tenant.id
-  const canSeeAll = canSeeAllDeals(membership.role)
 
   const from = parseDate(searchParams.from)
   const to = parseDate(searchParams.to)
@@ -43,6 +41,10 @@ export default async function ListadoPage({ params, searchParams }: Props) {
   ])
   const options = await getStatsFilterOptions(tenantId)
   const canSeeTotals = perms["stats.viewTotals"]
+  // Row visibility follows pipeline.viewAll, same as the funnel — reused from the perms
+  // already fetched above (scopeFromPermissions is pure) rather than a second pipelineScopeFor
+  // call, which would open a redundant transaction just to recompute the same rule.
+  const scope = scopeFromPermissions(perms, session.user.id)
 
   const rows = await getPipelineDeals(tenantId, {
     from,
@@ -50,7 +52,7 @@ export default async function ListadoPage({ params, searchParams }: Props) {
     ownerId: values.owner,
     channelKey: values.channel,
     equipmentCategoryKey: values.category,
-    visibleToUserId: canSeeAll ? undefined : session.user.id,
+    visibleToUserId: scope.visibleToUserId ?? undefined,
   })
   // Estado lives on the deal itself and isn't part of PipelineFilters, so it is applied here.
   const deals = values.status ? rows.filter((d) => d.statusKey === values.status) : rows

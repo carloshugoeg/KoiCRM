@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
-import { canSeeAllDeals } from "@/lib/auth/rbac"
+import { pipelineScopeFor } from "@/lib/permissions/resolve"
 import { getArchivedDeals } from "@/features/deals/queries"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
 import { withTenant } from "@/lib/db/rls"
@@ -24,12 +24,16 @@ export default async function ArchivePage({ params, searchParams }: Props) {
   const { tenant, membership } = resolved
   const tenantId = tenant.id
   const tenantSlug = params.tenantSlug
-  const canSeeAll = canSeeAllDeals(membership.role)
 
   const cursor = searchParams.cursor as string | undefined
 
+  // Resolved ahead of the Promise.all below rather than inside it: pipelineScopeFor opens its
+  // own tenant transaction, and running it concurrently with the two below would raise this
+  // route's peak concurrent-transaction count. Sequencing it first keeps the peak at 2.
+  const scope = await pipelineScopeFor(tenantId, membership.role, session.user.id)
+
   const [{ deals, nextCursor }, pipeline, settings] = await Promise.all([
-    getArchivedDeals(tenantId, cursor, 10, canSeeAll ? undefined : session.user.id),
+    getArchivedDeals(tenantId, cursor, 10, scope.visibleToUserId ?? undefined),
     withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
     prisma.tenantSettings.findUnique({ where: { tenantId } }),
   ])

@@ -1,7 +1,8 @@
 import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
-import { canSeeAllDeals, canArchiveDeal, canDeleteDeal } from "@/lib/auth/rbac"
+import { canArchiveDeal, canDeleteDeal } from "@/lib/auth/rbac"
+import { pipelineScopeFor } from "@/lib/permissions/resolve"
 import { getCalendarFollowUps } from "@/features/calendar/queries"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
 import { withTenant } from "@/lib/db/rls"
@@ -24,14 +25,20 @@ export default async function CalendarPage({ params, searchParams }: Props) {
 
   const { tenant, membership } = resolved
   const tenantId = tenant.id
-  const canSeeAll = canSeeAllDeals(membership.role)
+
+  // Resolved ahead of the Promise.all below rather than inside it: pipelineScopeFor opens its
+  // own tenant transaction, and running it concurrently with the three below would raise this
+  // route's peak concurrent-transaction count. Sequencing it first keeps the peak at 3.
+  const scope = await pipelineScopeFor(tenantId, membership.role, session.user.id)
+  const canSeeAll = scope.visibleToUserId === null
 
   const now = new Date()
   const year = searchParams.year ? parseInt(searchParams.year as string, 10) : now.getFullYear()
   const month =
     searchParams.month !== undefined ? parseInt(searchParams.month as string, 10) : now.getMonth()
-  // Asesores only see their own calendar; supervisors/superadmins may filter by advisor.
-  const ownerId = canSeeAll ? (searchParams.owner as string | undefined) : session.user.id
+  // Asesores (and any role with pipeline.viewAll off) only see their own calendar; supervisors/
+  // superadmins with the permission may filter by advisor.
+  const ownerId = canSeeAll ? (searchParams.owner as string | undefined) : (scope.visibleToUserId ?? undefined)
 
   const [followUps, members, pipeline, settings] = await Promise.all([
     getCalendarFollowUps(tenantId, year, month, ownerId),
