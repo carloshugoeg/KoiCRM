@@ -39,6 +39,8 @@ model Tenant {
   memberships  Membership[]
   invitations  Invitation[]
   joinLinks    JoinLink[]
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
 }
 
 model User {
@@ -60,6 +62,7 @@ model User {
   notesCreated     Note[]       @relation("NoteCreator")
   activities       Activity[]   @relation("ActivityUser")
   savedViews       SavedView[]  @relation("SavedViewUser")
+  userPermissions  UserPermission[]
 }
 
 model Account {
@@ -497,4 +500,35 @@ model RateLimitEntry {
   resetAt DateTime
 
   @@map("rate_limit_entries")
+}
+
+/// Workspace-level override of a role's built-in permission defaults.
+/// Only rows that differ from the default are stored — a workspace with no rows is correct.
+model RolePermission {
+  tenantId  String
+  role      Role
+  key       String
+  allowed   Boolean
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, role, key])
+  @@index([tenantId])
+}
+
+/// Per-person exception on top of the role matrix. Absence means "inherit the role".
+model UserPermission {
+  tenantId  String
+  userId    String
+  key       String
+  allowed   Boolean
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, userId, key])
+  @@index([tenantId])
+  @@index([userId])
 }

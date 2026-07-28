@@ -34,6 +34,8 @@ async function truncateIfExists(tableName: string): Promise<void> {
 export async function cleanDatabase() {
   // Business tables (T2.2) — truncated first due to FKs
   for (const table of [
+    "RolePermission",
+    "UserPermission",
     "Activity",
     "SavedView",
     "Attachment",
