@@ -21,9 +21,11 @@ import {
   getDealFollowUpsAction,
   getQuotesForDealAction,
   getPaymentsForDealAction,
+  moveDealAction,
 } from "@/features/deals/actions"
 import { globalSearchAction } from "@/features/search/actions"
-import { getDealNotesAction } from "@/features/notes/actions"
+import { getDealNotesAction, addNoteAction } from "@/features/notes/actions"
+import { updateQuote } from "@/features/quotes/actions"
 import { getDealAttachmentsAction } from "@/features/attachments/actions"
 import { auth } from "@/lib/auth/auth"
 import { loadPipelineKanbanData } from "@/features/pipeline/queries"
@@ -695,5 +697,171 @@ describe("cesión — follow-ups and the calendar follow the deal, not the owner
     const dealIds = [...alerts.overdue, ...alerts.today, ...alerts.next7].map((fu) => fu.deal.id)
     expect(dealIds).toContain(cededDealId)
     expect(dealIds).not.toContain(foreignDealId)
+  })
+})
+
+/**
+ * Decision 2: WRITE paths must respect the same visibility scope as reads. Before this change,
+ * canEditDealRow said explicitly that "any editor (MEMBER+) may edit any deal, regardless of
+ * ownership" — true when everyone saw the whole funnel, but once an admin can switch off
+ * pipeline.viewAll for a person, that made write access strictly wider than read access: a
+ * restricted advisor could not open a colleague's opportunity anywhere in the app, but could
+ * still move it, add a note to it, or edit one of its quotes just by supplying the id.
+ *
+ * moveDealAction (the kanban drag) and addNoteAction (a direct dealId write) cover the "direct"
+ * shape; updateQuote covers the "indirect" shape — it takes a bare quote id and has to resolve
+ * the owning deal itself before the scope check applies.
+ */
+describe("deal write actions honour the caller's scope", () => {
+  let moveTargetStageId: string
+  let foreignQuoteId: string
+  let ownQuoteId: string
+  let cededQuoteId: string
+
+  beforeAll(async () => {
+    const nuevoStage = await prismaAdmin.pipelineStage.findFirstOrThrow({ where: { tenantId, key: "nuevo" } })
+    const moveTargetStage = await prismaAdmin.pipelineStage.create({
+      data: {
+        tenantId,
+        pipelineId: nuevoStage.pipelineId,
+        order: 2,
+        key: "contactado",
+        label: "Contactado",
+        color: "#f59e0b",
+        iconKey: "circle",
+      },
+    })
+    moveTargetStageId = moveTargetStage.id
+
+    const foreignQuote = await prismaAdmin.quote.create({
+      data: { tenantId, dealId: foreignDealId, number: "Q-FOREIGN", date: new Date() },
+    })
+    foreignQuoteId = foreignQuote.id
+    const ownQuote = await prismaAdmin.quote.create({
+      data: { tenantId, dealId: ownDealId, number: "Q-OWN", date: new Date() },
+    })
+    ownQuoteId = ownQuote.id
+    const cededQuote = await prismaAdmin.quote.create({
+      data: { tenantId, dealId: cededDealId, number: "Q-CEDED", date: new Date() },
+    })
+    cededQuoteId = cededQuote.id
+  })
+
+  // moveDealAction mutates stageId — put the caller's own deals back in "nuevo" before every
+  // test so each move test starts from the same known state.
+  beforeEach(async () => {
+    const nuevoStage = await prismaAdmin.pipelineStage.findFirstOrThrow({ where: { tenantId, key: "nuevo" } })
+    await prismaAdmin.deal.updateMany({
+      where: { id: { in: [ownDealId, cededDealId, foreignDealId] } },
+      data: { stageId: nuevoStage.id },
+    })
+  })
+
+  describe("a MEMBER without pipeline.viewAll (restricted — the case this decision changes)", () => {
+    it("moveDealAction rejects a foreign deal", async () => {
+      const res = await moveDealAction({
+        tenantId, tenantSlug: "scope", dealId: foreignDealId, toStageId: moveTargetStageId,
+      })
+      expect(res.ok).toBe(false)
+    })
+
+    it("moveDealAction succeeds for the caller's own deal", async () => {
+      const res = await moveDealAction({
+        tenantId, tenantSlug: "scope", dealId: ownDealId, toStageId: moveTargetStageId,
+      })
+      expect(res.ok).toBe(true)
+    })
+
+    it("moveDealAction succeeds for a deal ceded to the caller — the case a naive strict-ownership fix would break", async () => {
+      const res = await moveDealAction({
+        tenantId, tenantSlug: "scope", dealId: cededDealId, toStageId: moveTargetStageId,
+      })
+      expect(res.ok).toBe(true)
+    })
+
+    it("moveDealAction does not distinguish a foreign deal from a missing one", async () => {
+      const foreign = await moveDealAction({
+        tenantId, tenantSlug: "scope", dealId: foreignDealId, toStageId: moveTargetStageId,
+      })
+      const missing = await moveDealAction({
+        tenantId, tenantSlug: "scope", dealId: makeCuid(), toStageId: moveTargetStageId,
+      })
+      expect(foreign.ok).toBe(false)
+      expect(missing.ok).toBe(false)
+      expect(foreign.error).toBe(missing.error)
+    })
+
+    it("addNoteAction rejects a foreign deal", async () => {
+      const res = await addNoteAction({ tenantId, tenantSlug: "scope", body: "Nota", dealId: foreignDealId })
+      expect(res.ok).toBe(false)
+    })
+
+    it("addNoteAction succeeds for the caller's own deal", async () => {
+      const res = await addNoteAction({ tenantId, tenantSlug: "scope", body: "Nota propia", dealId: ownDealId })
+      expect(res.ok).toBe(true)
+    })
+
+    it("addNoteAction succeeds for a deal ceded to the caller — the case a naive strict-ownership fix would break", async () => {
+      const res = await addNoteAction({ tenantId, tenantSlug: "scope", body: "Nota cedida", dealId: cededDealId })
+      expect(res.ok).toBe(true)
+    })
+
+    it("addNoteAction does not distinguish a foreign deal from a missing one", async () => {
+      const foreign = await addNoteAction({ tenantId, tenantSlug: "scope", body: "Nota", dealId: foreignDealId })
+      const missing = await addNoteAction({ tenantId, tenantSlug: "scope", body: "Nota", dealId: makeCuid() })
+      expect(foreign.ok).toBe(false)
+      expect(missing.ok).toBe(false)
+      expect(foreign.error).toBe(missing.error)
+    })
+
+    it("updateQuote (indirect: resolves the deal from the quote) rejects a quote on a foreign deal", async () => {
+      const res = await updateQuote(tenantId, { id: foreignQuoteId, number: "Q-FOREIGN-2" })
+      expect(res.ok).toBe(false)
+    })
+
+    it("updateQuote succeeds for a quote on the caller's own deal", async () => {
+      const res = await updateQuote(tenantId, { id: ownQuoteId, number: "Q-OWN-2" })
+      expect(res.ok).toBe(true)
+    })
+
+    it("updateQuote succeeds for a quote on a deal ceded to the caller — the case a naive strict-ownership fix would break", async () => {
+      const res = await updateQuote(tenantId, { id: cededQuoteId, number: "Q-CEDED-2" })
+      expect(res.ok).toBe(true)
+    })
+
+    it("updateQuote does not distinguish a foreign deal's quote from a missing quote id", async () => {
+      const foreign = await updateQuote(tenantId, { id: foreignQuoteId, number: "Q-X" })
+      const missing = await updateQuote(tenantId, { id: makeCuid(), number: "Q-X" })
+      expect(foreign.ok).toBe(false)
+      expect(missing.ok).toBe(false)
+      expect((foreign as { error: string }).error).toBe((missing as { error: string }).error)
+    })
+  })
+
+  describe("a MEMBER with pipeline.viewAll (the default backfilled for every existing tenant)", () => {
+    beforeEach(async () => {
+      await withTenant(tenantId, (tx) =>
+        tx.rolePermission.create({
+          data: { tenantId, role: "MEMBER", key: "pipeline.viewAll", allowed: true },
+        }),
+      )
+    })
+
+    it("moveDealAction still succeeds for a colleague's deal — regression guard for today's customers", async () => {
+      const res = await moveDealAction({
+        tenantId, tenantSlug: "scope", dealId: foreignDealId, toStageId: moveTargetStageId,
+      })
+      expect(res.ok).toBe(true)
+    })
+
+    it("addNoteAction still succeeds for a colleague's deal — regression guard for today's customers", async () => {
+      const res = await addNoteAction({ tenantId, tenantSlug: "scope", body: "Nota sin restricción", dealId: foreignDealId })
+      expect(res.ok).toBe(true)
+    })
+
+    it("updateQuote still succeeds for a colleague's deal's quote — regression guard for today's customers", async () => {
+      const res = await updateQuote(tenantId, { id: foreignQuoteId, number: "Q-REGRESSION" })
+      expect(res.ok).toBe(true)
+    })
   })
 })
