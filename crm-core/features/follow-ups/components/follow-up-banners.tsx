@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Bell, CalendarClock, X } from "lucide-react"
@@ -37,6 +37,11 @@ function formatFollowUpDate(iso: string): string {
   })
 }
 
+// useLayoutEffect only does anything useful on the client (it's a no-op warning source during
+// SSR), so pick the effect at module init based on environment rather than calling
+// useLayoutEffect unconditionally — the standard isomorphic-layout-effect pattern.
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect
+
 interface Props {
   tenantSlug: string
   items: FollowUpBannerItem[]
@@ -47,15 +52,28 @@ export function FollowUpBanners({ tenantSlug, items, totalCount }: Props) {
   const router = useRouter()
   const storageKey = `follow-up-banners-dismissed:${tenantSlug}`
 
-  const [dismissed, setDismissed] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set()
+  // Start empty so the first client render matches the server exactly (the server always sees
+  // an empty dismissed set — sessionStorage doesn't exist there). Reading sessionStorage in the
+  // initializer instead would make the very first client render disagree with the server's HTML
+  // whenever the user had dismissed something earlier in the session, and React discards the
+  // whole SSR'd tree to recover — see the hydration-fix report for the exact error this caused.
+  //
+  // The read happens in a layout effect (isomorphic — see above) rather than a regular effect,
+  // so it applies synchronously after the DOM is committed but before the browser paints. Net
+  // effect for the user: on a page that has any dismissed follow-ups this session, those banners
+  // are technically present in the DOM for a moment, but never actually painted — there is no
+  // visible flash. A plain `useEffect` would have painted the full (undismissed) list first and
+  // then removed items a frame later, which is the flash we're explicitly avoiding.
+  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set())
+
+  useIsomorphicLayoutEffect(() => {
     try {
       const raw = sessionStorage.getItem(storageKey)
-      return raw ? new Set(JSON.parse(raw) as string[]) : new Set()
+      if (raw) setDismissed(new Set(JSON.parse(raw) as string[]))
     } catch {
-      return new Set()
+      /* ignore malformed/unavailable storage — behaves as if nothing was dismissed */
     }
-  })
+  }, [storageKey])
 
   const visible = useMemo(
     () => items.filter((item) => !dismissed.has(item.id)),
