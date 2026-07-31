@@ -6,23 +6,28 @@ import { useRouter } from "next/navigation"
 import { Bell, CalendarClock, X } from "lucide-react"
 import type { FollowUpBannerItem, FollowUpBannerUrgency } from "@/features/follow-ups/banner-items"
 
+// Dark surfaces stay dark and low-saturation (the `-950` card tints, near black with a hint of
+// hue) so the hue reads through the border and badge instead of washing the card. Mirrors the
+// light formula (`{color}-50/95` + `shadow-{color}-100`) with the dark end of the same palette
+// instead of introducing a new visual language; `dark:shadow-none` drops the light-mode colored
+// shadow so it doesn't render as a pale halo around a dark card.
 const URGENCY_STYLES: Record<
   FollowUpBannerUrgency,
   { card: string; badge: string; label: string }
 > = {
   overdue: {
-    card: "border-red-200 bg-red-50/95 shadow-red-100",
-    badge: "bg-red-100 text-red-800",
+    card: "border-red-200 bg-red-50/95 shadow-red-100 dark:border-red-800/80 dark:bg-red-950/95 dark:shadow-none",
+    badge: "bg-red-100 text-red-800 dark:bg-red-900/70 dark:text-red-200",
     label: "Vencido",
   },
   today: {
-    card: "border-orange-200 bg-orange-50/95 shadow-orange-100",
-    badge: "bg-orange-100 text-orange-800",
+    card: "border-orange-200 bg-orange-50/95 shadow-orange-100 dark:border-orange-800/80 dark:bg-orange-950/95 dark:shadow-none",
+    badge: "bg-orange-100 text-orange-800 dark:bg-orange-900/70 dark:text-orange-200",
     label: "Hoy",
   },
   upcoming: {
-    card: "border-blue-200 bg-blue-50/95 shadow-blue-100",
-    badge: "bg-blue-100 text-blue-800",
+    card: "border-blue-200 bg-blue-50/95 shadow-blue-100 dark:border-blue-800/80 dark:bg-blue-950/95 dark:shadow-none",
+    badge: "bg-blue-100 text-blue-800 dark:bg-blue-900/70 dark:text-blue-200",
     label: "Próximo",
   },
 }
@@ -106,9 +111,15 @@ export function FollowUpBanners({ tenantSlug, items, totalCount }: Props) {
             key={item.id}
             className={`pointer-events-auto relative rounded-lg border p-3 shadow-lg backdrop-blur-sm ${style.card}`}
           >
+            {/* 44x44 touch target (Apple HIG minimum), anchored flush to the card's rounded
+                corner so the visible icon stays the same small size — only the invisible hit
+                area grows. It necessarily overlaps the top of the "open deal" button below;
+                that's an accepted tradeoff for a corner dismiss control, and the open-deal
+                button still has the rest of the card (title tail, company, note, date) to
+                receive taps. */}
             <button
               type="button"
-              className="absolute right-2 top-2 rounded p-0.5 text-muted-foreground hover:bg-black/5 hover:text-foreground"
+              className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center rounded-tr-lg text-muted-foreground motion-safe:transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
               aria-label="Cerrar recordatorio"
               onClick={() => dismiss(item.id)}
             >
@@ -117,7 +128,7 @@ export function FollowUpBanners({ tenantSlug, items, totalCount }: Props) {
 
             <button
               type="button"
-              className="w-full pr-6 text-left"
+              className="w-full pr-11 text-left"
               onClick={() => router.push(dealHref)}
             >
               <div className="mb-1.5 flex items-center gap-2">
