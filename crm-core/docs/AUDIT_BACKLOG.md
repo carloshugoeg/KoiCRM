@@ -450,7 +450,7 @@ all**, which blocks the stated white-label V1 goal and contradicts `AGENTS.md`.
 into the deal schemas, or drop the settings fields if GT-only is the accepted V1 scope — but
 pick one, don't leave a no-op control in the UI.
 
-### FINDING-029 · MEDIUM · Maintainability
+### FINDING-029 · MEDIUM · Maintainability — PARTIALLY RESOLVED
 **Test coverage is inverted relative to risk**
 `tests/unit/` (14 files), `features/*/__tests__/` (3 dirs)
 
@@ -466,6 +466,45 @@ FINDING-002 and FINDING-003 were live.
 role × self / other / OWNER-target / non-member — over `features/users/actions.ts`,
 `features/deals/actions.ts` getters, and the upload routes. This is the single highest-value
 test investment in the codebase.
+
+**Implemented (partial):** added `tests/integration/user-actions-authorization.test.ts` — the
+matrix for every privileged action in `features/users/actions.ts` (`removeMemberAction`,
+`changeMemberRoleAction`, `updateMemberAction`, `adminResetPasswordAction`,
+`deactivateMemberAction`, `reactivateMemberAction`, `setMemberPinAction`,
+`clearMemberPinAction`), 36 cases across caller role × target (self / other MEMBER / other
+ADMIN / OWNER / non-member). This is exactly what the finding predicted: **writing it found two
+more instances of the FINDING-003 bug class**, immediately, before the tests were even passing
+— see FINDING-039 (new) below. The deal sub-resource getters and the upload routes are **not**
+covered yet; left for a follow-up pass, this one already paid for itself.
+
+### FINDING-039 · HIGH · Security (new — found writing the FINDING-029 matrix)
+**Two more missing target-side ADMIN guards, same bug class as FINDING-003**
+`features/users/actions.ts` — `changeMemberRoleAction`, `updateMemberAction`
+
+While writing the FINDING-029 authorization matrix, two of `updateMemberAction`'s and
+`changeMemberRoleAction`'s tests failed **before any test code was wrong** — actual gaps:
+
+1. `updateMemberAction`'s role-change branch checked `isSelf`, `target.role === "OWNER"`, and
+   `canManage` (OWNER or ADMIN), but never `target.role === "ADMIN" && caller.role !== "OWNER"`
+   — the guard every sibling in this file has. **This one is live**: `EditMemberModal.tsx` calls
+   `updateMemberAction` with a `role` payload whenever `canManageRole` is true (caller is
+   OWNER/ADMIN) and the target isn't OWNER — nothing stopped one ADMIN from reassigning
+   (including demoting) another ADMIN's role through Settings → Team, in production, today.
+2. `changeMemberRoleAction` had the identical gap. This function currently has **no caller
+   anywhere in the app** (`updateMemberAction`'s `role` field is the live role-change path), so
+   it carried no live exposure — but it is an exported `"use server"` action, which means it is
+   reachable the moment anything imports it, with no guard preventing the FINDING-003 pattern.
+
+**Fix:** added `if (target.role === "ADMIN" && caller.role !== "OWNER") return { ok: false,
+error: "Solo el propietario puede cambiar el rol de un administrador." }` to both, matching the
+message family already used by `removeMemberAction` / `adminResetPasswordAction` /
+`setMemberPinAction` / `clearMemberPinAction` / `deactivateMemberAction`. Covered by the new
+matrix in `tests/integration/user-actions-authorization.test.ts`; before the fix, the matrix
+failed with the target's role having actually changed in the database, not a mocked failure.
+
+This is the argument for FINDING-025/028 (collapsing the 28 duplicated inline role checks into
+one shared policy function) made concrete: two of the eight actions in this one file, all
+following the identical hand-written pattern, independently drifted from it.
 
 ### FINDING-030 · LOW · Maintainability
 **24 sites swallow errors into empty or falsy returns**

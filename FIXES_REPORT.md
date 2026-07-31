@@ -194,3 +194,70 @@ green (129/129 unit, 292/292 integration — unchanged counts, as expected for a
 deletion).
 
 ---
+
+## FINDING-029 · MEDIUM · Maintainability — authorization matrix — PARTIALLY RESOLVED
+## FINDING-039 · HIGH · Security (new) — two more FINDING-003-class gaps — RESOLVED
+
+This is the big one from this session, and it's exactly the outcome FINDING-029 predicted.
+
+Added `tests/integration/user-actions-authorization.test.ts`: a table-driven matrix over every
+privileged action in `features/users/actions.ts` — `removeMemberAction`,
+`changeMemberRoleAction`, `updateMemberAction`, `adminResetPasswordAction`,
+`deactivateMemberAction`, `reactivateMemberAction`, `setMemberPinAction`,
+`clearMemberPinAction` — crossed with caller role (OWNER/ADMIN/SUPERVISOR/MEMBER/non-member)
+and target (self / other MEMBER / other ADMIN / OWNER / non-member). 36 cases.
+
+**Writing it — not a mocked scenario, the actual first run — found two real, currently-shipped
+gaps**, both the same shape as FINDING-003 (target-side ADMIN guard missing):
+
+1. **`updateMemberAction` (live, reachable today):** its role-change branch never checked
+   `target.role === "ADMIN" && caller.role !== "OWNER"`. `EditMemberModal.tsx` calls this action
+   with a `role` payload whenever the caller is OWNER/ADMIN and the target isn't OWNER — so any
+   ADMIN could reassign (including demote) another ADMIN's role via Settings → Team. Confirmed
+   by running the test against the pre-fix code: the assertion failed because the target's role
+   had actually changed in the database, not because of a bad mock.
+2. **`changeMemberRoleAction`:** identical gap. This function has zero callers anywhere in the
+   app today (`updateMemberAction`'s `role` field is the live path), so it wasn't exploitable
+   yet, but it's an exported `"use server"` action with no guard against exactly the FINDING-003
+   pattern — one wire-up away from being live.
+
+**Fix:** added the same guard both siblings already had —
+`if (target.role === "ADMIN" && caller.role !== "OWNER") return { ok: false, error: "Solo el
+propietario puede cambiar el rol de un administrador." }` — to both functions, matching the
+message family the other five actions in this file already use.
+
+**TDD evidence — the real sequence, not reconstructed:**
+```
+1st run (updateMemberAction unfixed):
+ × ADMIN cannot change another ADMIN's role via updateMemberAction either
+   expected true to be false          ← role change actually succeeded
+ (4 more tests cascade-failed afterward: adminBId's role had been mutated to
+  MEMBER for real by the bug, so every later test targeting adminBId as an
+  "other ADMIN" saw a MEMBER instead and correctly proceeded)
+
+after fixing updateMemberAction, before fixing changeMemberRoleAction:
+ × ADMIN cannot change another ADMIN's role   (changeMemberRoleAction)
+   expected true to be false
+
+after fixing both:
+ Test Files  1 passed (1)   Tests  36 passed (36)
+```
+The cascade in the first run is itself a small lesson: a real (not mocked) authorization bug in
+shared fixture state can make unrelated-looking assertions fail downstream. Worth remembering
+if this matrix grows and someone sees a batch of failures that don't look related to what they
+changed — check whether an earlier test actually mutated something it shouldn't have been able
+to.
+
+**Scope not covered:** the deal sub-resource getters (`features/deals/actions.ts`) and the
+upload routes, both named in the original FINDING-029 text, are not in this matrix. Left for a
+follow-up — this pass already found and fixed two real bugs, which is the point of the
+investment; didn't want to let scope creep turn one session into rewriting the whole
+authorization test suite the night before onboarding.
+
+**Files:** `features/users/actions.ts` (two guards added),
+`tests/integration/user-actions-authorization.test.ts` (new, 36 tests).
+
+**Verification:** `pnpm type-check && pnpm lint && pnpm test && pnpm test:integration` all
+green (129/129 unit, 328/328 integration — +36 from the new matrix file).
+
+---
