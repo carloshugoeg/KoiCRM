@@ -138,7 +138,7 @@ into an attacker-controlled tenant.
 **Why deferred:** converting to POST breaks every join link already distributed. Needs a
 migration path (interstitial confirmation page that POSTs), plus a `maxUses` column decision.
 
-### FINDING-037 · LOW · Security
+### FINDING-037 · LOW · Security — RESOLVED (documented)
 **Write scope is evaluated against the action-PIN actor, not the session user**
 `lib/auth/action-pin.ts` (`resolveActionActor`); `features/deals/guards.ts`
 
@@ -154,6 +154,11 @@ off on, so it is recorded here as a decision rather than left to be rediscovered
 **Decision needed:** none functionally — current behaviour is correct given how the PIN model
 works. Write it up as an ADR (see FINDING-033's note on undocumented deliberate trade-offs) so
 a future reader finds the reasoning here instead of re-deriving it.
+
+**Implemented:** `docs/adr/0001-pin-actor-governs-write-scope.md`. No code change — the ADR
+records why current behaviour is correct, so it stops looking like an oversight to the next
+reader. Explicitly does not resolve FINDING-010 (open), which is the larger, not-yet-settled
+question of whether the PIN should carry authorization weight at all.
 
 ---
 

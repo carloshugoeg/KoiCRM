@@ -261,3 +261,18 @@ authorization test suite the night before onboarding.
 green (129/129 unit, 328/328 integration — +36 from the new matrix file).
 
 ---
+
+## FINDING-037 · LOW · Security — documented via ADR — RESOLVED
+
+No code change. The finding asked for exactly one thing: write up, as an ADR, why write scope
+correctly follows the action-PIN actor rather than the session user. Added
+`docs/adr/0001-pin-actor-governs-write-scope.md`, following this repo's own convention in
+`DECISIONS_AND_OPEN_QUESTIONS.md` §6 (`docs/adr/NNNN-titulo.md`). Explicitly scoped narrower
+than FINDING-010 (open, "Decision needed") — this ADR only says "given the PIN model as it
+exists, scope following the PIN actor is correct and coherent with capability already doing
+the same," not "the PIN model itself is the right design."
+
+**Verification:** doc-only change; ran the full suite anyway per the house rule (129/129 unit,
+328/328 integration).
+
+---
