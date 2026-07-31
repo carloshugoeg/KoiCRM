@@ -210,20 +210,31 @@ export function KanbanBoard({
                 type="button"
                 aria-current={isActive ? "true" : undefined}
                 onClick={() => goToStage(index)}
-                className="flex h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-[11px] font-black uppercase tracking-wider transition-colors"
+                // Only the active pill needs an inline style — its colour comes from the stage
+                // row. The inactive one is left to Tailwind so it can carry a dark variant,
+                // which an inline background cannot.
+                className={
+                  "flex h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-[11px] font-black uppercase tracking-wider transition-colors" +
+                  (isActive
+                    ? ""
+                    : " border-slate-200 bg-white text-slate-600 dark:border-border dark:bg-card dark:text-muted-foreground")
+                }
                 style={
                   isActive
                     ? { background: stage.color, borderColor: stage.color, color: "#ffffff" }
-                    : { background: "#ffffff", borderColor: "#e2e8f0", color: "#64748b" }
+                    : undefined
                 }
               >
                 <span className="max-w-[9rem] truncate">{stage.label}</span>
                 <span
-                  className="flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold"
+                  className={
+                    "flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold" +
+                    (isActive ? "" : " bg-slate-100 text-slate-600 dark:bg-border dark:text-muted-foreground")
+                  }
                   style={
                     isActive
                       ? { background: "rgba(255,255,255,0.25)", color: "#ffffff" }
-                      : { background: "#f1f5f9", color: "#475569" }
+                      : undefined
                   }
                 >
                   {count}
