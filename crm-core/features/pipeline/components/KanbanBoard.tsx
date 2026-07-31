@@ -16,6 +16,7 @@ import { toast } from "sonner"
 import { KanbanColumn } from "@/features/pipeline/components/KanbanColumn"
 import { DealCard, type DealCardData } from "@/features/pipeline/components/DealCard"
 import { useNarrowViewport } from "@/features/pipeline/hooks/use-narrow-viewport"
+import { SwipeAwarePointerSensor } from "@/features/pipeline/sensors/swipe-aware-pointer-sensor"
 import { moveDealAction } from "@/features/deals/actions"
 import { useActionPin } from "@/features/auth/pin-gate"
 import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
@@ -55,15 +56,19 @@ export function KanbanBoard({
   const railRef = useRef<HTMLDivElement>(null)
   const scrollRaf = useRef<number | null>(null)
 
-  // Phones swipe between stages, so dnd-kit gets no sensors there: the two gestures
+  // Phones swipe between stages, so pointer dragging is refused there: the two gestures
   // would otherwise fight over the same touch. Stage moves live in the deal modal.
+  //
+  // The refusal happens inside the sensor rather than by handing DndContext a shorter
+  // sensor list. Swapping the list between two entries and none changes the size of the
+  // dependency array dnd-kit derives from it, which React rejects — and the swap really
+  // does happen, because useNarrowViewport renders false on the server and the real value
+  // after hydration, and again on every rotation across the breakpoint.
   const isNarrow = useNarrowViewport()
-  const pointerSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  const sensors = useSensors(
+    useSensor(SwipeAwarePointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
-  const noSensors = useSensors()
-  const sensors = isNarrow ? noSensors : pointerSensors
 
   useEffect(() => {
     setDeals(initialDeals)
@@ -184,7 +189,10 @@ export function KanbanBoard({
     : "#6366f1"
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    // `id` is pinned rather than left to dnd-kit's module-level counter, which is not reset
+    // between server renders: the server would emit DndDescribedBy-1 while the client's
+    // fresh counter emitted DndDescribedBy-0, and React reported the mismatch on every card.
+    <DndContext id="pipeline-kanban" sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex h-full min-w-0 flex-col">
         {/* Stage rail — mobile only: shows the current stage and jumps between them. */}
         <div

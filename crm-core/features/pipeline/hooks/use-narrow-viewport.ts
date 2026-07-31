@@ -17,6 +17,15 @@ function getSnapshot() {
   return window.matchMedia(NARROW_QUERY).matches
 }
 
+/**
+ * Imperative read of the same breakpoint, for callers that run outside React's render
+ * cycle — dnd-kit sensor activators, for one. Prefer the hook anywhere a re-render is
+ * wanted; this is deliberately not reactive.
+ */
+export function isNarrowViewport(): boolean {
+  return getSnapshot()
+}
+
 function getServerSnapshot() {
   return false
 }
