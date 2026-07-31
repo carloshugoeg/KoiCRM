@@ -73,7 +73,7 @@ export function FilterBar({
   const subOptions = selectedCategory?.subcategories ?? []
 
   const hasFilters = Object.values(currentFilters).some(Boolean)
-  const triggerClasses = "h-11 md:h-9 text-xs bg-slate-50 border-slate-200 rounded-full font-medium text-slate-600 shadow-sm focus:ring-0 focus:ring-offset-0"
+  const triggerClasses = "h-11 board:tall:h-9 text-xs bg-slate-50 border-slate-200 rounded-full font-medium text-slate-600 shadow-sm focus:ring-0 focus:ring-offset-0"
 
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -161,7 +161,7 @@ export function FilterBar({
           disabled={isPending}
           placeholder="Desde"
           aria-label="Fecha desde"
-          className={`h-11 md:h-9 min-w-0 w-32 bg-slate-50 border-slate-200 rounded-full text-slate-600 shadow-sm${isPending ? " opacity-50" : ""}`}
+          className={`h-11 board:tall:h-9 min-w-0 w-32 bg-slate-50 border-slate-200 rounded-full text-slate-600 shadow-sm${isPending ? " opacity-50" : ""}`}
         />
         <span className="text-xs text-slate-400" aria-hidden="true">→</span>
         <DatePicker
@@ -170,12 +170,12 @@ export function FilterBar({
           disabled={isPending}
           placeholder="Hasta"
           aria-label="Fecha hasta"
-          className={`h-11 md:h-9 min-w-0 w-32 bg-slate-50 border-slate-200 rounded-full text-slate-600 shadow-sm${isPending ? " opacity-50" : ""}`}
+          className={`h-11 board:tall:h-9 min-w-0 w-32 bg-slate-50 border-slate-200 rounded-full text-slate-600 shadow-sm${isPending ? " opacity-50" : ""}`}
         />
       </div>
 
       {hasFilters && (
-        <Button variant="ghost" size="sm" className="h-11 md:h-9 text-xs rounded-full" onClick={clearAll}>
+        <Button variant="ghost" size="sm" className="h-11 board:tall:h-9 text-xs rounded-full" onClick={clearAll}>
           Limpiar filtros
         </Button>
       )}

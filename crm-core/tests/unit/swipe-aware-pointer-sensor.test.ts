@@ -12,7 +12,7 @@ const activator = SwipeAwarePointerSensor.activators[0]
 
 function setViewport(narrow: boolean) {
   vi.stubGlobal("matchMedia", (query: string) => ({
-    matches: narrow && query === "(max-width: 767px)",
+    matches: narrow && query === "(max-width: 1023px)",
     media: query,
     addEventListener: () => {},
     removeEventListener: () => {},

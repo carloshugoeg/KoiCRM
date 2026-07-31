@@ -56,8 +56,9 @@ export function KanbanBoard({
   const railRef = useRef<HTMLDivElement>(null)
   const scrollRaf = useRef<number | null>(null)
 
-  // Phones swipe between stages, so pointer dragging is refused there: the two gestures
-  // would otherwise fight over the same touch. Stage moves live in the deal modal.
+  // Below the board tier (phone and tablet-portrait) the user swipes between stages, so
+  // pointer dragging is refused there: the two gestures would otherwise fight over the
+  // same touch. Stage moves live in the deal modal.
   //
   // The refusal happens inside the sensor rather than by handing DndContext a shorter
   // sensor list. Swapping the list between two entries and none changes the size of the
@@ -194,12 +195,13 @@ export function KanbanBoard({
     // fresh counter emitted DndDescribedBy-0, and React reported the mismatch on every card.
     <DndContext id="pipeline-kanban" sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex h-full min-w-0 flex-col">
-        {/* Stage rail — mobile only: shows the current stage and jumps between them. */}
+        {/* Stage rail — phone and tablet-portrait only (below `board`): shows the current
+            stage and jumps between them. */}
         <div
           ref={railRef}
           role="group"
           aria-label="Etapas del embudo"
-          className="flex shrink-0 gap-2 overflow-x-auto px-3 pb-3 md:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex shrink-0 gap-2 overflow-x-auto px-3 pb-3 board:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {stages.map((stage, index) => {
             const isActive = index === activeStageIndex
@@ -247,7 +249,7 @@ export function KanbanBoard({
         <div
           ref={slidesRef}
           onScroll={handleScroll}
-          className="flex w-full min-w-0 flex-1 min-h-0 snap-x snap-mandatory overscroll-x-contain gap-2 overflow-x-auto overflow-y-hidden px-2 pb-4 pt-2 sm:gap-3 sm:px-3 md:h-full md:min-h-[calc(100vh-180px)] md:snap-none md:gap-4 md:overflow-hidden md:px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex w-full min-w-0 flex-1 min-h-0 snap-x snap-mandatory overscroll-x-contain gap-2 overflow-x-auto overflow-y-hidden px-2 pb-4 pt-2 tablet:gap-3 tablet:px-3 board:h-full board:min-h-[calc(100vh-180px)] board:snap-none board:gap-4 board:overflow-hidden board:px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {stages.map((stage) => (
             <KanbanColumn

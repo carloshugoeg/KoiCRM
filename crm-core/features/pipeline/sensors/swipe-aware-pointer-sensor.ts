@@ -2,8 +2,9 @@ import { PointerSensor } from "@dnd-kit/core"
 import { isNarrowViewport } from "@/features/pipeline/hooks/use-narrow-viewport"
 
 /**
- * PointerSensor that declines to start a drag on phone-sized viewports, leaving the
- * horizontal swipe between stages in sole possession of the touch.
+ * PointerSensor that declines to start a drag below the board tier (phone and
+ * tablet-portrait), leaving the horizontal swipe between stages in sole possession of
+ * the touch.
  *
  * Refusing inside the sensor is what keeps the sensor list a fixed size across renders.
  * The obvious alternative — handing DndContext a shorter list when the viewport is narrow —

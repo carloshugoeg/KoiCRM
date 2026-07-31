@@ -201,8 +201,16 @@ export function PipelineClient({
   return (
     <PinProvider>
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-[#f8faff]">
-      <div className="flex items-center gap-3 px-3 py-3 border-b border-indigo-500/10 bg-white/80 dark:bg-card/80 backdrop-blur-sm sticky top-0 z-10 flex-wrap md:gap-5 md:px-6 md:py-4">
-        <div className="hidden items-center gap-3 md:flex">
+      {/*
+        Chrome collapses below `board:tall:` (true desktop: full width AND normal height).
+        That is deliberately not just `board:` — the Galaxy Tab A9 in landscape is 893px
+        wide, short of the 1024px board tier, so gating this on width alone would leave the
+        short-viewport case with no relief. `short:` additionally tightens padding whenever
+        height is scarce, independent of width, which is what actually claws back the
+        vertical space on that device. See tailwind.config.ts for the screen definitions.
+      */}
+      <div className="flex items-center gap-3 px-3 py-3 border-b border-indigo-500/10 bg-white/80 dark:bg-card/80 backdrop-blur-sm sticky top-0 z-10 flex-wrap short:gap-2 short:py-2 board:tall:gap-5 board:tall:px-6 board:tall:py-4">
+        <div className="hidden items-center gap-3 board:tall:flex">
           <Button
             size="sm"
             className="rounded-full bg-[#4f46e5] hover:bg-[#4338ca] text-white shadow-md shadow-indigo-500/20 px-6 h-10 font-bold tracking-wide"
@@ -223,19 +231,20 @@ export function PipelineClient({
           </Button>
         </div>
 
-        {/* Mobile: filters collapse behind a toggle so the board keeps the screen. */}
+        {/* Below true desktop (phone, tablet-portrait, and short viewports): filters
+            collapse behind a toggle so the board keeps the screen. */}
         <Button
           size="sm"
           variant="ghost"
           aria-expanded={filtersOpen}
-          className="h-11 rounded-full border border-slate-200 bg-white px-4 text-xs font-bold text-slate-600 shadow-sm md:hidden dark:bg-card dark:border-border dark:text-muted-foreground"
+          className="h-11 rounded-full border border-slate-200 bg-white px-4 text-xs font-bold text-slate-600 shadow-sm board:tall:hidden dark:bg-card dark:border-border dark:text-muted-foreground"
           onClick={() => setFiltersOpen((p) => !p)}
         >
           <SlidersHorizontal className="mr-1.5 h-4 w-4" />
           Filtros
         </Button>
 
-        <div className={cn("w-full md:block md:w-auto", filtersOpen ? "block" : "hidden")}>
+        <div className={cn("w-full board:tall:block board:tall:w-auto", filtersOpen ? "block" : "hidden")}>
           <FilterBar
             members={members}
             channels={channels}
@@ -253,7 +262,7 @@ export function PipelineClient({
         )}
       </div>
 
-      <div className="min-w-0 flex-1 overflow-hidden pt-3 px-0 md:pt-4 md:px-2">
+      <div className="min-w-0 flex-1 overflow-hidden pt-3 px-0 board:pt-4 board:px-2">
         <KanbanBoard
           tenantId={tenantId}
           tenantSlug={tenantSlug}
@@ -266,13 +275,14 @@ export function PipelineClient({
         />
       </div>
 
-      {/* Quick add — thumb-reachable on phones; desktop keeps the header button. */}
+      {/* Quick add — thumb-reachable whenever the header button is collapsed (phone,
+          tablet-portrait, short viewports); true desktop keeps the header button instead. */}
       {canCreate && (
         <button
           type="button"
           onClick={() => setNewDealOpen(true)}
           aria-label="Nueva oportunidad"
-          className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/30 transition-colors active:bg-[#4338ca] md:hidden"
+          className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/30 transition-colors active:bg-[#4338ca] board:tall:hidden"
           style={{ bottom: "calc(1rem + env(safe-area-inset-bottom))" }}
         >
           <Plus className="h-6 w-6" />

@@ -89,12 +89,15 @@ export function KanbanColumn({
 
   const totalValue = deals.reduce((sum, d) => sum + d.value, 0)
 
-  // Mobile: one full-width slide per stage inside the snap scroller.
-  // Tablet/desktop (md+): the original equal-width Kanban column, untouched.
+  // Phone (<520): one full-width slide per stage inside the snap scroller.
+  // Tablet portrait (520-1023, `tablet:`): two half-width slides side by side, still
+  // snapping — swipe reaches the rest.
+  // Board (≥1024, `board:`): the original equal-width Kanban column, snap dropped since
+  // the whole row now fits without scrolling.
   return (
     <div
       ref={columnRef}
-      className="flex min-w-0 shrink-0 basis-full snap-center flex-col overflow-hidden rounded-2xl transition-all duration-300 ring-1 ring-black/5 md:shrink md:basis-0 md:flex-1"
+      className="flex min-w-0 shrink-0 basis-full snap-center flex-col overflow-hidden rounded-2xl transition-all duration-300 ring-1 ring-black/5 tablet:basis-1/2 board:shrink board:basis-0 board:flex-1 board:snap-align-none"
       style={{
         background: isOver ? hex2rgba(stage.color, 0.1) : "#ffffff",
         border: `1px solid ${hex2rgba(stage.color, 0.25)}`,
@@ -183,7 +186,7 @@ export function KanbanColumn({
             {dropHint}
           </div>
         )}
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden max-h-none md:max-h-[calc(100vh-280px)]">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden max-h-none board:max-h-[calc(100vh-280px)]">
           <div className="flex w-full min-w-0 flex-col gap-3 pb-4 pt-1">
             {deals.map((deal) => (
               <div

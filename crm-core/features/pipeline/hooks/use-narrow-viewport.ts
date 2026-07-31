@@ -2,8 +2,12 @@
 
 import { useSyncExternalStore } from "react"
 
-/** Same breakpoint as Tailwind's `md`: below it the funnel renders as swipeable slides. */
-const NARROW_QUERY = "(max-width: 767px)"
+/**
+ * Same breakpoint as the funnel's `board` tier (tailwind.config.ts): below it, the whole
+ * board doesn't fit on screen at once (phone's one-stage carousel, tablet-portrait's
+ * two-stage carousel), so the horizontal swipe gesture owns the touch instead of dnd-kit.
+ */
+const NARROW_QUERY = "(max-width: 1023px)"
 
 function subscribe(onChange: () => void) {
   if (typeof window === "undefined" || !window.matchMedia) return () => {}
@@ -31,8 +35,9 @@ function getServerSnapshot() {
 }
 
 /**
- * True on phone-sized viewports. Used to turn drag-and-drop off so the horizontal
- * swipe gesture owns the touch interaction; layout itself stays CSS-driven.
+ * True below the board tier (phone and tablet-portrait). Used to turn drag-and-drop off
+ * so the horizontal swipe gesture owns the touch interaction; layout itself stays
+ * CSS-driven.
  */
 export function useNarrowViewport(): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
