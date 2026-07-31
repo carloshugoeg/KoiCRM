@@ -351,7 +351,7 @@ Correct anti-enumeration behaviour, but indistinguishable from real registration
 re-registers an existing address sees success, then cannot sign in with the password they chose.
 Consider a generic "check your account or contact your administrator" confirmation screen.
 
-### FINDING-021 · MEDIUM · Performance
+### FINDING-021 · MEDIUM · Performance — RESOLVED (already fixed, pre-dates this pass)
 **Six concurrent `withTenant` transactions per clients-page render**
 `app/app/[tenantSlug]/clients/page.tsx:36-45`
 
@@ -363,13 +363,34 @@ RLS-scoped helpers.
 **Fix:** consolidate into a single loader, exactly as `loadPipelineKanbanData` already does for
 the pipeline page. The stats pages need the same treatment.
 
-### FINDING-022 · LOW · Performance
+**Status found while working this backlog:** commit `15889e3` ("fix(perf): collapse per-page
+transaction fan-out causing P2028 outages", same day as the audit) already did exactly this —
+`loadClientsPageData` in `features/clients/queries.ts` runs one `withTenant` transaction with
+the chrome/list/detail queries issued inside it via `Promise.all` on the shared `tx`, and there
+is no bare `prisma.*` call left in that file or the page. The audit's line numbers describe a
+state the code was already past by the time this entry was written. No code change made here —
+verified by reading the current implementation and `git log` on both files. Leaving the stats
+pages' equivalent, if any remains, to whoever picks up the LOW items — this entry only covers
+the clients page named in its own title.
+
+### FINDING-022 · LOW · Performance — RESOLVED
 **N+1 in `resolveEquipmentPairs`**
 `features/deals/actions.ts:52-58`
 
 One `isActiveSubcategoryOfCategory` query per subcategory in a nested loop inside the
 transaction. Collapse to a single `findMany({ where: { key: { in: [...] } } })` plus in-memory
 validation of the parent relationship.
+
+**Implemented:** added `activeSubcategoryParentsInTx` to `features/catalogs/queries.ts` — one
+`findMany` with `key: { in: [...] }` returning a `Map<subcategoryKey, {categoryKey, active}>`,
+relying on the existing `@@unique([tenantId, catalogKey, key])` constraint so each
+subcategoryKey resolves to exactly one parent. `resolveEquipmentPairs` now calls it once and
+validates the same rule (active, correct parent categoría, parent active) in memory. The
+single-pair `isActiveSubcategoryOfCategory` had no other callers, so it was removed rather than
+left dead. Covered by new tests in `tests/integration/catalogs.test.ts`
+(`activeSubcategoryParentsInTx`), pinning the exact validity rules (inactive subcategoría
+omitted, category mismatch detected, inactive parent detected) so the collapse is behaviour-
+preserving.
 
 ---
 

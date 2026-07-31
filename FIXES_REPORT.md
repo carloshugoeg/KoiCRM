@@ -142,3 +142,40 @@ entry, which is a separate, larger piece of work.
 green (129/129 unit, 288/288 integration across 36 files).
 
 ---
+
+## FINDING-021 · MEDIUM · Performance — already resolved, no code change
+
+While reading `app/app/[tenantSlug]/clients/page.tsx` and `features/clients/queries.ts` to work
+this finding, found it was already fixed: commit `15889e3` (same day as the audit) collapsed
+the six-transaction fan-out into one `withTenant` call (`loadClientsPageData`) with the
+sub-queries issued via `Promise.all` on the shared `tx`. No bare `prisma.*` call remains in
+either file. Confirmed with `git log` on both files and by reading the current implementation.
+Updated `docs/AUDIT_BACKLOG.md` to mark it RESOLVED with this note; no source change needed.
+
+---
+
+## FINDING-022 · LOW · Performance — N+1 in resolveEquipmentPairs — RESOLVED
+
+**What was wrong:** `resolveEquipmentPairs` (`features/deals/actions.ts`) called
+`isActiveSubcategoryOfCategory` once per subcategoría in a nested loop, inside the
+`withTenant` transaction that also creates the deal — one query per selected subcategoría.
+
+**Fix:** added `activeSubcategoryParentsInTx` (`features/catalogs/queries.ts`) — a single
+`findMany({ key: { in: [...] } })` returning a `Map<subcategoryKey, {categoryKey, active}>`.
+Correctness relies on the existing `@@unique([tenantId, catalogKey, key])` constraint, so each
+subcategoryKey maps to exactly one parent regardless of how many groups reference it.
+`resolveEquipmentPairs` now does one query, then validates in memory. Removed
+`isActiveSubcategoryOfCategory` — it had no other callers after the change, and leaving it
+would be dead code.
+
+**Tests:** no existing coverage exercised this validation logic at all (checked — no test calls
+`createDealAction`, and the equipment-hierarchy tests operate on raw rows). Added
+`tests/integration/catalogs.test.ts > activeSubcategoryParentsInTx`, pinning the exact rules
+the old per-pair check enforced: inactive subcategoría omitted from the result, category
+mismatch detectable, inactive parent detectable, and an empty input never issuing a query. All
+pass against the new implementation (10/10 in that file).
+
+**Verification:** `pnpm type-check && pnpm lint && pnpm test && pnpm test:integration` all
+green (129/129 unit, 292/292 integration).
+
+---
