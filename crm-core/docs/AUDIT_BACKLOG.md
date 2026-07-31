@@ -271,7 +271,7 @@ an arbitrary attacker-chosen URL is rendered in the attachment UI. Exploitabilit
 the global `nosniff` header and `X-Frame-Options: DENY`, but it defeats the same-origin
 media-proxy design. Fix alongside FINDING-005 (same function).
 
-### FINDING-014 · HIGH · Logic
+### FINDING-014 · HIGH · Logic — RESOLVED
 **`deactivateMemberAction` is not atomic**
 `features/users/actions.ts` (deal reassignment inside `withTenant`, membership status change
 after it)
@@ -285,6 +285,17 @@ the most likely cause of the second step never being reached. The atomicity gap 
 **Fix:** move the `membership.update` inside the same `withTenant` transaction (`Membership`
 has no RLS and `app_user` holds DML, so this works) — deferred only because offboarding is a
 critical low-traffic path that deserves an integration test written first.
+
+**Implemented:** wrote `tests/integration/offboarding-atomicity.test.ts` first, reproducing a
+*real* mid-flight Postgres failure (spying on `prisma.membership.update` doesn't work — Prisma
+builds a fresh delegate per interactive transaction, so it can't intercept a call made through
+`tx`; a hook in `recordActivities` instead deletes the target's membership row from an
+independent connection between the two writes). The red run showed the promise rejecting while
+the deal had already been reassigned — the exact bug. Fix was exactly as specified:
+`tx.membership.update(...)` now runs inside the same `withTenant` callback as the deal
+reassignment, the same pattern `updateMemberAction` already used for `user` + `membership`.
+Transaction count on this path went from 1 interactive transaction + 1 standalone query to 1
+interactive transaction — a reduction. See `FIXES_REPORT.md` for the full red/green output.
 
 ### FINDING-015 · MEDIUM · Logic
 **Early `return` inside a `withTenant` callback commits instead of aborting**

@@ -265,7 +265,11 @@ export async function deactivateMemberAction(raw: unknown): Promise<{ ok: boolea
     return { ok: false, error: "El asesor destino no es válido o está inactivo." }
   }
 
-  // Reassign the deals under RLS, then deactivate the membership.
+  // Reassign the deals under RLS and deactivate the membership in the same transaction —
+  // otherwise a failure deactivating the membership leaves deals reassigned to an advisor
+  // who still shows as ACTIVE and can still sign in (FINDING-014). `Membership` carries no
+  // RLS policy, so writing it through the tenant-scoped `tx` is safe (same pattern as
+  // `updateMemberAction`'s combined `user` + `membership` transaction above).
   await withTenant(tenantId, async (tx) => {
     const deals = await tx.deal.findMany({ where: { tenantId, ownerId: targetUserId }, select: { id: true } })
     if (deals.length > 0) {
@@ -283,11 +287,11 @@ export async function deactivateMemberAction(raw: unknown): Promise<{ ok: boolea
         })),
       )
     }
-  })
 
-  await prisma.membership.update({
-    where: { userId_tenantId: { userId: targetUserId, tenantId } },
-    data: { status: "INACTIVE" },
+    await tx.membership.update({
+      where: { userId_tenantId: { userId: targetUserId, tenantId } },
+      data: { status: "INACTIVE" },
+    })
   })
 
   return { ok: true }
