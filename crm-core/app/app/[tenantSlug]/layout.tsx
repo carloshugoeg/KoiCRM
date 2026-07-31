@@ -43,12 +43,12 @@ export default async function TenantLayout({ children, params }: Props) {
   // One transaction for the whole layout — see loadTenantLayoutData's docstring. This runs on
   // every /app page, so any fan-out here is paid by every request before the page's own
   // queries even start.
-  const [{ clientsCount, followUpAlerts }, sessionPin] = await Promise.all([
+  const [{ clientsCount, followUpAlerts, timezone }, sessionPin] = await Promise.all([
     loadTenantLayoutData(tenantId, resolved.membership.role, session.user.id),
     getSessionPinLockStatusAction(tenantId),
   ])
 
-  const followUpBannerItems = toFollowUpBannerItems(followUpAlerts)
+  const followUpBannerItems = toFollowUpBannerItems(followUpAlerts, timezone)
   const followUpBannerTotal = countFollowUpBannerItems(followUpAlerts)
 
   const cssVars = buildCssVars(resolved.tenant.branding)

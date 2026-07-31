@@ -27,16 +27,6 @@ const URGENCY_STYLES: Record<
   },
 }
 
-function formatFollowUpDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("es-GT", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
 // useLayoutEffect only does anything useful on the client (it's a no-op warning source during
 // SSR), so pick the effect at module init based on environment rather than calling
 // useLayoutEffect unconditionally — the standard isomorphic-layout-effect pattern.
@@ -145,7 +135,7 @@ export function FollowUpBanners({ tenantSlug, items, totalCount }: Props) {
               </p>
               <p className="mt-1 flex items-center gap-1 text-xs font-medium text-foreground/80">
                 <CalendarClock className="h-3 w-3 shrink-0" aria-hidden />
-                {formatFollowUpDate(item.dateIso)}
+                {item.dateLabel}
               </p>
             </button>
           </div>

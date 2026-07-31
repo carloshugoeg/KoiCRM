@@ -8,6 +8,7 @@ import { getFollowUpAlertsInTx } from "@/features/follow-ups/queries"
 export interface TenantLayoutData {
   clientsCount: number
   followUpAlerts: Awaited<ReturnType<typeof getFollowUpAlertsInTx>>
+  timezone: string
 }
 
 /**
@@ -23,6 +24,10 @@ export interface TenantLayoutData {
  * this same connection rather than opening a second withTenant() — see permissionsFor's
  * docstring — so the alert owner filter can be derived from pipeline.viewAll instead of the
  * role-based canSeeAllDeals() bypass without doubling this route's transaction cost.
+ *
+ * The tenant's timezone is read here too (one more query, same transaction) so the follow-up
+ * banner dates can be formatted on the server in the tenant's zone instead of the request
+ * process's zone — see formatFollowUpBannerDate's docstring. Still exactly one transaction.
  */
 export async function loadTenantLayoutData(
   tenantId: string,
@@ -32,9 +37,14 @@ export async function loadTenantLayoutData(
   return withTenant(tenantId, async (tx) => {
     const perms = await permissionsForInTx(tx, tenantId, role, userId)
     const scope = scopeFromPermissions(perms, userId)
+    const settings = await tx.tenantSettings.findUnique({
+      where: { tenantId },
+      select: { timezone: true },
+    })
     return {
       clientsCount: await countClientsInTx(tx, tenantId),
       followUpAlerts: await getFollowUpAlertsInTx(tx, tenantId, scope.visibleToUserId ?? undefined),
+      timezone: settings?.timezone ?? "America/Guatemala",
     }
   })
 }
