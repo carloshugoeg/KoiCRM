@@ -209,7 +209,7 @@ export function PipelineClient({
         height is scarce, independent of width, which is what actually claws back the
         vertical space on that device. See tailwind.config.ts for the screen definitions.
       */}
-      <div className="flex items-center gap-3 px-3 py-3 border-b border-indigo-500/10 bg-white/80 dark:bg-card/80 backdrop-blur-sm sticky top-0 z-10 flex-wrap short:gap-2 short:py-2 board:tall:gap-5 board:tall:px-6 board:tall:py-4">
+      <div className="flex items-center justify-center gap-3 px-3 py-3 border-b border-indigo-500/10 bg-white/80 dark:bg-card/80 backdrop-blur-sm sticky top-0 z-10 flex-wrap short:gap-2 short:py-2 board:justify-start board:tall:gap-5 board:tall:px-6 board:tall:py-4">
         <div className="hidden items-center gap-3 board:tall:flex">
           <Button
             size="sm"
@@ -230,6 +230,20 @@ export function PipelineClient({
             <Printer className="h-4 w-4" />
           </Button>
         </div>
+
+        {/* Below `board`: "Nueva oportunidad" moves up beside "Filtros" instead of sitting
+            alone in the header button (board:tall above) or only on the floating action
+            button — see the FAB below, which hides in this range so there is exactly one
+            way to start a deal per viewport. */}
+        <Button
+          size="sm"
+          className="h-11 rounded-full bg-[#4f46e5] px-5 font-bold text-white shadow-md shadow-indigo-500/20 hover:bg-[#4338ca] board:hidden"
+          onClick={() => setNewDealOpen(true)}
+          disabled={!canCreate}
+        >
+          <Plus className="mr-1.5 h-4 w-4" />
+          Nueva oportunidad
+        </Button>
 
         {/* Below true desktop (phone, tablet-portrait, and short viewports): filters
             collapse behind a toggle so the board keeps the screen. */}
@@ -256,7 +270,7 @@ export function PipelineClient({
         </div>
 
         {canSeeTotals && (
-          <div className="ml-auto">
+          <div className="board:ml-auto">
             <KpiBar totalPipeline={totalPipeline} totalWon={totalWon} settings={intlSettings} />
           </div>
         )}
@@ -275,14 +289,18 @@ export function PipelineClient({
         />
       </div>
 
-      {/* Quick add — thumb-reachable whenever the header button is collapsed (phone,
-          tablet-portrait, short viewports); true desktop keeps the header button instead. */}
+      {/* Quick add — only for the gap the header row can't otherwise cover: full board
+          width with a short viewport (`board:short:`), where the true-desktop header
+          button needs `tall` and is hidden, and the below-`board` inline button beside
+          "Filtros" doesn't apply either. Below `board` that inline button is the single
+          way to start a deal, so the FAB stays hidden there instead of doubling it up;
+          true desktop (`board:tall:`) keeps the header button instead. */}
       {canCreate && (
         <button
           type="button"
           onClick={() => setNewDealOpen(true)}
           aria-label="Nueva oportunidad"
-          className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/30 transition-colors active:bg-[#4338ca] board:tall:hidden"
+          className="fixed right-4 z-30 hidden h-14 w-14 items-center justify-center rounded-full bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/30 transition-colors active:bg-[#4338ca] board:short:flex"
           style={{ bottom: "calc(1rem + env(safe-area-inset-bottom))" }}
         >
           <Plus className="h-6 w-6" />

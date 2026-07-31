@@ -13,10 +13,21 @@ import {
   BarChart2,
   Droplets,
   FileText,
+  Menu,
+  LogOut,
   type LucideIcon,
 } from "lucide-react"
 import { useTenant } from "@/lib/tenant/context"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { CommandMenu, openCommandMenu } from "@/components/CommandMenu"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { SessionPinToggle } from "@/features/auth/components/session-pin-toggle"
@@ -56,6 +67,14 @@ export function TenantHeader({
       ? "flex items-center gap-1.5 text-sm font-semibold"
       : "flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
   }
+  // Same active/inactive distinction as navClass, sized as a full-width dropdown row
+  // with a 44px minimum touch target for the collapsed (below-`board`) menu.
+  function menuItemClass(href: string) {
+    return cn(
+      "flex min-h-11 w-full cursor-pointer items-center gap-2.5",
+      pathname.startsWith(href) ? "font-semibold" : "text-muted-foreground",
+    )
+  }
 
   const base = `/app/${tenant.slug}`
   const productName = tenant.branding?.productName ?? tenant.name
@@ -87,7 +106,7 @@ export function TenantHeader({
       />
       <Link
         href={`${base}/pipeline`}
-        className="flex shrink-0 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-w-0 shrink items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         title={productName}
       >
         {logoUrl ? (
@@ -102,12 +121,17 @@ export function TenantHeader({
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-sky-400 to-blue-700">
               <Droplets className="h-4 w-4 text-white" aria-hidden />
             </span>
-            <span className="font-semibold">{productName}</span>
+            <span className="truncate font-semibold">{productName}</span>
           </>
         )}
       </Link>
+
+      {/* board and above: full horizontal chrome, unchanged. Below `board` this whole
+          block is replaced by the hamburger menu further down — every destination it
+          holds (tenant switcher, nav links, PIN toggle, settings, search, salir) is
+          reproduced there so nothing is dropped. */}
       {memberships.length > 1 && (
-        <nav className="flex gap-2 text-sm">
+        <nav className="hidden gap-2 text-sm board:flex">
           {memberships.map((m) => (
             <Link
               key={m.tenant.slug}
@@ -123,7 +147,7 @@ export function TenantHeader({
           ))}
         </nav>
       )}
-      <nav className="flex gap-4">
+      <nav className="hidden gap-4 board:flex">
         {navItems.map(({ href, label, icon: Icon, badge }) => (
           <Link key={href} href={href} className={navClass(href)}>
             <Icon className="h-4 w-4" />
@@ -136,7 +160,7 @@ export function TenantHeader({
           </Link>
         ))}
       </nav>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto hidden items-center gap-2 board:flex">
         <SessionPinToggle
           tenantId={tenantId}
           initialLocked={sessionPinLocked}
@@ -165,6 +189,96 @@ export function TenantHeader({
           Salir
         </Button>
       </div>
+
+      {/* Below `board`: hamburger + dropdown. Holds every destination the inline chrome
+          above holds — nothing is dropped, including the right-hand items. */}
+      <div className="ml-auto board:hidden">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Abrir menú"
+              className="h-11 w-11 text-muted-foreground hover:text-foreground"
+            >
+              <Menu className="h-5 w-5" aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" sideOffset={8} className="w-64">
+            {memberships.length > 1 && (
+              <>
+                <DropdownMenuLabel className="text-xs text-muted-foreground">
+                  Empresas
+                </DropdownMenuLabel>
+                {memberships.map((m) => (
+                  <DropdownMenuItem key={m.tenant.slug} asChild>
+                    <Link
+                      href={`/app/${m.tenant.slug}/pipeline`}
+                      className={cn(
+                        "flex min-h-11 w-full cursor-pointer items-center",
+                        m.tenant.slug === tenant.slug ? "font-semibold" : "text-muted-foreground",
+                      )}
+                    >
+                      {m.tenant.name}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+              </>
+            )}
+
+            {navItems.map(({ href, label, icon: Icon, badge }) => (
+              <DropdownMenuItem key={href} asChild>
+                <Link href={href} className={menuItemClass(href)}>
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="flex-1">{label}</span>
+                  {badge != null && badge > 0 && (
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold leading-none text-muted-foreground">
+                      {badge}
+                    </span>
+                  )}
+                </Link>
+              </DropdownMenuItem>
+            ))}
+
+            <DropdownMenuSeparator />
+
+            <div className="flex min-h-11 w-full items-center justify-between px-2 py-1.5">
+              <span className="text-sm text-muted-foreground">Protección con PIN</span>
+              <SessionPinToggle
+                tenantId={tenantId}
+                initialLocked={sessionPinLocked}
+                hasPin={hasActionPin}
+              />
+            </div>
+
+            <DropdownMenuItem asChild>
+              <Link href={`${base}/settings/appearance`} className={menuItemClass(`${base}/settings`)}>
+                <Settings className="h-4 w-4 shrink-0" aria-hidden />
+                Configuración
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="flex min-h-11 w-full cursor-pointer items-center gap-2.5 text-muted-foreground"
+              onSelect={() => openCommandMenu()}
+            >
+              <Search className="h-4 w-4 shrink-0" aria-hidden />
+              Buscar
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              className="flex min-h-11 w-full cursor-pointer items-center gap-2.5 text-destructive focus:text-destructive"
+              onSelect={() => signOut({ callbackUrl: "/signin" })}
+            >
+              <LogOut className="h-4 w-4 shrink-0" aria-hidden />
+              Salir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       <CommandMenu tenantId={tenant.id} tenantSlug={tenant.slug} />
     </header>
   )
