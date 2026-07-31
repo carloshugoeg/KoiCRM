@@ -479,3 +479,31 @@ indistinguishable from oversights.
 9. **FINDING-031** — formatting, in an isolated commit.
 10. Remaining LOW items (010 write-up, 012, 016, 018, 030, 032, 033, 037 write-up) as capacity
     allows.
+
+### FINDING-038 · MEDIUM · UX
+**Dark mode is unbuilt below the shell, and was being served automatically**
+`components/providers.tsx`; `features/pipeline/components/{KanbanColumn,DealCard}.tsx`; `app/app/[tenantSlug]/layout.tsx`
+
+Dark mode shipped as `defaultTheme="system"` with `enableSystem`, so every user whose OS was
+set to dark received it without ever asking. Only the shell was ever themed: header, page
+background, follow-up banners, the KPI and filter bars and the mobile stage rail (the last
+three fixed on this branch). The funnel itself was never done — `KanbanColumn.tsx:99` and
+`DealCard.tsx:134` set their surface with `style={{ background: "#ffffff" }}`, and an inline
+style cannot carry a `dark:` variant at all, so those need converting to classes or CSS
+variables before they can follow a theme. `layout.tsx:86` and `PipelineClient.tsx:203` use
+`bg-[#f8faff]`. Beyond the funnel: ~10 hardcoded light backgrounds across 6 files and ~35
+dark `text-slate-*` colours with no dark variant, spread over clients, calendar, stats and
+settings. Measured in the browser, not estimated: white cards on a black page, on the
+product's main screen.
+
+Mitigated on branch `feat/permissions-and-scope` by pinning `forcedTheme="light"` and hiding
+the Apariencia mode switch and the "Fondo oscuro" picker. `forcedTheme` rather than
+`defaultTheme` because it also overrides a `"dark"` already persisted in localStorage by
+someone who used the old switch. `bgColorDark` is still held in state and still saved, so no
+tenant loses a colour it had chosen.
+
+**Decision needed:** whether dark mode is a product commitment. If yes, the work is converting
+the inline-hex surfaces to theme-aware values and then a screen-by-screen visual pass — it
+needs eyes on every screen, not a find-and-replace. If no, delete the theme plumbing, the
+`bgColorDark` branding field and the `.dark` block in `lib/branding/css-vars.ts` rather than
+leaving half a feature in the tree. Until one of those happens the pin stays.
