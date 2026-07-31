@@ -229,7 +229,7 @@ FINDING-007 policy migration to avoid two manual applications.
 
 ## Deferred — safe but needs care / larger diff
 
-### FINDING-005 · HIGH · Security
+### FINDING-005 · HIGH · Security — RESOLVED
 **Storage quota bypass via client-declared size**
 `features/attachments/actions.ts:68-88`
 
@@ -242,6 +242,21 @@ unenforceable. Direct revenue impact.
 **Why deferred:** adds a network call to the upload path; a HEAD failure must not break
 uploads for live users, so it needs a considered failure mode (retry / reconcile job) rather
 than a naive fallback to the declared size, which would preserve the bypass.
+
+**Implemented:** `lib/storage/s3.ts` gained `getObjectSize` (`HeadObjectCommand`). It's called
+before the `withTenant` transaction (a network call with retries has no business holding a
+pooled connection open under `connection_limit=1`), retried 3x with a short backoff to absorb
+transient failures, and its result — not `data.size` — now drives both the `fileSizeMaxBytes`
+and `storageMaxBytes` checks and the increment. On a HEAD failure that survives retries: the
+upload is still accepted (the object is already durably in S3; refusing it would be the "broke
+uploads for live users" outcome this was deferred to avoid) but `storageUsedBytes` is **not**
+incremented from the unverified declared size, and a `Sentry.captureMessage` records it for
+manual reconciliation — except when the tenant's already-verified usage is at or over quota,
+in which case the upload is still refused rather than let more unaccounted data in. There is no
+automated reconciliation job (no queue/cron infrastructure exists in this codebase); the Sentry
+event is the signal for a follow-up manual or scripted pass. Covered by
+`tests/integration/attachments.test.ts` ("confirmUpload — storage accounting uses the verified
+S3 size"), including the retry-then-fallback and still-refuses-when-already-over-quota cases.
 
 ### FINDING-011 · MEDIUM · Security
 **Avatar and branding uploads sit outside every guardrail**

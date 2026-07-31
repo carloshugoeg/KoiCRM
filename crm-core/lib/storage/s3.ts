@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const PRESIGN_TTL_SECONDS = 300;
@@ -60,6 +60,18 @@ export async function deleteObject(key: string): Promise<void> {
   await getClient().send(
     new DeleteObjectCommand({ Bucket: BUCKET(), Key: key }),
   );
+}
+
+/**
+ * Authoritative object size, straight from the storage provider. Never trust a
+ * client-declared `size` for quota accounting (FINDING-005) — the client can PUT any number
+ * of bytes to a presigned URL regardless of what it later claims in `confirmUpload`.
+ * Throws if the object is missing or the provider doesn't return a length.
+ */
+export async function getObjectSize(key: string): Promise<bigint> {
+  const res = await getClient().send(new HeadObjectCommand({ Bucket: BUCKET(), Key: key }));
+  if (res.ContentLength == null) throw new Error("head_object_missing_content_length");
+  return BigInt(res.ContentLength);
 }
 
 export async function getObject(
