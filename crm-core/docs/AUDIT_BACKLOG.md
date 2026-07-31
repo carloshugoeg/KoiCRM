@@ -488,13 +488,21 @@ today.
 nothing else, then enforce it. Do **not** mix this with a behavioural change — it would bury
 the real diff.
 
-### FINDING-032 · LOW · Maintainability
+### FINDING-032 · LOW · Maintainability — RESOLVED
 **Dead field: `createDealSchema.clientId`**
 `features/deals/schemas.ts:48`
 
 Accepted and validated but never read by `createDealAction`, which derives the client through
 `findOrCreateClient` from name/phone. A caller supplying `clientId` gets no error and no
 effect, implying an association capability that does not exist.
+
+**Implemented:** removed the field from `createDealSchema`. Confirmed no in-tree caller ever
+sent it — `ClientFormModal.tsx` (the only caller of `createDealAction`) always creates the deal
+from name/phone — and `CreateDealInput` has no other consumers, so this is a pure deletion, not
+a behaviour change. Dropped rather than wired up: there is no existing UI path for "attach this
+new deal to an existing client by id," and inventing one wasn't the ask here — if that
+capability is wanted later, it should come with its own UI and validation, not a schema field
+nobody drives.
 
 ### FINDING-033 · LOW · Maintainability
 **Empty scaffolding implies subsystems that do not exist**

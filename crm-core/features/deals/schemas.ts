@@ -45,7 +45,6 @@ export const createDealSchema = z
     value: z.coerce.number().min(0).default(0),
     statusKey: z.string().min(1).default("activo"),
     customData: z.record(z.string(), z.unknown()).optional(),
-    clientId: z.string().optional(),
     pin: pinField,
   })
   .refine((d) => hasAtLeastOneSubcategory(d.equipment), {

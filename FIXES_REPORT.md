@@ -179,3 +179,18 @@ pass against the new implementation (10/10 in that file).
 green (129/129 unit, 292/292 integration).
 
 ---
+
+## FINDING-032 · LOW · Maintainability — dead `clientId` field — RESOLVED
+
+Removed `clientId` from `createDealSchema` (`features/deals/schemas.ts`). It was accepted and
+validated but never read by `createDealAction`, which always derives the client via
+`findOrCreateClient` from name/phone. Confirmed `ClientFormModal.tsx` (the only in-tree caller
+of `createDealAction`) never sends it, and `CreateDealInput` has no other consumers — a pure
+deletion. Chose to drop rather than wire it up: there's no existing UI for "attach this deal to
+an existing client by id," and building that UI wasn't the ask in this finding.
+
+**Verification:** `pnpm type-check && pnpm lint && pnpm test && pnpm test:integration` all
+green (129/129 unit, 292/292 integration — unchanged counts, as expected for a dead-code
+deletion).
+
+---
