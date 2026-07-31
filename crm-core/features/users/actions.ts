@@ -104,6 +104,16 @@ export async function changeMemberRoleAction(raw: unknown): Promise<{ ok: boolea
   if (!caller || !["OWNER", "ADMIN"].includes(caller.role)) return { ok: false, error: "Sin permisos." }
   if (!target) return { ok: false, error: "El usuario no es miembro." }
   if (target.role === "OWNER") return { ok: false, error: "No puedes cambiar el rol del propietario." }
+  // Missing target-side guard (same bug class as FINDING-003): every sibling action in this
+  // file blocks an ADMIN acting on another ADMIN unless the caller is OWNER. This one didn't —
+  // caught while writing the FINDING-029 authorization matrix, which is exactly what that test
+  // investment is for. changeMemberRoleAction currently has no caller anywhere in the app
+  // (updateMemberAction's `role` field is the live role-change path and already had this
+  // guard), so there's no behavioural regression for any real user — this closes the gap
+  // before it's wired up to something.
+  if (target.role === "ADMIN" && caller.role !== "OWNER") {
+    return { ok: false, error: "Solo el propietario puede cambiar el rol de un administrador." }
+  }
 
   await prisma.membership.update({
     where: { userId_tenantId: { userId: targetUserId, tenantId } },
@@ -155,6 +165,13 @@ export async function updateMemberAction(raw: unknown): Promise<{ ok: boolean; e
     if (isSelf) return { ok: false, error: "No puedes cambiar tu propio rol." }
     if (target.role === "OWNER") return { ok: false, error: "No puedes cambiar el rol del propietario." }
     if (!canManage) return { ok: false, error: "Sin permisos para cambiar rol." }
+    // Same guard every sibling action in this file has for an ADMIN target — was missing here
+    // even though this is the live role-change path (EditMemberModal → updateMemberAction),
+    // so any ADMIN could reassign another ADMIN's role (including demoting them). Caught
+    // writing the FINDING-029 authorization matrix.
+    if (target.role === "ADMIN" && caller.role !== "OWNER") {
+      return { ok: false, error: "Solo el propietario puede cambiar el rol de un administrador." }
+    }
   }
 
   const userData: { name?: string; image?: string | null } = {}
@@ -265,7 +282,11 @@ export async function deactivateMemberAction(raw: unknown): Promise<{ ok: boolea
     return { ok: false, error: "El asesor destino no es válido o está inactivo." }
   }
 
-  // Reassign the deals under RLS, then deactivate the membership.
+  // Reassign the deals under RLS and deactivate the membership in the same transaction —
+  // otherwise a failure deactivating the membership leaves deals reassigned to an advisor
+  // who still shows as ACTIVE and can still sign in (FINDING-014). `Membership` carries no
+  // RLS policy, so writing it through the tenant-scoped `tx` is safe (same pattern as
+  // `updateMemberAction`'s combined `user` + `membership` transaction above).
   await withTenant(tenantId, async (tx) => {
     const deals = await tx.deal.findMany({ where: { tenantId, ownerId: targetUserId }, select: { id: true } })
     if (deals.length > 0) {
@@ -283,11 +304,11 @@ export async function deactivateMemberAction(raw: unknown): Promise<{ ok: boolea
         })),
       )
     }
-  })
 
-  await prisma.membership.update({
-    where: { userId_tenantId: { userId: targetUserId, tenantId } },
-    data: { status: "INACTIVE" },
+    await tx.membership.update({
+      where: { userId_tenantId: { userId: targetUserId, tenantId } },
+      data: { status: "INACTIVE" },
+    })
   })
 
   return { ok: true }

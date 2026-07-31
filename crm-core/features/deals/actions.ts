@@ -29,7 +29,7 @@ import {
   deleteDealSchema,
 } from "@/features/deals/schemas"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
-import { isActiveCatalogItemKeyInTx, isActiveSubcategoryOfCategory } from "@/features/catalogs/queries"
+import { isActiveCatalogItemKeyInTx, activeSubcategoryParentsInTx } from "@/features/catalogs/queries"
 import type { PrismaTx } from "@/lib/db/rls"
 import { z } from "zod"
 import { getDeal } from "@/features/deals/queries"
@@ -48,10 +48,16 @@ async function resolveEquipmentPairs(
   | { ok: true; pairs: { categoryKey: string; subcategoryKey: string }[] }
   | { ok: false; error: string }
 > {
+  // One round trip for every subcategoría across all groups (FINDING-022) instead of one
+  // query per subcategoría in a nested loop.
+  const allSubcategoryKeys = groups.flatMap((g) => g.subcategoryKeys)
+  const parents = await activeSubcategoryParentsInTx(tx, tenantId, allSubcategoryKeys)
+
   const pairs: { categoryKey: string; subcategoryKey: string }[] = []
   for (const group of groups) {
     for (const subcategoryKey of group.subcategoryKeys) {
-      const valid = await isActiveSubcategoryOfCategory(tx, tenantId, group.categoryKey, subcategoryKey)
+      const parent = parents.get(subcategoryKey)
+      const valid = !!parent && parent.active && parent.categoryKey === group.categoryKey
       if (!valid) return { ok: false, error: "La subcategoría seleccionada no es válida o está inactiva." }
       pairs.push({ categoryKey: group.categoryKey, subcategoryKey })
     }
