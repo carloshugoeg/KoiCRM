@@ -110,16 +110,18 @@ export function PermissionsSettings({ tenantId, matrix: initialMatrix, canManage
   }
 
   return (
-    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pb-6">
+    // No vertical scroll of its own: the page scrolls as one, so a second scroll region here
+    // would trap the wheel over the matrix and hide the section below it.
+    <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Define qué puede ver cada rol. Los cambios se guardan al instante.
       </p>
 
       <div className="overflow-x-auto rounded-xl border border-border/80 bg-background">
-        <table className="w-full min-w-[540px] border-collapse text-left">
+        <table className="w-full min-w-[420px] border-collapse text-left md:min-w-[540px]">
           <thead>
             <tr className="border-b border-border/60">
-              <th className="sticky left-0 z-10 w-[220px] bg-background px-3 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <th className="sticky left-0 z-10 w-[132px] md:w-[220px] bg-background px-3 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Permiso
               </th>
               {MATRIX_COLUMNS.map((role) => (
@@ -151,7 +153,7 @@ export function PermissionsSettings({ tenantId, matrix: initialMatrix, canManage
                   <tr key={def.key} className="border-b border-border/40 last:border-b-0">
                     <th
                       scope="row"
-                      className="sticky left-0 z-10 w-[220px] bg-background px-3 py-3 align-top text-left"
+                      className="sticky left-0 z-10 w-[132px] md:w-[220px] bg-background px-3 py-3 align-top text-left"
                     >
                       <span className="block text-sm font-semibold leading-snug">{def.label}</span>
                       <span className="mt-1 block text-xs font-normal leading-snug text-muted-foreground">

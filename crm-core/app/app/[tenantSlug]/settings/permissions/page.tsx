@@ -48,7 +48,12 @@ export default async function PermissionsSettingsPage({ params }: Props) {
   })
 
   return (
-    <div className="space-y-8">
+    // The settings shell clips its children (`overflow-hidden` in settings/layout.tsx) and
+    // expects each page to own its scrolling, the way Apariencia does. This page is the only
+    // one that renders two sections instead of a single client component, so the scroll
+    // belongs here rather than inside either of them — otherwise nothing scrolls at all and
+    // "Excepciones por persona" is unreachable below the fold.
+    <div className="min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain pb-6">
       <section className="space-y-3">
         <div>
           <h2 className="text-sm font-semibold">Permisos por rol</h2>
