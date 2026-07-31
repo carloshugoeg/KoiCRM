@@ -291,6 +291,11 @@ an arbitrary attacker-chosen URL is rendered in the attachment UI. Exploitabilit
 the global `nosniff` header and `X-Frame-Options: DENY`, but it defeats the same-origin
 media-proxy design. Fix alongside FINDING-005 (same function).
 
+**Not done in the FINDING-005 pass:** that fix was scoped to `size` verification only —
+`data.url` and `data.mimeType` are still trusted as-is from the client in `confirmUpload`. This
+is a distinct validation gap in the same function and still needs its own fix (validate/reject
+an unrecognized `url` shape rather than storing and rendering it).
+
 ### FINDING-014 · HIGH · Logic — RESOLVED
 **`deactivateMemberAction` is not atomic**
 `features/users/actions.ts` (deal reassignment inside `withTenant`, membership status change
@@ -347,6 +352,12 @@ in-process fallback counter.
 
 Concurrent presign requests all observe the pre-increment total. `confirmUpload` re-checks
 inside its transaction, which bounds the overshoot. Residual; fix with FINDING-005.
+
+**Not resolved by the FINDING-005 pass:** that fix made the confirm-time re-check trustworthy
+(it now checks the S3-verified size instead of the declared one), which is a real improvement
+to what this residual overshoot is bounded by — but it doesn't touch the presign-side race
+itself. The window between concurrent presigns observing the same pre-increment total is
+unchanged. Still open.
 
 ### FINDING-018 · LOW · Logic
 **`signupAction` returns success for an existing email**
