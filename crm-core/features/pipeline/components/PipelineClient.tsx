@@ -201,7 +201,7 @@ export function PipelineClient({
   return (
     <PinProvider>
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-[#f8faff]">
-      <div className="flex items-center gap-3 px-3 py-3 border-b border-indigo-500/10 bg-white/80 backdrop-blur-sm sticky top-0 z-10 flex-wrap md:gap-5 md:px-6 md:py-4">
+      <div className="flex items-center gap-3 px-3 py-3 border-b border-indigo-500/10 bg-white/80 dark:bg-card/80 backdrop-blur-sm sticky top-0 z-10 flex-wrap md:gap-5 md:px-6 md:py-4">
         <div className="hidden items-center gap-3 md:flex">
           <Button
             size="sm"
@@ -215,7 +215,7 @@ export function PipelineClient({
           <Button
             size="icon"
             variant="ghost"
-            className="rounded-full h-10 w-10 text-slate-500 hover:text-slate-900 border border-slate-200 shadow-sm bg-white"
+            className="rounded-full h-10 w-10 text-slate-500 hover:text-slate-900 border border-slate-200 shadow-sm bg-white dark:bg-card dark:border-border dark:text-muted-foreground dark:hover:text-foreground"
             onClick={() => window.print()}
             title="Imprimir reporte"
           >
@@ -228,7 +228,7 @@ export function PipelineClient({
           size="sm"
           variant="ghost"
           aria-expanded={filtersOpen}
-          className="h-11 rounded-full border border-slate-200 bg-white px-4 text-xs font-bold text-slate-600 shadow-sm md:hidden"
+          className="h-11 rounded-full border border-slate-200 bg-white px-4 text-xs font-bold text-slate-600 shadow-sm md:hidden dark:bg-card dark:border-border dark:text-muted-foreground"
           onClick={() => setFiltersOpen((p) => !p)}
         >
           <SlidersHorizontal className="mr-1.5 h-4 w-4" />
