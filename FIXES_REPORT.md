@@ -276,3 +276,71 @@ the same," not "the PIN model itself is the right design."
 328/328 integration).
 
 ---
+
+## Skipped findings and why
+
+**Instructed not to touch:**
+- **FINDING-004** — "Decision needed: which roles may close a deal?" Product decision.
+- **FINDING-006** — CSP nonce work; entry says do it in a preview deployment first.
+- **FINDING-038** — "Decision needed: whether dark mode is a product commitment at all."
+
+**Other open decisions the backlog doesn't settle (same category, found while triaging):**
+- **FINDING-010** — "Decision needed: was PIN intended for attribution only?" Open.
+- **FINDING-012** — converting `GET /api/join/accept` to POST needs a migration path
+  (interstitial confirm page) plus an undecided `maxUses` column design.
+- **FINDING-016** — `rateLimit` fails open on the signin key. Entry offers two options
+  ("consider fail-closed... or an in-process fallback counter") without picking one.
+- **FINDING-018** — signup-returns-success-for-existing-email is correct anti-enumeration
+  behaviour; the entry only "considers" a UX copy change, doesn't commit to one.
+- **FINDING-026** — dead `phoneFormat`/`whatsappCountryCode` settings blocking white-label.
+  Entry presents two real options (derive validators from settings, or drop the fields) without
+  choosing. Also touches deal-creation phone validation — the highest-traffic write path in the
+  app, the day before a client onboarding. Left alone.
+
+**Deferred for risk/size, not indecision — all still open, no code touched:**
+- **FINDING-007** (RLS coverage gaps) + **FINDING-008** (`SET ROLE app_user` unreliable under
+  pgbouncer) — the backlog itself says "sequence them together... closing either one alone
+  leaves the gap." Both touch the core DB/RLS layer that every tenant-scoped query in the app
+  depends on. Fixing this correctly needs a migration (007) and changes to
+  `lib/db/ensure-app-role.ts` (008) reviewed together — not a same-night change on a branch
+  that has to merge before a client onboarding.
+- **FINDING-023** (unindexed `DealEquipment.subcategoryKey`) — the entry explicitly says bundle
+  its migration with FINDING-007's to avoid two manual prod migrations. Deferred with it.
+- **FINDING-011** (avatar/branding uploads have no quota accounting) — its own entry says it
+  needs a storage-usage reconciliation pass first, since turning on enforcement now would make
+  `storageUsedBytes` wrong for every existing untracked object. Separate, larger piece of work.
+- **FINDING-015** (early-return-inside-`withTenant` commits instead of aborting) — mechanical
+  but touches 8 write paths across `features/deals/actions.ts`, one of the highest-traffic files
+  in the app, with regression coverage for only 1 of those 7 actions (`moveDealAction`, via
+  `pipeline-scope.test.ts`). The entry itself frames it as "worth doing as its own reviewed
+  change," and there's no live bug today. Skipped rather than rushed.
+- **FINDING-024** (circular dependency in `lib/db/rls.ts` ↔ `lib/db/ensure-app-role.ts`) — a
+  real architectural refactor of the module that establishes RLS role context for every request
+  in the app. Even though it's a behavior-preserving refactor on paper, a mistake here breaks
+  tenant isolation everywhere. Not a same-night change.
+- **FINDING-025 / FINDING-028** (collapse 28 duplicated inline role checks into one shared
+  policy function) — the audit's own suggested sequencing calls this the highest-leverage
+  refactor in the backlog, and FINDING-029/039 this session is direct evidence why (two of the
+  duplicated copies had independently drifted from the pattern). But it's a 13-file, 28-call-site
+  diff the night before onboarding. Recommend doing this next, with the new authorization
+  matrix as the regression net — that net exists now specifically so this refactor is safer
+  whenever it happens.
+- **FINDING-030** (24 sites swallow errors into empty/falsy returns) — the entry names one
+  representative site and says there are ~24 total without enumerating them. Fixing "the"
+  example wouldn't resolve the finding (which is about a systemic detection gap), and finding
+  all 24 correctly — distinguishing genuine swallowed errors from legitimate empty results —
+  wasn't something to rush through unscoped.
+- **FINDING-031** (semicolon style split repo-wide) — the entry itself says "decide the house
+  style" first, and this task's own house rules say never run the formatter.
+- **FINDING-033** (empty `lib/logging/`, `lib/email/`, mostly-empty `docs/adr/`) — partially
+  addressed as a side effect (`docs/adr/` now has its first real entry, FINDING-037's ADR); the
+  empty scaffolding directories themselves weren't touched. Low value, left for later.
+
+**Marked RESOLVED with no code change** (verified already fixed or already correct, updated
+the backlog to say so): **FINDING-021** (transaction fan-out — already fixed by `15889e3`
+before this session started).
+
+**Discovered, not in the original backlog:** **FINDING-039** (new) — two missing target-side
+ADMIN guards found while building the FINDING-029 test matrix, one of them live in production
+today. Fixed; see above.
+
