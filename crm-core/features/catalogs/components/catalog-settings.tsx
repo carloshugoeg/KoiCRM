@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type CSSProperties } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -200,16 +200,59 @@ function CatalogTab({
   )
 }
 
+// CSS-only "scroll shadow": a pair of hard-edged fills in `background-attachment: local` slide
+// with the tab strip's own content and exactly cancel the paired soft `scroll`-attached shadow
+// at each edge, so the fade only shows while there is more to scroll in that direction — no JS
+// scroll-position tracking, and it collapses to nothing by itself once the strip fits (board
+// and up), so it never has to be gated behind a `board:` override to look "off".
+const TAB_SCROLL_SHADOW_STYLE: CSSProperties = {
+  backgroundImage: [
+    "linear-gradient(to right, hsl(var(--muted)) 30%, transparent)",
+    "linear-gradient(to left, hsl(var(--muted)) 30%, transparent) 100% 0",
+    "linear-gradient(to right, hsl(var(--foreground) / 0.14), transparent)",
+    "linear-gradient(to left, hsl(var(--foreground) / 0.14), transparent) 100% 0",
+  ].join(", "),
+  backgroundRepeat: "no-repeat",
+  backgroundSize: "24px 100%, 24px 100%, 10px 100%, 10px 100%",
+  backgroundAttachment: "local, local, scroll, scroll",
+  WebkitOverflowScrolling: "touch",
+}
+
 export function CatalogSettings({ tenant, itemsByKey, equipmentCategories, canManage }: Props) {
   return (
     <div className="p-6 space-y-6 max-w-3xl">
       <h1 className="text-2xl font-semibold">Catálogos</h1>
       <Tabs defaultValue="equipment">
-        <TabsList>
-          {CATALOG_KEYS.map((k) => (
-            <TabsTrigger key={k} value={k}>{CATALOG_LABELS[k]}</TabsTrigger>
-          ))}
-        </TabsList>
+        {/*
+          Bug: TabsList is `inline-flex`, so it always reports its own true (unclipped) size —
+          617px of tabs on a 533px viewport — and never overflows itself. The actual clipping
+          ancestor is several levels up: `app/app/[tenantSlug]/layout.tsx`'s `<main>` and the
+          settings shell (`settings/layout.tsx`, `settings/_width.tsx`) are all
+          `overflow-hidden` by design — that's the app's scroll-containment pattern, where each
+          route's own content is expected to own a scroll container rather than the shell
+          scrolling. `_width.tsx` also caps width to `max-w-lg` on this route, so it's the
+          nearest ancestor whose box is actually narrower than the tab strip's 617px — that's
+          where the fourth tab gets cut off, in a way that reports no overflow anywhere near
+          the tabs themselves. Fix stays local to this page: wrap the strip in its own
+          `overflow-x-auto` container per the same "content owns its scroll" pattern used
+          elsewhere (see permissions/page.tsx, equipment-settings.tsx).
+        */}
+        <div
+          className="overflow-x-auto overscroll-x-contain rounded-lg board:overflow-visible board:bg-none"
+          style={TAB_SCROLL_SHADOW_STYLE}
+        >
+          <TabsList className="h-auto w-max min-w-full justify-start gap-1 board:h-9 board:w-auto board:justify-center board:gap-0">
+            {CATALOG_KEYS.map((k) => (
+              <TabsTrigger
+                key={k}
+                value={k}
+                className="h-11 shrink-0 px-4 board:h-auto board:px-3"
+              >
+                {CATALOG_LABELS[k]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
         {CATALOG_KEYS.map((k) => (
           <TabsContent key={k} value={k} className="pt-4">
             {k === "equipment" ? (
