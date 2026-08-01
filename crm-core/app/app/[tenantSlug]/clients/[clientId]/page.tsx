@@ -76,6 +76,7 @@ export default async function ClientDetailPage({ params }: Props) {
           phone: clientData.phone,
           whatsapp: clientData.whatsapp,
           email: clientData.email,
+          address: clientData.address,
         }}
         deals={dealsList}
         kpis={kpis}
@@ -86,6 +87,7 @@ export default async function ClientDetailPage({ params }: Props) {
         statuses={statuses}
         settings={intlSettings}
         canEdit={canEdit}
+        backHref={`/app/${tenantSlug}/clients`}
       />
     </div>
   )

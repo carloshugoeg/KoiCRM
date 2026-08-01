@@ -58,14 +58,17 @@ export function ClientSidebar({
   const alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".split("")
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-r">
-      {/* Search + sort */}
+    <aside
+      className={`h-full flex-col overflow-hidden board:flex board:w-72 board:shrink-0 board:border-r ${selectedClientId ? "hidden" : "flex w-full"}`}
+    >
+      {/* Search + sort. Below `board` this list is the whole screen, so every control here is
+          a finger target (44px min); `board:` restores the compact desktop sizing. */}
       <div className="space-y-2 border-b p-3">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground board:left-2.5" />
           <Input
             placeholder="Buscar por nombre, empresa o teléfono..."
-            className="h-8 pl-8 text-sm"
+            className="h-11 pl-9 text-sm board:h-8 board:pl-8"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -74,11 +77,11 @@ export function ClientSidebar({
           <span className="shrink-0 text-xs text-muted-foreground">
             {clients.length} {clients.length === 1 ? "cliente" : "clientes"}
           </span>
-          <div className="ml-auto flex gap-1">
+          <div className="ml-auto flex gap-1.5 board:gap-1">
             <Button
               size="sm"
               variant={sort === "name" ? "default" : "outline"}
-              className="h-7 text-xs"
+              className="h-11 text-xs board:h-7"
               onClick={() => setSort("name")}
             >
               A–Z
@@ -86,7 +89,7 @@ export function ClientSidebar({
             <Button
               size="sm"
               variant={sort === "recent" ? "default" : "outline"}
-              className="h-7 text-xs"
+              className="h-11 text-xs board:h-7"
               onClick={() => setSort("recent")}
             >
               Fecha
@@ -172,7 +175,7 @@ export function ClientSidebar({
             <Button
               size="sm"
               variant="outline"
-              className="h-8 w-full text-xs"
+              className="h-11 w-full text-xs board:h-8"
               onClick={loadMore}
             >
               Cargar más

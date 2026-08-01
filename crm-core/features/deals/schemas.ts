@@ -41,6 +41,7 @@ export const createDealSchema = z
       .nullable()
       .or(z.literal("")),
     email: z.string().email("Email inválido.").optional().nullable().or(z.literal("")),
+    address: z.string().max(500).optional().nullable(),
     equipment: equipmentSelectionSchema.default([]),
     value: z.coerce.number().min(0).default(0),
     statusKey: z.string().min(1).default("activo"),

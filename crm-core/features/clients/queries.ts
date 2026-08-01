@@ -22,6 +22,7 @@ export async function findOrCreateClient(
     phone?: string | null
     whatsapp?: string | null
     email?: string | null
+    address?: string | null
   }
 ) {
   const name = input.name.trim()
@@ -45,6 +46,7 @@ export async function findOrCreateClient(
       phone: input.phone?.trim() || null,
       whatsapp: input.whatsapp?.trim() || null,
       email: input.email?.trim() || null,
+      address: input.address?.trim() || null,
     },
   })
 }

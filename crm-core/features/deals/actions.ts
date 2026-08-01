@@ -123,6 +123,7 @@ export async function createDealAction(
         phone: fields.phone,
         whatsapp: fields.whatsapp,
         email: fields.email,
+        address: fields.address,
       })
 
       await tx.deal.create({

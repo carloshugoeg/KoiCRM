@@ -33,6 +33,7 @@ export async function createClientAction(raw: unknown): Promise<{ ok: boolean; e
           phone: fields.phone?.trim() || null,
           whatsapp: fields.whatsapp?.trim() || null,
           email: fields.email?.trim() || null,
+          address: fields.address?.trim() || null,
           customData: fields.customData as Prisma.InputJsonValue | undefined,
         },
       })
@@ -77,6 +78,7 @@ export async function updateClientAction(raw: unknown): Promise<{ ok: boolean; e
           phone: fields.phone?.trim() || null,
           whatsapp: fields.whatsapp?.trim() || null,
           email: fields.email?.trim() || null,
+          address: fields.address?.trim() || null,
           customData: fields.customData as Prisma.InputJsonValue | undefined,
         },
       })
