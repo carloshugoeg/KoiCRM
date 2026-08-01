@@ -1,12 +1,13 @@
 import { withTenant, type PrismaTx } from "@/lib/db/rls"
 import type { CatalogItem } from "@prisma/client"
 
-export type CatalogKey = "equipment" | "salesChannel" | "dealStatus"
+export type CatalogKey = "equipment" | "salesChannel" | "dealStatus" | "archiveReason"
 
 export const CATALOG_LABELS: Record<CatalogKey, string> = {
   equipment: "Equipos",
   salesChannel: "Canal de ventas",
   dealStatus: "Estado de oportunidad",
+  archiveReason: "Motivo de archivo",
 }
 
 export type GetCatalogItemsOptions = {
@@ -121,27 +122,34 @@ export async function getEquipmentHierarchy(
 }
 
 /**
- * Parent-aware validity check for a subcategoría selection. Runs inside the caller's transaction so
- * it shares the RLS-scoped connection. The subcategoría must be active, belong to the given
- * categoría (by key), and that categoría must itself be active.
+ * Batched variant of isActiveSubcategoryOfCategory — validates every subcategoría in one
+ * round trip instead of one `findFirst` per subcategoría. `resolveEquipmentPairs` used to
+ * call the single-pair check inside a nested loop, meaning N queries in the same
+ * transaction for a deal with N equipment selections (FINDING-022). Runs inside the
+ * caller's transaction, same as the single-pair check.
  */
-export async function isActiveSubcategoryOfCategory(
+export async function activeSubcategoryParentsInTx(
   tx: PrismaTx,
   tenantId: string,
-  categoryKey: string,
-  subcategoryKey: string,
-): Promise<boolean> {
-  const sub = await tx.catalogItem.findFirst({
+  subcategoryKeys: string[],
+): Promise<Map<string, { categoryKey: string; active: boolean }>> {
+  const result = new Map<string, { categoryKey: string; active: boolean }>()
+  if (subcategoryKeys.length === 0) return result
+  const rows = await tx.catalogItem.findMany({
     where: {
       tenantId,
       catalogKey: "equipment",
-      key: subcategoryKey,
+      key: { in: subcategoryKeys },
       active: true,
       parentId: { not: null },
     },
-    select: { parent: { select: { key: true, active: true } } },
+    select: { key: true, parent: { select: { key: true, active: true } } },
   })
-  return !!sub?.parent && sub.parent.active && sub.parent.key === categoryKey
+  for (const row of rows) {
+    if (!row.parent) continue
+    result.set(row.key, { categoryKey: row.parent.key, active: row.parent.active })
+  }
+  return result
 }
 
 export async function getCatalogItemUsageCount(
@@ -164,6 +172,9 @@ export async function getCatalogItemUsageCount(
     }
     if (catalogKey === "dealStatus") {
       return tx.deal.count({ where: { tenantId, statusKey: key } })
+    }
+    if (catalogKey === "archiveReason") {
+      return tx.deal.count({ where: { tenantId, archiveReasonKey: key } })
     }
     return 0
   })

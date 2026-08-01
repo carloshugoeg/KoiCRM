@@ -2,6 +2,7 @@ import { withTenant, type PrismaTx } from "@/lib/db/rls"
 import type { Prisma } from "@prisma/client"
 import { getCatalogItemsInTx, getEquipmentHierarchyInTx } from "@/features/catalogs/queries"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
+import { dealVisibilityWhere } from "@/features/deals/queries"
 
 export type ClientWithDealCount = Awaited<ReturnType<typeof listClients>>["items"][number]
 
@@ -21,6 +22,7 @@ export async function findOrCreateClient(
     phone?: string | null
     whatsapp?: string | null
     email?: string | null
+    address?: string | null
   }
 ) {
   const name = input.name.trim()
@@ -44,6 +46,7 @@ export async function findOrCreateClient(
       phone: input.phone?.trim() || null,
       whatsapp: input.whatsapp?.trim() || null,
       email: input.email?.trim() || null,
+      address: input.address?.trim() || null,
     },
   })
 }
@@ -61,12 +64,20 @@ export async function countClients(tenantId: string) {
   return withTenant(tenantId, (tx) => countClientsInTx(tx, tenantId))
 }
 
+/**
+ * `visibleToUserId` restricts the `_count.deals` figure the sidebar renders as "N
+ * oportunidades" to what that user may see — their own deals plus anything ceded to them, the
+ * same rule `getClientWithDealsInTx` and `getClientKpisInTx` already apply on this same
+ * screen. Without it a restricted member sees "8 oportunidades" in the list next to a client
+ * whose opened profile shows "Oportunidades: 2" for that same client — a leak of a colleague's
+ * deal count baked into the sidebar every member sees, regardless of role.
+ */
 export async function listClientsInTx(
   tx: PrismaTx,
   tenantId: string,
-  opts: { search?: string; sort?: "name" | "recent"; cursor?: string; limit?: number } = {}
+  opts: { search?: string; sort?: "name" | "recent"; cursor?: string; limit?: number; visibleToUserId?: string } = {}
 ) {
-  const { search, sort = "name", cursor, limit = CLIENTS_PAGE_SIZE } = opts
+  const { search, sort = "name", cursor, limit = CLIENTS_PAGE_SIZE, visibleToUserId } = opts
 
   const where: Prisma.ClientWhereInput = { tenantId }
   if (search) {
@@ -89,7 +100,12 @@ export async function listClientsInTx(
     include: {
       _count: {
         select: {
-          deals: { where: { isArchived: false } },
+          deals: {
+            where: {
+              isArchived: false,
+              ...(visibleToUserId ? dealVisibilityWhere(visibleToUserId) : {}),
+            },
+          },
         },
       },
     },
@@ -106,17 +122,31 @@ export async function listClientsInTx(
 
 export async function listClients(
   tenantId: string,
-  opts: { search?: string; sort?: "name" | "recent"; cursor?: string; limit?: number } = {}
+  opts: { search?: string; sort?: "name" | "recent"; cursor?: string; limit?: number; visibleToUserId?: string } = {}
 ) {
   return withTenant(tenantId, (tx) => listClientsInTx(tx, tenantId, opts))
 }
 
-export async function getClientWithDealsInTx(tx: PrismaTx, tenantId: string, clientId: string) {
+/**
+ * `visibleToUserId` restricts the deal list (and therefore the "Abrir" deep link on each row)
+ * to what that user may see — their own deals plus anything ceded to them, same rule as the
+ * funnel. Without it a restricted member sees every deal a client has ever had, including a
+ * colleague's name, stage and value, on a page that predates the permission system.
+ */
+export async function getClientWithDealsInTx(
+  tx: PrismaTx,
+  tenantId: string,
+  clientId: string,
+  visibleToUserId?: string,
+) {
   return tx.client.findUnique({
     where: { id: clientId, tenantId },
     include: {
       deals: {
-        where: { isArchived: false },
+        where: {
+          isArchived: false,
+          ...(visibleToUserId ? dealVisibilityWhere(visibleToUserId) : {}),
+        },
         include: {
           stage: true,
           owner: { select: { id: true, name: true, email: true } },
@@ -131,25 +161,35 @@ export async function getClientWithDealsInTx(tx: PrismaTx, tenantId: string, cli
   })
 }
 
-export async function getClientWithDeals(tenantId: string, clientId: string) {
-  return withTenant(tenantId, (tx) => getClientWithDealsInTx(tx, tenantId, clientId))
+export async function getClientWithDeals(tenantId: string, clientId: string, visibleToUserId?: string) {
+  return withTenant(tenantId, (tx) => getClientWithDealsInTx(tx, tenantId, clientId, visibleToUserId))
 }
 
+/**
+ * `visibleToUserId` restricts the KPI counts to what that user may see — their own deals plus
+ * anything ceded to them, the same rule `getClientWithDealsInTx` already applies to the deal
+ * list on this same screen. Without it a restricted member sees a KPI card ("Oportunidades",
+ * "Ganadas", "Valor ganado") counting every deal the client has ever had while the list right
+ * below it shows only the ones they can open — a leak of a colleague's deal count/value, and
+ * visibly incoherent with the list.
+ */
 export async function getClientKpisInTx(
   tx: PrismaTx,
   tenantId: string,
   clientId: string,
-  dateRange?: { from: Date; to: Date }
+  dateRange?: { from: Date; to: Date },
+  visibleToUserId?: string,
 ) {
   const dateFilter = dateRange ? { createdAt: { gte: dateRange.from, lte: dateRange.to } } : {}
+  const visibilityFilter = visibleToUserId ? dealVisibilityWhere(visibleToUserId) : {}
 
   const [allDeals, wonDeals] = await Promise.all([
     tx.deal.findMany({
-      where: { tenantId, clientId, ...dateFilter },
+      where: { tenantId, clientId, ...dateFilter, ...visibilityFilter },
       select: { id: true, isArchived: true, stage: { select: { key: true } }, value: true },
     }),
     tx.deal.findMany({
-      where: { tenantId, clientId, stage: { key: "ganado" }, ...dateFilter },
+      where: { tenantId, clientId, stage: { key: "ganado" }, ...dateFilter, ...visibilityFilter },
       select: { value: true },
     }),
   ])
@@ -167,9 +207,10 @@ export async function getClientKpisInTx(
 export async function getClientKpis(
   tenantId: string,
   clientId: string,
-  dateRange?: { from: Date; to: Date }
+  dateRange?: { from: Date; to: Date },
+  visibleToUserId?: string,
 ) {
-  return withTenant(tenantId, (tx) => getClientKpisInTx(tx, tenantId, clientId, dateRange))
+  return withTenant(tenantId, (tx) => getClientKpisInTx(tx, tenantId, clientId, dateRange, visibleToUserId))
 }
 
 /**
@@ -206,6 +247,8 @@ export async function loadClientsPageData(
     sort?: "name" | "recent"
     cursor?: string
     selectedClientId?: string
+    /** Restricts the selected client's deal list — see getClientWithDealsInTx. */
+    visibleToUserId?: string
   },
 ) {
   return withTenant(
@@ -217,13 +260,14 @@ export async function loadClientsPageData(
           search: opts.search,
           sort: opts.sort,
           cursor: opts.cursor,
+          visibleToUserId: opts.visibleToUserId,
         }),
       ])
 
       const selected = opts.selectedClientId
         ? await Promise.all([
-            getClientWithDealsInTx(tx, tenantId, opts.selectedClientId),
-            getClientKpisInTx(tx, tenantId, opts.selectedClientId),
+            getClientWithDealsInTx(tx, tenantId, opts.selectedClientId, opts.visibleToUserId),
+            getClientKpisInTx(tx, tenantId, opts.selectedClientId, undefined, opts.visibleToUserId),
           ])
         : null
 
@@ -240,14 +284,14 @@ export async function loadClientsPageData(
 }
 
 /** Same chrome as the clients list page, for the standalone client detail route. */
-export async function loadClientDetailPageData(tenantId: string, clientId: string) {
+export async function loadClientDetailPageData(tenantId: string, clientId: string, visibleToUserId?: string) {
   return withTenant(
     tenantId,
     async (tx) => {
       const [chrome, client, kpis] = await Promise.all([
         loadClientPageChromeInTx(tx, tenantId),
-        getClientWithDealsInTx(tx, tenantId, clientId),
-        getClientKpisInTx(tx, tenantId, clientId),
+        getClientWithDealsInTx(tx, tenantId, clientId, visibleToUserId),
+        getClientKpisInTx(tx, tenantId, clientId, undefined, visibleToUserId),
       ])
       return { ...chrome, client, kpis }
     },

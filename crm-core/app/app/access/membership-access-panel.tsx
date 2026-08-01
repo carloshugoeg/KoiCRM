@@ -31,23 +31,23 @@ export function MembershipAccessPanel({ contactEmail, contactPhone, contactLabel
 
   return (
     <div className="space-y-8">
-      <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+      <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:bg-card dark:border-border">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">
           Renovación o adquisición
         </h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-slate-600 dark:text-muted-foreground">
           Para activar o renovar tu membresía, contacta a {contactLabel}:
         </p>
         <ul className="mt-3 space-y-1 text-sm">
           <li>
-            <span className="text-slate-500">Correo: </span>
+            <span className="text-slate-500 dark:text-muted-foreground">Correo: </span>
             <a href={`mailto:${contactEmail}`} className="font-medium text-primary underline">
               {contactEmail}
             </a>
           </li>
           {contactPhone ? (
             <li>
-              <span className="text-slate-500">Teléfono: </span>
+              <span className="text-slate-500 dark:text-muted-foreground">Teléfono: </span>
               <a href={`tel:${contactPhone}`} className="font-medium text-primary underline">
                 {contactPhone}
               </a>
@@ -56,11 +56,11 @@ export function MembershipAccessPanel({ contactEmail, contactPhone, contactLabel
         </ul>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+      <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:bg-card dark:border-border">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-muted-foreground">
           Tengo un enlace de unión
         </h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-slate-600 dark:text-muted-foreground">
           Si un administrador te compartió un enlace de unión, pégalo aquí para entrar a su espacio de
           trabajo con el permiso configurado en el enlace.
         </p>

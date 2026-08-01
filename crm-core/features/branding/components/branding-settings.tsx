@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useTheme } from "next-themes"
 import { toast } from "sonner"
-import { Droplets, Moon, Palette, Sun } from "lucide-react"
+import { Droplets, Palette } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { updateBrandingAction } from "@/features/branding/actions"
 import {
@@ -50,7 +49,6 @@ async function uploadBrandingFile(
 
 export function BrandingSettings({ tenant, branding, canManage }: Props) {
   const router = useRouter()
-  const { theme, setTheme, resolvedTheme } = useTheme()
   const logoInputRef = useRef<HTMLInputElement>(null)
   const bgInputRef = useRef<HTMLInputElement>(null)
 
@@ -62,8 +60,6 @@ export function BrandingSettings({ tenant, branding, canManage }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState<"logo" | "background" | null>(null)
-
-  const isDark = (resolvedTheme ?? theme) === "dark"
 
   useEffect(() => {
     setShowArchived(readShowArchivedPreference())
@@ -99,11 +95,6 @@ export function BrandingSettings({ tenant, branding, canManage }: Props) {
     toast.success(toastMessages.branding.saved)
     router.refresh()
     return true
-  }
-
-  async function handleThemeChange(dark: boolean) {
-    setTheme(dark ? "dark" : "light")
-    await persistBranding({})
   }
 
   async function handleBgColorChange(which: "dark" | "light", value: string) {
@@ -156,59 +147,18 @@ export function BrandingSettings({ tenant, branding, canManage }: Props) {
       {error && <p className="text-sm text-destructive">{error}</p>}
       {saving && <p className="text-xs text-muted-foreground">Guardando…</p>}
 
-      <div>
-        <SettingsSectionTitle>Modo de pantalla</SettingsSectionTitle>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { dark: true, label: "Oscuro", icon: Moon },
-            { dark: false, label: "Claro", icon: Sun },
-          ].map((opt) => (
-            <button
-              key={String(opt.dark)}
-              type="button"
-              disabled={!canManage}
-              onClick={() => handleThemeChange(opt.dark)}
-              className={`flex flex-col items-center gap-3 py-6 rounded-xl border transition-all ${
-                isDark === opt.dark
-                  ? "bg-indigo-500/15 border-indigo-400 ring-1 ring-indigo-500/40"
-                  : "bg-muted/30 border-border"
-              }`}
-            >
-              <opt.icon
-                className={`h-[22px] w-[22px] ${isDark === opt.dark ? "text-indigo-400" : "text-muted-foreground"}`}
-              />
-              <span
-                className={`text-sm font-semibold ${isDark === opt.dark ? "text-indigo-400" : "text-muted-foreground"}`}
-              >
-                {opt.label}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
+      {/*
+        The "Modo de pantalla" picker is hidden while dark mode is pinned off in
+        components/providers.tsx — offering a switch that no longer changes anything is worse
+        than offering none. Restore it together with the theme.
+      */}
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <SettingsSectionTitle>Fondo oscuro</SettingsSectionTitle>
-          <div className="flex gap-3 items-center">
-            <input
-              type="color"
-              value={bgColorDark}
-              disabled={!canManage}
-              onChange={(e) => handleBgColorChange("dark", e.target.value)}
-              className="w-[34px] h-[34px] rounded cursor-pointer border-none p-0"
-            />
-            {branding?.bgColorDark && canManage && (
-              <button
-                type="button"
-                onClick={() => handleClearBgColor("dark")}
-                className="text-[10px] text-red-500 hover:underline"
-              >
-                Restaurar
-              </button>
-            )}
-          </div>
-        </div>
+      {/*
+        The "Fondo oscuro" picker is hidden alongside the mode switch — it configures a
+        surface nobody can currently reach. `bgColorDark` is still held in state and still
+        sent on every save, so a tenant that already chose one does not lose it.
+      */}
+      <div className="grid grid-cols-1 gap-3">
         <div>
           <SettingsSectionTitle>Fondo claro</SettingsSectionTitle>
           <div className="flex gap-3 items-center">

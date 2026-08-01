@@ -16,12 +16,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { HistoryPanel } from "@/features/deals/components/HistoryPanel"
+import { DisclosureSection } from "@/features/deals/components/DisclosureSection"
+import { useNarrowViewport } from "@/features/pipeline/hooks/use-narrow-viewport"
 import { NotesSection } from "@/features/notes/components/NotesSection"
 import { QuoteSection } from "@/features/quotes/components/QuoteSection"
 import { PaymentSection } from "@/features/payments/components/PaymentSection"
 import { DealAttachmentsSection } from "@/features/attachments/components/DealAttachmentsSection"
-import { updateDealAction, updateDealFieldAction, moveDealAction, archiveDealAction, transferDealAction, deleteDealAction } from "@/features/deals/actions"
+import { updateDealAction, updateDealFieldAction, moveDealAction, archiveDealAction, unarchiveDealAction, transferDealAction, deleteDealAction } from "@/features/deals/actions"
 import { EquipmentSelector, rowsToEquipmentGroups, type EquipmentGroup } from "@/features/deals/components/EquipmentSelector"
+import { ArchiveDealDialog } from "@/features/deals/components/ArchiveDealDialog"
 import type { EquipmentCategory } from "@/features/catalogs/queries"
 import { addFollowUpAction, completeFollowUpAction, deleteFollowUpAction } from "@/features/follow-ups/actions"
 import { getDealActivityAction, getDealFollowUpsAction, getQuotesForDealAction, getPaymentsForDealAction } from "@/features/deals/actions"
@@ -31,7 +34,7 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 import { formatPhone } from "@/lib/deals/phone-format"
 import { formatCurrency, formatDate } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
-import type { PipelineStage, FollowUp, Quote, Payment } from "@prisma/client"
+import type { PipelineStage, FollowUp, Quote, Payment, CatalogItem } from "@prisma/client"
 
 interface DealDetailData {
   id: string
@@ -55,6 +58,10 @@ interface DealDetailData {
   equipment: { categoryKey: string; subcategoryKey: string }[]
   quoteCount: number
   paymentCount: number
+  /** Archive state. Undefined on callers that predate this field — treated as "not archived". */
+  isArchived?: boolean
+  archiveReasonKey?: string | null
+  archiveNote?: string | null
 }
 
 interface DealDetailModalProps {
@@ -73,6 +80,13 @@ interface DealDetailModalProps {
   members?: { id: string; name: string | null; email: string }[]
   /** Equipo de interés taxonomy; when provided, equipment becomes inline-editable. */
   equipmentHierarchy?: EquipmentCategory[]
+  /**
+   * Archive-reason catalog items — feeds the "Archivar" dialog's required reason select, and
+   * resolves the label shown for a deal already carrying archiveReasonKey. Callers that don't
+   * pass this (yet) just get an empty select, which the dialog surfaces as "sin motivos
+   * configurados" and refuses to submit rather than allowing a reason-less archive.
+   */
+  archiveReasons?: CatalogItem[]
   onClose: () => void
   onAction?: () => void
 }
@@ -115,10 +129,12 @@ function DealDetailModalContent({
   canDelete = false,
   members = [],
   equipmentHierarchy,
+  archiveReasons = [],
   onClose,
   onAction,
 }: DealDetailModalProps) {
   const router = useRouter()
+  const isNarrow = useNarrowViewport()
   const { guard } = useActionPin()
   const [activities, setActivities] = useState<ActivityEntry[]>([])
   const [activityCursor, setActivityCursor] = useState<string | null>(null)
@@ -128,7 +144,9 @@ function DealDetailModalContent({
   const [payments, setPayments] = useState<Payment[]>([])
   const [loadingAct, setLoadingAct] = useState(true)
   const [moving, setMoving] = useState(false)
-  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
+  const [archiving, setArchiving] = useState(false)
+  const [unarchiveConfirmOpen, setUnarchiveConfirmOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [transferring, setTransferring] = useState(false)
   const [deleteFollowUpId, setDeleteFollowUpId] = useState<string | null>(null)
@@ -224,6 +242,12 @@ function DealDetailModalContent({
     return cat?.subcategories.find((s) => s.key === subcategoryKey)?.label ?? subcategoryKey
   }
   const groupedEquipment = rowsToEquipmentGroups(deal.equipment)
+  // Falls back to the raw key (same convention as the raw statusKey shown on kanban cards) when
+  // the caller's archiveReasons list doesn't carry this key — e.g. the reason was later
+  // deactivated/removed, or the caller only passes active reasons.
+  const archiveReasonLabel = deal.archiveReasonKey
+    ? (archiveReasons.find((r) => r.key === deal.archiveReasonKey)?.label ?? deal.archiveReasonKey)
+    : null
 
   async function handleMove(toStageId: string, force = false) {
     if (moving) return
@@ -241,15 +265,34 @@ function DealDetailModalContent({
     }
   }
 
-  async function handleArchive() {
-    if (moving) return
-    setMoving(true)
+  async function handleArchive(archiveReasonKey: string, archiveNote: string) {
+    if (archiving) return
+    setArchiving(true)
     try {
-      const result = await guard((pin) => archiveDealAction({ tenantId, tenantSlug, dealId: deal.id, pin }))
+      const result = await guard((pin) =>
+        archiveDealAction({ tenantId, tenantSlug, dealId: deal.id, archiveReasonKey, archiveNote, pin }),
+      )
       if (!result.ok) {
         if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorArchive))
       } else {
         toast.success(toastMessages.deal.archived, { onAutoClose: () => onAction?.() })
+        setArchiveDialogOpen(false)
+        onClose()
+      }
+    } finally {
+      setArchiving(false)
+    }
+  }
+
+  async function handleUnarchive() {
+    if (moving) return
+    setMoving(true)
+    try {
+      const result = await guard((pin) => unarchiveDealAction({ tenantId, tenantSlug, dealId: deal.id, pin }))
+      if (!result.ok) {
+        if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorUnarchive))
+      } else {
+        toast.success(toastMessages.deal.unarchived, { onAutoClose: () => onAction?.() })
         onClose()
       }
     } finally {
@@ -355,6 +398,486 @@ function DealDetailModalContent({
   const pendingFUs = followUps.filter((f) => !f.completed)
   const completedFUs = followUps.filter((f) => f.completed)
 
+  // The three body panels are built once and reused for both layouts: on desktop each
+  // sits in its own independent ScrollArea (unchanged); on mobile they're stacked into a
+  // single scrolling region with the long sections collapsed behind DisclosureSection.
+  const leftPanelContent = (
+    <div className="min-w-0 w-full max-w-full space-y-4 p-4">
+      {/* Asignado a / Creado por */}
+      <div className="mb-4 space-y-2.5">
+        <div className="flex items-center gap-2">
+          <UserAvatar userId={deal.ownerId} name={deal.ownerName} imageUrl={deal.ownerImage} size={32} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground leading-none">Asignado a</p>
+              {canEdit && members.length > 1 && editField !== "owner" && (
+                <FieldEditButton
+                  label="Cambiar asesor asignado"
+                  onClick={() => setEditField("owner")}
+                />
+              )}
+            </div>
+            {editField === "owner" ? (
+              <div className="mt-1 space-y-1">
+                <Select
+                  value={deal.ownerId}
+                  onValueChange={handleTransfer}
+                  disabled={transferring}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Elegir asesor…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {members.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>{m.name ?? m.email}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setEditField(null)}
+                  disabled={transferring}
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm font-medium truncate">{deal.ownerName ?? "Sin asesor"}</p>
+            )}
+          </div>
+        </div>
+        {deal.createdById && (
+          <div className="flex items-center gap-2">
+            <UserAvatar userId={deal.createdById} name={deal.createdByName} imageUrl={deal.createdByImage} size={32} />
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground leading-none">Creado por</p>
+              <p className="text-sm font-medium truncate">{deal.createdByName ?? "—"}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Value */}
+      <div className="mb-3">
+        <div className="flex items-center justify-between gap-1 mb-1">
+          <p className="text-xs text-muted-foreground">Valor</p>
+          {canEdit && editField !== "value" && (
+            <FieldEditButton
+              label="Editar valor"
+              onClick={() => { setEditField("value"); setEditValue(String(deal.value)) }}
+            />
+          )}
+        </div>
+        {editField === "value" ? (
+          <Input
+            autoFocus
+            type="number"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            className="h-7 text-sm"
+            onBlur={() => saveField("value", parseFloat(editValue) || 0)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur()
+              if (e.key === "Escape") setEditField(null)
+            }}
+          />
+        ) : (
+          <p className="text-base font-bold">{formatCurrency(deal.value, settings)}</p>
+        )}
+      </div>
+
+      {/* Equipo de interés (categoría → subcategorías) */}
+      {(deal.equipment.length > 0 || (canEdit && equipmentHierarchy)) && (
+        <div className="mb-3">
+          <div className="flex items-center justify-between gap-1 mb-1">
+            <p className="text-xs text-muted-foreground">Equipo de interés</p>
+            {canEdit && equipmentHierarchy && editField !== "equipment" && (
+              <FieldEditButton
+                label="Editar equipo de interés"
+                onClick={() => {
+                  setEditField("equipment")
+                  setEditEquipment(rowsToEquipmentGroups(deal.equipment))
+                }}
+              />
+            )}
+          </div>
+          {editField === "equipment" && equipmentHierarchy ? (
+            <div className="space-y-2">
+              <EquipmentSelector
+                hierarchy={equipmentHierarchy}
+                value={editEquipment}
+                onChange={setEditEquipment}
+              />
+              <div className="flex items-center gap-2">
+                <Button size="sm" className="h-7 text-xs" onClick={saveEquipment} disabled={savingEquipment}>
+                  {savingEquipment ? "Guardando…" : "Guardar"}
+                </Button>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setEditField(null)}
+                  disabled={savingEquipment}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : deal.equipment.length > 0 ? (
+            <div className="space-y-1.5">
+              {groupedEquipment.map((g) => (
+                <div key={g.categoryKey}>
+                  <p className="text-[11px] font-semibold">{categoryLabel(g.categoryKey)}</p>
+                  <div className="mt-0.5 flex flex-wrap gap-1">
+                    {g.subcategoryKeys.map((s) => (
+                      <Badge key={s} variant="secondary" className="text-xs">
+                        {subcategoryLabel(g.categoryKey, s)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs italic text-muted-foreground">Sin equipo de interés.</p>
+          )}
+        </div>
+      )}
+
+      {/* Contact info */}
+      <div className="space-y-2 mb-3">
+        {(deal.phone || canEdit) && (
+          <div className="flex items-center gap-2">
+            <Phone className="h-3 w-3 shrink-0 text-muted-foreground" />
+            {editField === "phone" ? (
+              <Input
+                autoFocus
+                value={editValue}
+                onChange={(e) => setEditValue(formatPhone(e.target.value, false))}
+                className="h-7 flex-1 text-sm"
+                placeholder="XXXX-XXXX"
+                onBlur={() => saveField("phone", editValue)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur()
+                  if (e.key === "Escape") setEditField(null)
+                }}
+              />
+            ) : deal.phone ? (
+              <a href={`tel:${deal.phone}`} className="flex-1 text-sm hover:text-primary truncate">
+                {deal.phone}
+              </a>
+            ) : (
+              <span className="flex-1 text-sm text-muted-foreground italic">Sin teléfono</span>
+            )}
+            {canEdit && editField !== "phone" && (
+              <FieldEditButton
+                label="Editar teléfono"
+                onClick={() => { setEditField("phone"); setEditValue(deal.phone ?? "") }}
+              />
+            )}
+          </div>
+        )}
+        {deal.whatsapp && (
+          <a
+            href={`https://wa.me/${deal.whatsapp.replace(/[^0-9]/g, "")}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-2 text-sm hover:text-primary"
+          >
+            <MessageCircle className="h-3 w-3" />
+            {deal.whatsapp}
+          </a>
+        )}
+        {deal.email && (
+          <a href={`mailto:${deal.email}`} className="flex items-center gap-2 text-sm hover:text-primary">
+            <Mail className="h-3 w-3" />
+            {deal.email}
+          </a>
+        )}
+      </div>
+
+      <Separator />
+
+      {/* Time metrics */}
+      <div className="text-xs text-muted-foreground space-y-1 mt-3">
+        <p>Creado: {formatDate(deal.createdAt, settings)}</p>
+        <p>{daysTotal}d totales · {daysStage}d en etapa</p>
+      </div>
+
+      <Separator />
+
+      {/* Quotes */}
+      <DisclosureSection title="Cotizaciones" count={quotes.length} defaultOpen={false} isNarrow={isNarrow} className="border-t pt-4 mt-3">
+        <QuoteSection
+          dealId={deal.id}
+          tenantId={tenantId}
+          quotes={quotes}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onRefresh={refreshQuotesAndPayments}
+          showHeading={!isNarrow}
+        />
+      </DisclosureSection>
+
+      {/* Payments */}
+      <DisclosureSection title="Pagos" count={payments.length} defaultOpen={false} isNarrow={isNarrow} className="border-t pt-4 mt-3">
+        <PaymentSection
+          dealId={deal.id}
+          tenantId={tenantId}
+          payments={payments}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onRefresh={refreshQuotesAndPayments}
+          showHeading={!isNarrow}
+        />
+      </DisclosureSection>
+
+      {/* Files & images (screenshots, product photos, etc.) — count needs its own fetch, so none shown */}
+      <DisclosureSection title="Archivos" defaultOpen={false} isNarrow={isNarrow} className="border-t pt-4 mt-3">
+        <DealAttachmentsSection
+          dealId={deal.id}
+          tenantId={tenantId}
+          canEdit={canEdit}
+          excludeUrls={[...quotes.map((q) => q.fileUrl), ...payments.map((p) => p.fileUrl)].filter(
+            (u): u is string => !!u,
+          )}
+          showHeading={!isNarrow}
+        />
+      </DisclosureSection>
+    </div>
+  )
+
+  const centerPanelContent = (
+    <div className="min-w-0 w-full p-4">
+      {/* Action buttons */}
+      {wonStage && deal.stageKey !== "ganado" && !hasPaymentDoc && (
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-950 dark:text-amber-100"
+        >
+          <p className="font-semibold text-amber-800 dark:text-amber-200">
+            Etapa «Ganado» bloqueada para esta oportunidad
+          </p>
+          <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">{PAYMENT_DOC_REQUIRED_FOR_WON}</p>
+        </div>
+      )}
+
+      {deal.isArchived && (deal.archiveReasonKey || deal.archiveNote) && (
+        <div className="mb-4 rounded-lg border bg-muted/30 px-3 py-2.5 text-xs">
+          <p className="font-semibold text-foreground">
+            Archivado{archiveReasonLabel ? ` — ${archiveReasonLabel}` : ""}
+          </p>
+          {deal.archiveNote && <p className="mt-1 text-muted-foreground">{deal.archiveNote}</p>}
+        </div>
+      )}
+
+      {(canEdit || canArchive || canDelete) && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {!deal.isArchived && canEdit && unlockedStages.length > 0 && (
+            <Select onValueChange={(v) => handleMove(v)}>
+              <SelectTrigger className="w-40 h-8 text-xs" disabled={moving}>
+                <SelectValue placeholder="Mover a..." />
+              </SelectTrigger>
+              <SelectContent>
+                {unlockedStages.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {!deal.isArchived && canEdit && wonStage && deal.stageKey !== "ganado" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs text-emerald-600 border-emerald-300"
+              onClick={() => {
+                if (!hasPaymentDoc) {
+                  toast.error(toastMessages.deal.paymentDocRequiredForWon, { duration: 8000 })
+                  return
+                }
+                void handleMove(wonStage.id, true)
+              }}
+              disabled={loadingAct || moving}
+              title={!hasPaymentDoc ? PAYMENT_DOC_REQUIRED_FOR_WON : undefined}
+            >
+              Marcar como ganado
+            </Button>
+          )}
+          {!deal.isArchived && canEdit && lostStage && deal.stageKey !== "perdido" && (
+            <Button size="sm" variant="outline" className="h-8 text-xs text-red-600 border-red-300" onClick={() => handleMove(lostStage.id, true)} disabled={moving}>
+              Marcar como perdido
+            </Button>
+          )}
+          {!deal.isArchived && canArchive && (
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setArchiveDialogOpen(true)} disabled={moving}>
+              Archivar
+            </Button>
+          )}
+          {deal.isArchived && canArchive && (
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setUnarchiveConfirmOpen(true)} disabled={moving}>
+              Desarchivar
+            </Button>
+          )}
+          {canDelete && (
+            <Button size="sm" variant="outline" className="h-8 text-xs text-red-600 border-red-300" onClick={() => setDeleteConfirmOpen(true)} disabled={moving}>
+              <Trash2 className="h-3 w-3 mr-1" />
+              Eliminar
+            </Button>
+          )}
+        </div>
+      )}
+
+      <Separator className="mb-4" />
+
+      {/* Follow-ups */}
+      <DisclosureSection title="Seguimientos" count={pendingFUs.length} defaultOpen isNarrow={isNarrow} className="mb-4">
+        {!isNarrow && <h3 className="text-sm font-semibold mb-3">Seguimientos</h3>}
+
+        {pendingFUs.length === 0 && (
+          <p className="text-xs text-muted-foreground mb-3">Sin seguimientos pendientes.</p>
+        )}
+
+        <div className="space-y-2 mb-3">
+          {pendingFUs.map((fu) => {
+            const isCompleting = completingId === fu.id
+            return (
+              <div key={fu.id} className="p-2 bg-muted/40 rounded space-y-2">
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    {fu.note && <p className="text-xs font-medium">{fu.note}</p>}
+                    <p className="text-xs text-muted-foreground">{formatDate(fu.date, settings)}</p>
+                  </div>
+                  {canEdit && (
+                    <Button
+                      size="sm" variant="outline" className="h-6 text-xs shrink-0"
+                      onClick={() => { setCompletingId(fu.id); setCompletingResult("") }}
+                    >
+                      Completar
+                    </Button>
+                  )}
+                  {canEdit && (
+                    <Button
+                      size="icon" variant="ghost" className="h-6 w-6 shrink-0"
+                      onClick={() => setDeleteFollowUpId(fu.id)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+                {canEdit && isCompleting && (
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      placeholder="Resultado (opcional)"
+                      value={completingResult}
+                      onChange={(e) => setCompletingResult(e.target.value)}
+                      className="h-6 text-xs flex-1"
+                    />
+                    <Button
+                      size="sm" className="h-6 text-xs"
+                      onClick={() => handleCompleteFollowUp(fu.id, completingResult)}
+                    >
+                      Confirmar
+                    </Button>
+                    <button className="text-xs text-muted-foreground" onClick={() => setCompletingId(null)}>
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Add follow-up form */}
+        {canEdit && (
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <Input
+                type="date"
+                value={fuDate}
+                onChange={(e) => setFuDate(e.target.value)}
+                className="h-7 text-xs"
+              />
+            </div>
+            <Input
+              type="text"
+              placeholder="Texto del seguimiento (opcional)"
+              maxLength={500}
+              value={fuNote}
+              onChange={(e) => setFuNote(e.target.value)}
+              className="h-7 text-xs flex-1"
+            />
+            <Button
+              size="sm"
+              className="h-7 text-xs"
+              onClick={handleAddFollowUp}
+              disabled={fuLoading || !fuDate}
+            >
+              {fuLoading ? "..." : "Agregar"}
+            </Button>
+          </div>
+        )}
+
+        {completedFUs.length > 0 && (
+          <details className="mt-3">
+            <summary className="text-xs text-muted-foreground cursor-pointer">
+              {completedFUs.length} completado(s)
+            </summary>
+            <div className="space-y-1 mt-2">
+              {completedFUs.map((fu) => (
+                <div key={fu.id} className="p-2 bg-muted/20 rounded opacity-60">
+                  {fu.note && <p className="text-xs line-through">{fu.note}</p>}
+                  {fu.result && <p className="text-xs text-muted-foreground">{fu.result}</p>}
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+      </DisclosureSection>
+
+      <Separator className="mb-4" />
+
+      <div>
+        <h3 className="text-sm font-semibold mb-2">Notas</h3>
+        <NotesSection
+          tenantId={tenantId}
+          tenantSlug={tenantSlug}
+          dealId={deal.id}
+          settings={settings}
+          canEdit={canEdit}
+        />
+      </div>
+    </div>
+  )
+
+  const rightPanelContent = (
+    <div className="min-w-0 w-full p-4">
+      <DisclosureSection title="Historial" defaultOpen={false} isNarrow={isNarrow}>
+        {!isNarrow && <h3 className="text-sm font-semibold mb-3">Historial</h3>}
+        {loadingAct ? (
+          <p className="text-xs text-muted-foreground">Cargando...</p>
+        ) : (
+          <>
+            <HistoryPanel activities={activities} settings={settings} />
+            {activityCursor && (
+              <div className="mt-3 flex justify-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  onClick={handleLoadMoreActivity}
+                  disabled={loadingMoreAct}
+                >
+                  {loadingMoreAct ? "Cargando..." : "Cargar más"}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </DisclosureSection>
+    </div>
+  )
+
   return (
     <>
     <DialogPrimitive.Root open onOpenChange={(open) => { if (!open) onClose() }}>
@@ -386,482 +909,44 @@ function DealDetailModalContent({
           </div>
         )}
 
-        {/* Three-panel body */}
-        <div className="flex flex-1 min-h-0 flex-col overflow-hidden divide-y md:flex-row md:divide-x md:divide-y-0">
-          {/* LEFT PANEL – Deal data */}
-          <ScrollArea className="h-auto max-h-[45vh] w-full shrink-0 md:h-full md:max-h-none md:w-80">
-            <div className="min-w-0 w-full max-w-full space-y-4 p-4">
-            {/* Asignado a / Creado por */}
-            <div className="mb-4 space-y-2.5">
-              <div className="flex items-center gap-2">
-                <UserAvatar userId={deal.ownerId} name={deal.ownerName} imageUrl={deal.ownerImage} size={32} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-1">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground leading-none">Asignado a</p>
-                    {canEdit && members.length > 1 && editField !== "owner" && (
-                      <FieldEditButton
-                        label="Cambiar asesor asignado"
-                        onClick={() => setEditField("owner")}
-                      />
-                    )}
-                  </div>
-                  {editField === "owner" ? (
-                    <div className="mt-1 space-y-1">
-                      <Select
-                        value={deal.ownerId}
-                        onValueChange={handleTransfer}
-                        disabled={transferring}
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Elegir asesor…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {members.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>{m.name ?? m.email}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <button
-                        type="button"
-                        className="text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => setEditField(null)}
-                        disabled={transferring}
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="text-sm font-medium truncate">{deal.ownerName ?? "Sin asesor"}</p>
-                  )}
-                </div>
-              </div>
-              {deal.createdById && (
-                <div className="flex items-center gap-2">
-                  <UserAvatar userId={deal.createdById} name={deal.createdByName} imageUrl={deal.createdByImage} size={32} />
-                  <div className="min-w-0">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground leading-none">Creado por</p>
-                    <p className="text-sm font-medium truncate">{deal.createdByName ?? "—"}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Value */}
-            <div className="mb-3">
-              <div className="flex items-center justify-between gap-1 mb-1">
-                <p className="text-xs text-muted-foreground">Valor</p>
-                {canEdit && editField !== "value" && (
-                  <FieldEditButton
-                    label="Editar valor"
-                    onClick={() => { setEditField("value"); setEditValue(String(deal.value)) }}
-                  />
-                )}
-              </div>
-              {editField === "value" ? (
-                <Input
-                  autoFocus
-                  type="number"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  className="h-7 text-sm"
-                  onBlur={() => saveField("value", parseFloat(editValue) || 0)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") e.currentTarget.blur()
-                    if (e.key === "Escape") setEditField(null)
-                  }}
-                />
-              ) : (
-                <p className="text-base font-bold">{formatCurrency(deal.value, settings)}</p>
-              )}
-            </div>
-
-            {/* Equipo de interés (categoría → subcategorías) */}
-            {(deal.equipment.length > 0 || (canEdit && equipmentHierarchy)) && (
-              <div className="mb-3">
-                <div className="flex items-center justify-between gap-1 mb-1">
-                  <p className="text-xs text-muted-foreground">Equipo de interés</p>
-                  {canEdit && equipmentHierarchy && editField !== "equipment" && (
-                    <FieldEditButton
-                      label="Editar equipo de interés"
-                      onClick={() => {
-                        setEditField("equipment")
-                        setEditEquipment(rowsToEquipmentGroups(deal.equipment))
-                      }}
-                    />
-                  )}
-                </div>
-                {editField === "equipment" && equipmentHierarchy ? (
-                  <div className="space-y-2">
-                    <EquipmentSelector
-                      hierarchy={equipmentHierarchy}
-                      value={editEquipment}
-                      onChange={setEditEquipment}
-                    />
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" className="h-7 text-xs" onClick={saveEquipment} disabled={savingEquipment}>
-                        {savingEquipment ? "Guardando…" : "Guardar"}
-                      </Button>
-                      <button
-                        type="button"
-                        className="text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => setEditField(null)}
-                        disabled={savingEquipment}
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                ) : deal.equipment.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {groupedEquipment.map((g) => (
-                      <div key={g.categoryKey}>
-                        <p className="text-[11px] font-semibold">{categoryLabel(g.categoryKey)}</p>
-                        <div className="mt-0.5 flex flex-wrap gap-1">
-                          {g.subcategoryKeys.map((s) => (
-                            <Badge key={s} variant="secondary" className="text-xs">
-                              {subcategoryLabel(g.categoryKey, s)}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs italic text-muted-foreground">Sin equipo de interés.</p>
-                )}
-              </div>
-            )}
-
-            {/* Contact info */}
-            <div className="space-y-2 mb-3">
-              {(deal.phone || canEdit) && (
-                <div className="flex items-center gap-2">
-                  <Phone className="h-3 w-3 shrink-0 text-muted-foreground" />
-                  {editField === "phone" ? (
-                    <Input
-                      autoFocus
-                      value={editValue}
-                      onChange={(e) => setEditValue(formatPhone(e.target.value, false))}
-                      className="h-7 flex-1 text-sm"
-                      placeholder="XXXX-XXXX"
-                      onBlur={() => saveField("phone", editValue)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") e.currentTarget.blur()
-                        if (e.key === "Escape") setEditField(null)
-                      }}
-                    />
-                  ) : deal.phone ? (
-                    <a href={`tel:${deal.phone}`} className="flex-1 text-sm hover:text-primary truncate">
-                      {deal.phone}
-                    </a>
-                  ) : (
-                    <span className="flex-1 text-sm text-muted-foreground italic">Sin teléfono</span>
-                  )}
-                  {canEdit && editField !== "phone" && (
-                    <FieldEditButton
-                      label="Editar teléfono"
-                      onClick={() => { setEditField("phone"); setEditValue(deal.phone ?? "") }}
-                    />
-                  )}
-                </div>
-              )}
-              {deal.whatsapp && (
-                <a
-                  href={`https://wa.me/${deal.whatsapp.replace(/[^0-9]/g, "")}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-2 text-sm hover:text-primary"
-                >
-                  <MessageCircle className="h-3 w-3" />
-                  {deal.whatsapp}
-                </a>
-              )}
-              {deal.email && (
-                <a href={`mailto:${deal.email}`} className="flex items-center gap-2 text-sm hover:text-primary">
-                  <Mail className="h-3 w-3" />
-                  {deal.email}
-                </a>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* Time metrics */}
-            <div className="text-xs text-muted-foreground space-y-1 mt-3">
-              <p>Creado: {formatDate(deal.createdAt, settings)}</p>
-              <p>{daysTotal}d totales · {daysStage}d en etapa</p>
-            </div>
-
-            <Separator />
-
-            {/* Quotes */}
-            <div className="border-t pt-4 mt-3">
-              <QuoteSection
-                dealId={deal.id}
-                tenantId={tenantId}
-                quotes={quotes}
-                canEdit={canEdit}
-                canDelete={canDelete}
-                onRefresh={refreshQuotesAndPayments}
-              />
-            </div>
-
-            {/* Payments */}
-            <div className="border-t pt-4 mt-3">
-              <PaymentSection
-                dealId={deal.id}
-                tenantId={tenantId}
-                payments={payments}
-                canEdit={canEdit}
-                canDelete={canDelete}
-                onRefresh={refreshQuotesAndPayments}
-              />
-            </div>
-
-            {/* Files & images (screenshots, product photos, etc.) */}
-            <div className="border-t pt-4 mt-3">
-              <DealAttachmentsSection
-                dealId={deal.id}
-                tenantId={tenantId}
-                canEdit={canEdit}
-                excludeUrls={[...quotes.map((q) => q.fileUrl), ...payments.map((p) => p.fileUrl)].filter(
-                  (u): u is string => !!u,
-                )}
-              />
-            </div>
-            </div>
-          </ScrollArea>
-
-          {/* CENTER PANEL – Operations */}
-          <ScrollArea className="min-h-0 min-w-0 flex-1">
-            <div className="min-w-0 w-full p-4">
-            {/* Action buttons */}
-            {wonStage && deal.stageKey !== "ganado" && !hasPaymentDoc && (
-              <div
-                role="alert"
-                className="mb-4 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-950 dark:text-amber-100"
-              >
-                <p className="font-semibold text-amber-800 dark:text-amber-200">
-                  Etapa «Ganado» bloqueada para esta oportunidad
-                </p>
-                <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">{PAYMENT_DOC_REQUIRED_FOR_WON}</p>
-              </div>
-            )}
-
-            {(canEdit || canArchive || canDelete) && (
-              <div className="flex flex-wrap gap-2 mb-4">
-                {canEdit && unlockedStages.length > 0 && (
-                  <Select onValueChange={(v) => handleMove(v)}>
-                    <SelectTrigger className="w-40 h-8 text-xs" disabled={moving}>
-                      <SelectValue placeholder="Mover a..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {unlockedStages.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {canEdit && wonStage && deal.stageKey !== "ganado" && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-xs text-emerald-600 border-emerald-300"
-                    onClick={() => {
-                      if (!hasPaymentDoc) {
-                        toast.error(toastMessages.deal.paymentDocRequiredForWon, { duration: 8000 })
-                        return
-                      }
-                      void handleMove(wonStage.id, true)
-                    }}
-                    disabled={loadingAct || moving}
-                    title={!hasPaymentDoc ? PAYMENT_DOC_REQUIRED_FOR_WON : undefined}
-                  >
-                    Marcar como ganado
-                  </Button>
-                )}
-                {canEdit && lostStage && deal.stageKey !== "perdido" && (
-                  <Button size="sm" variant="outline" className="h-8 text-xs text-red-600 border-red-300" onClick={() => handleMove(lostStage.id, true)} disabled={moving}>
-                    Marcar como perdido
-                  </Button>
-                )}
-                {canArchive && (
-                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setArchiveConfirmOpen(true)} disabled={moving}>
-                    Archivar
-                  </Button>
-                )}
-                {canDelete && (
-                  <Button size="sm" variant="outline" className="h-8 text-xs text-red-600 border-red-300" onClick={() => setDeleteConfirmOpen(true)} disabled={moving}>
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    Eliminar
-                  </Button>
-                )}
-              </div>
-            )}
-
-            <Separator className="mb-4" />
-
-            {/* Follow-ups */}
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold mb-3">Seguimientos</h3>
-
-              {pendingFUs.length === 0 && (
-                <p className="text-xs text-muted-foreground mb-3">Sin seguimientos pendientes.</p>
-              )}
-
-              <div className="space-y-2 mb-3">
-                {pendingFUs.map((fu) => {
-                  const isCompleting = completingId === fu.id
-                  return (
-                    <div key={fu.id} className="p-2 bg-muted/40 rounded space-y-2">
-                      <div className="flex items-start gap-2">
-                        <div className="flex-1 min-w-0">
-                          {fu.note && <p className="text-xs font-medium">{fu.note}</p>}
-                          <p className="text-xs text-muted-foreground">{formatDate(fu.date, settings)}</p>
-                        </div>
-                        {canEdit && (
-                          <Button
-                            size="sm" variant="outline" className="h-6 text-xs shrink-0"
-                            onClick={() => { setCompletingId(fu.id); setCompletingResult("") }}
-                          >
-                            Completar
-                          </Button>
-                        )}
-                        {canEdit && (
-                          <Button
-                            size="icon" variant="ghost" className="h-6 w-6 shrink-0"
-                            onClick={() => setDeleteFollowUpId(fu.id)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                      {canEdit && isCompleting && (
-                        <div className="flex gap-2 items-center">
-                          <Input
-                            placeholder="Resultado (opcional)"
-                            value={completingResult}
-                            onChange={(e) => setCompletingResult(e.target.value)}
-                            className="h-6 text-xs flex-1"
-                          />
-                          <Button
-                            size="sm" className="h-6 text-xs"
-                            onClick={() => handleCompleteFollowUp(fu.id, completingResult)}
-                          >
-                            Confirmar
-                          </Button>
-                          <button className="text-xs text-muted-foreground" onClick={() => setCompletingId(null)}>
-                            Cancelar
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Add follow-up form */}
-              {canEdit && (
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    <Input
-                      type="date"
-                      value={fuDate}
-                      onChange={(e) => setFuDate(e.target.value)}
-                      className="h-7 text-xs"
-                    />
-                  </div>
-                  <Input
-                    type="text"
-                    placeholder="Texto del seguimiento (opcional)"
-                    maxLength={500}
-                    value={fuNote}
-                    onChange={(e) => setFuNote(e.target.value)}
-                    className="h-7 text-xs flex-1"
-                  />
-                  <Button
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={handleAddFollowUp}
-                    disabled={fuLoading || !fuDate}
-                  >
-                    {fuLoading ? "..." : "Agregar"}
-                  </Button>
-                </div>
-              )}
-
-              {completedFUs.length > 0 && (
-                <details className="mt-3">
-                  <summary className="text-xs text-muted-foreground cursor-pointer">
-                    {completedFUs.length} completado(s)
-                  </summary>
-                  <div className="space-y-1 mt-2">
-                    {completedFUs.map((fu) => (
-                      <div key={fu.id} className="p-2 bg-muted/20 rounded opacity-60">
-                        {fu.note && <p className="text-xs line-through">{fu.note}</p>}
-                        {fu.result && <p className="text-xs text-muted-foreground">{fu.result}</p>}
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              )}
-            </div>
-
-            <Separator className="mb-4" />
-
-            <div>
-              <h3 className="text-sm font-semibold mb-2">Notas</h3>
-              <NotesSection
-                tenantId={tenantId}
-                tenantSlug={tenantSlug}
-                dealId={deal.id}
-                settings={settings}
-                canEdit={canEdit}
-              />
-            </div>
-            </div>
-          </ScrollArea>
-
-          {/* RIGHT PANEL – History */}
-          <ScrollArea className="h-auto max-h-[35vh] w-full shrink-0 md:h-full md:max-h-none md:w-64">
-            <div className="min-w-0 w-full p-4">
-            <h3 className="text-sm font-semibold mb-3">Historial</h3>
-            {loadingAct ? (
-              <p className="text-xs text-muted-foreground">Cargando...</p>
-            ) : (
-              <>
-                <HistoryPanel activities={activities} settings={settings} />
-                {activityCursor && (
-                  <div className="mt-3 flex justify-center">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs"
-                      onClick={handleLoadMoreActivity}
-                      disabled={loadingMoreAct}
-                    >
-                      {loadingMoreAct ? "Cargando..." : "Cargar más"}
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
-            </div>
-          </ScrollArea>
-        </div>
+        {/* Three-panel body. Mobile: one scroll region, panels stacked, long sections
+            collapsible. Desktop: unchanged three independent ScrollAreas, always expanded. */}
+        {isNarrow ? (
+          <div className="flex flex-1 min-h-0 flex-col divide-y overflow-y-auto">
+            {leftPanelContent}
+            {centerPanelContent}
+            {rightPanelContent}
+          </div>
+        ) : (
+          <div className="flex flex-1 min-h-0 flex-row divide-x overflow-hidden">
+            {/* LEFT PANEL – Deal data */}
+            <ScrollArea className="h-full w-80 shrink-0">{leftPanelContent}</ScrollArea>
+            {/* CENTER PANEL – Operations */}
+            <ScrollArea className="min-h-0 min-w-0 flex-1">{centerPanelContent}</ScrollArea>
+            {/* RIGHT PANEL – History */}
+            <ScrollArea className="h-full w-64 shrink-0">{rightPanelContent}</ScrollArea>
+          </div>
+        )}
         </DialogPrimitive.Content>
       </DialogPortal>
     </DialogPrimitive.Root>
 
-    <AlertDialog
-      open={archiveConfirmOpen}
-      onOpenChange={setArchiveConfirmOpen}
-      title="¿Archivar oportunidad?"
-      description="La oportunidad se moverá al archivo y no aparecerá en el pipeline."
-      confirmLabel="Archivar"
-      cancelLabel="Cancelar"
-      destructive
+    <ArchiveDealDialog
+      open={archiveDialogOpen}
+      onOpenChange={setArchiveDialogOpen}
+      reasons={archiveReasons.filter((r) => r.active)}
+      submitting={archiving}
       onConfirm={handleArchive}
+    />
+
+    <AlertDialog
+      open={unarchiveConfirmOpen}
+      onOpenChange={setUnarchiveConfirmOpen}
+      title="¿Restaurar oportunidad?"
+      description="La oportunidad volverá al pipeline. El motivo y la nota de archivo quedan guardados como historial."
+      confirmLabel="Desarchivar"
+      cancelLabel="Cancelar"
+      onConfirm={handleUnarchive}
     />
 
     <AlertDialog

@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
+import { pipelineScopeFor } from "@/lib/permissions/resolve"
 import { loadClientDetailPageData } from "@/features/clients/queries"
 import { ClientProfile } from "@/features/clients/components/ClientProfile"
 import type { IntlSettings } from "@/lib/intl/format"
@@ -21,6 +22,10 @@ export default async function ClientDetailPage({ params }: Props) {
   const tenantSlug = params.tenantSlug
   const canEdit = membership.role !== "VIEWER"
 
+  // Sequenced ahead of loadClientDetailPageData's single transaction rather than alongside it,
+  // so this route still opens its queries one at a time (matches the fan-out fix in 15889e3).
+  const scope = await pipelineScopeFor(tenantId, membership.role, session.user.id)
+
   const {
     client: clientData,
     kpis,
@@ -30,7 +35,7 @@ export default async function ClientDetailPage({ params }: Props) {
     equipmentHierarchy,
     statuses,
     settings,
-  } = await loadClientDetailPageData(tenantId, params.clientId)
+  } = await loadClientDetailPageData(tenantId, params.clientId, scope.visibleToUserId ?? undefined)
 
   if (!clientData) notFound()
 
@@ -71,6 +76,7 @@ export default async function ClientDetailPage({ params }: Props) {
           phone: clientData.phone,
           whatsapp: clientData.whatsapp,
           email: clientData.email,
+          address: clientData.address,
         }}
         deals={dealsList}
         kpis={kpis}
@@ -81,6 +87,7 @@ export default async function ClientDetailPage({ params }: Props) {
         statuses={statuses}
         settings={intlSettings}
         canEdit={canEdit}
+        backHref={`/app/${tenantSlug}/clients`}
       />
     </div>
   )

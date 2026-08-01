@@ -25,6 +25,8 @@ interface QuoteSectionProps {
   canEdit: boolean;
   canDelete: boolean;
   onRefresh?: () => void;
+  /** Set false when an ancestor (e.g. a mobile disclosure header) already shows the "Cotizaciones" label. */
+  showHeading?: boolean;
 }
 
 interface PendingUpload {
@@ -34,7 +36,7 @@ interface PendingUpload {
   size: number;
 }
 
-export function QuoteSection({ dealId, tenantId, quotes, canEdit, canDelete, onRefresh }: QuoteSectionProps) {
+export function QuoteSection({ dealId, tenantId, quotes, canEdit, canDelete, onRefresh, showHeading = true }: QuoteSectionProps) {
   const { guard } = useActionPin();
   const [showForm, setShowForm] = useState(false);
   const [number, setNumber] = useState("");
@@ -92,10 +94,12 @@ export function QuoteSection({ dealId, tenantId, quotes, canEdit, canDelete, onR
   return (
     <TooltipProvider delayDuration={100}>
       <div className="min-w-0 space-y-2">
-        <div className="flex items-center justify-between">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Cotizaciones
-          </h4>
+        <div className={`flex items-center ${showHeading ? "justify-between" : "justify-end"}`}>
+          {showHeading && (
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Cotizaciones
+            </h4>
+          )}
           {canEdit && (
             <Button
               type="button"

@@ -19,9 +19,11 @@ interface Props {
   canEdit?: boolean
   /** fileUrls already shown as Cotizaciones/Pagos — excluded from the general gallery. */
   excludeUrls?: string[]
+  /** Set false when an ancestor (e.g. a mobile disclosure header) already shows the "Archivos" label. */
+  showHeading?: boolean
 }
 
-export function DealAttachmentsSection({ dealId, tenantId, canEdit = false, excludeUrls = [] }: Props) {
+export function DealAttachmentsSection({ dealId, tenantId, canEdit = false, excludeUrls = [], showHeading = true }: Props) {
   const [items, setItems] = useState<DealAttachmentDTO[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -69,10 +71,12 @@ export function DealAttachmentsSection({ dealId, tenantId, canEdit = false, excl
   return (
     <>
       <div className="min-w-0 space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Archivos e imágenes
-          </h4>
+        <div className={`flex flex-wrap items-center gap-2 ${showHeading ? "justify-between" : "justify-end"}`}>
+          {showHeading && (
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Archivos e imágenes
+            </h4>
+          )}
           {canEdit && (
             <FileUploadButton
               dealId={dealId}

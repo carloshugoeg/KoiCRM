@@ -21,6 +21,10 @@ interface KanbanColumnProps {
   onDealClick: (dealId: string) => void
   movingDealId?: string | null
   draggingDeal?: DealCardData
+  /** When false the stage total is hidden; each card keeps showing its own value. */
+  canSeeTotals?: boolean
+  /** Mobile: drag is off so the swipe-between-stages gesture owns the touch. */
+  dragDisabled?: boolean
 }
 
 function hex2rgba(hex: string, alpha = 0.15) {
@@ -40,6 +44,9 @@ export function KanbanColumn({
   onDealClick,
   movingDealId,
   draggingDeal,
+  // Fail closed: an omitted prop must hide the total, not reveal it.
+  canSeeTotals = false,
+  dragDisabled = false,
 }: KanbanColumnProps) {
   const dropHint =
     stage.locked && draggingDeal
@@ -82,10 +89,15 @@ export function KanbanColumn({
 
   const totalValue = deals.reduce((sum, d) => sum + d.value, 0)
 
+  // Phone (<520): one full-width slide per stage inside the snap scroller.
+  // Tablet portrait (520-1023, `tablet:`): two half-width slides side by side, still
+  // snapping — swipe reaches the rest.
+  // Board (≥1024, `board:`): the original equal-width Kanban column, snap dropped since
+  // the whole row now fits without scrolling.
   return (
     <div
       ref={columnRef}
-      className="flex min-w-0 flex-1 basis-0 flex-col overflow-hidden rounded-2xl transition-all duration-300 ring-1 ring-black/5"
+      className="flex min-w-0 shrink-0 basis-full snap-center flex-col overflow-hidden rounded-2xl transition-all duration-300 ring-1 ring-black/5 tablet:basis-1/2 board:shrink board:basis-0 board:flex-1 board:snap-align-none"
       style={{
         background: isOver ? hex2rgba(stage.color, 0.1) : "#ffffff",
         border: `1px solid ${hex2rgba(stage.color, 0.25)}`,
@@ -134,15 +146,26 @@ export function KanbanColumn({
               : <MinusCircle size={15} />}
           </span>
         </div>
-        {/* Row 2: total value + sublabel */}
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-[13px] font-black" style={{ color: stage.color }}>
-            {formatCurrency(totalValue, settings)}
-          </span>
-          {stage.sublabel && (
-            <span className="text-[11px] truncate ml-2 text-slate-500 font-medium">{stage.sublabel}</span>
-          )}
-        </div>
+        {/* Row 2: total value (permission-gated) + sublabel */}
+        {(canSeeTotals || stage.sublabel) && (
+          <div className="flex items-center justify-between mt-2">
+            {canSeeTotals && (
+              <span className="text-[13px] font-black" style={{ color: stage.color }}>
+                {formatCurrency(totalValue, settings)}
+              </span>
+            )}
+            {stage.sublabel && (
+              <span
+                className={cn(
+                  "text-[11px] truncate text-slate-500 font-medium",
+                  canSeeTotals && "ml-2",
+                )}
+              >
+                {stage.sublabel}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Drop zone */}
@@ -163,7 +186,7 @@ export function KanbanColumn({
             {dropHint}
           </div>
         )}
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-280px)]">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden max-h-none board:max-h-[calc(100vh-280px)]">
           <div className="flex w-full min-w-0 flex-col gap-3 pb-4 pt-1">
             {deals.map((deal) => (
               <div
@@ -177,6 +200,7 @@ export function KanbanColumn({
                   stageColor={stage.color}
                   isCompact={isCollapsed && !expandedIds.has(deal.id)}
                   isHighlighted={highlightedDealId === deal.id}
+                  dragDisabled={dragDisabled}
                   onClick={() => handleCardClick(deal)}
                   onOpenDetail={() => onDealClick(deal.id)}
                 />

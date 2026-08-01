@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest"
 import {
   canCreateDeal, canEditDeal, canDeleteDeal,
-  canArchiveDeal, canSeeAllDeals, canEditDealRow,
+  canArchiveDeal, canSeeAllDeals,
   canManageMembers, canManageSettings,
 } from "@/lib/auth/rbac"
 import type { Role } from "@prisma/client"
@@ -29,21 +29,4 @@ describe("RBAC policy matrix", () => {
       expect(canSeeAllDeals(role)).toBe(seeAll)
     },
   )
-})
-
-describe("canEditDealRow (embudo abierto)", () => {
-  it("lets supervisors and above edit any deal regardless of owner", () => {
-    expect(canEditDealRow("SUPERVISOR", "owner-1", "other-2")).toBe(true)
-    expect(canEditDealRow("ADMIN", "owner-1", "other-2")).toBe(true)
-    expect(canEditDealRow("OWNER", "owner-1", "other-2")).toBe(true)
-  })
-
-  it("lets an asesor edit any deal, not only their own (ownership no longer gates edits)", () => {
-    expect(canEditDealRow("MEMBER", "user-1", "user-1")).toBe(true)
-    expect(canEditDealRow("MEMBER", "owner-1", "user-2")).toBe(true)
-  })
-
-  it("never lets a viewer edit", () => {
-    expect(canEditDealRow("VIEWER", "user-1", "user-1")).toBe(false)
-  })
 })

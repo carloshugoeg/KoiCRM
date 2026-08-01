@@ -1,15 +1,26 @@
 import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
-import { getFollowUpAlerts, type FollowUpAlert } from "@/features/follow-ups/queries"
+import type { FollowUpAlert } from "@/features/follow-ups/queries"
 import { parseDate } from "@/lib/intl/format"
-import { getTenantMembers } from "@/features/tenants/queries"
+import { getStatsFilterOptions } from "@/features/stats/queries"
+import { readPanelFilters } from "@/features/stats/panel-filters"
+import type {
+  PanelFilterKey,
+  PanelFilterValues,
+  StatsFilterOptions,
+} from "@/features/stats/panel-filters"
+import { PanelFilters } from "@/features/stats/components/PanelFilters"
 import { Badge } from "@/components/ui/badge"
+import { loadAlertsPageData } from "./page-data"
 
 interface Props {
   params: { tenantSlug: string }
   searchParams: Record<string, string | string[] | undefined>
 }
+
+// Follow-ups only carry an owner dimension, so asesor is the one meaningful cut per section.
+const ALERT_FILTERS: PanelFilterKey[] = ["owner"]
 
 function AlertRow({ fu }: { fu: FollowUpAlert }) {
   return (
@@ -28,16 +39,25 @@ function AlertRow({ fu }: { fu: FollowUpAlert }) {
 }
 
 function AlertSection({
-  title, count, items, emptyText, countClass,
+  title, count, items, emptyText, countClass, panelId, options, values, canSeeAll,
 }: {
   title: string; count: number; items: FollowUpAlert[]
   emptyText: string; countClass: string
+  panelId: string; options: StatsFilterOptions; values: PanelFilterValues; canSeeAll: boolean
 }) {
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-3">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${countClass}`}>{count}</span>
+    <section>
+      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold">{title}</h2>
+          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${countClass}`}>{count}</span>
+        </div>
+        {/* Asesores (and any role with pipeline.viewAll off) only ever see their own scope, so
+            the advisor filter has nothing to offer them — hidden the same way calendar hides
+            its owner select for a restricted caller. */}
+        {canSeeAll && (
+          <PanelFilters panelId={panelId} keys={ALERT_FILTERS} options={options} values={values} />
+        )}
       </div>
       {items.length === 0 ? (
         <p className="text-xs text-muted-foreground">{emptyText}</p>
@@ -48,7 +68,7 @@ function AlertSection({
           ))}
         </div>
       )}
-    </div>
+    </section>
   )
 }
 
@@ -59,47 +79,47 @@ export default async function AlertsPage({ params, searchParams }: Props) {
   const resolved = await resolveTenant(params.tenantSlug, session)
   if (!resolved) notFound()
 
-  const { tenant } = resolved
+  const { tenant, membership } = resolved
   const tenantId = tenant.id
-  const ownerId = searchParams.owner as string | undefined
   const from = parseDate(searchParams.from)
   const to = parseDate(searchParams.to)
 
-  const [alerts, members] = await Promise.all([
-    getFollowUpAlerts(tenantId, ownerId, { from, to }),
-    getTenantMembers(tenantId),
-  ])
+  const vencidosValues = readPanelFilters(searchParams, "vencidos", ALERT_FILTERS)
+  const hoyValues = readPanelFilters(searchParams, "hoy", ALERT_FILTERS)
+  const proximosValues = readPanelFilters(searchParams, "proximos", ALERT_FILTERS)
 
-  const memberList = members.map((m) => ({ id: m.user.id, name: m.user.name, email: m.user.email }))
+  // loadAlertsPageData opens one tenant transaction for the permission read and all three
+  // bucket queries; sequenced ahead of getStatsFilterOptions' own transaction so we never hold
+  // two open at once on a small connection pool (see 15889e3, and stats/listado's own comment
+  // to the same effect). A restricted caller's owner params are discarded inside it —
+  // scope.visibleToUserId always wins over a hand-crafted ?<panel>.owner=, the same rule
+  // stats/listado applies to the funnel.
+  const { canSeeAll, vencidos, hoy, proximos } = await loadAlertsPageData(
+    tenantId,
+    membership.role,
+    session.user.id,
+    { vencidos: vencidosValues.owner, hoy: hoyValues.owner, proximos: proximosValues.owner },
+    { from, to },
+  )
+
+  const options = await getStatsFilterOptions(tenantId)
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-6">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <div>
-          <h1 className="text-lg font-bold">Alertas de seguimiento</h1>
-          <p className="text-sm text-muted-foreground">Seguimientos vencidos, para hoy y próximos 7 días</p>
-        </div>
-        <form action={`/app/${params.tenantSlug}/stats/alerts`} method="GET" className="flex gap-2 items-center">
-          {searchParams.from && <input type="hidden" name="from" value={searchParams.from as string} />}
-          {searchParams.to && <input type="hidden" name="to" value={searchParams.to as string} />}
-          <select name="owner" defaultValue={ownerId ?? ""} className="h-8 rounded border text-xs px-2 bg-background">
-            <option value="">Todos los asesores</option>
-            {memberList.map((m) => (
-              <option key={m.id} value={m.id}>{m.name ?? m.email}</option>
-            ))}
-          </select>
-          <button type="submit" className="text-xs border rounded px-2 py-1 hover:bg-muted transition-colors">
-            Filtrar
-          </button>
-        </form>
+      <div className="mb-6">
+        <h1 className="text-lg font-bold">Alertas de seguimiento</h1>
+        <p className="text-sm text-muted-foreground">Seguimientos vencidos, para hoy y próximos 7 días</p>
       </div>
       <div className="space-y-8">
-        <AlertSection title="Vencidos" count={alerts.overdue.length} items={alerts.overdue}
-          emptyText="No hay seguimientos vencidos." countClass="bg-red-100 text-red-700" />
-        <AlertSection title="Para hoy" count={alerts.today.length} items={alerts.today}
-          emptyText="No hay seguimientos programados para hoy." countClass="bg-orange-100 text-orange-700" />
-        <AlertSection title="Próximos 7 días" count={alerts.next7.length} items={alerts.next7}
-          emptyText="No hay seguimientos en los próximos 7 días." countClass="bg-blue-100 text-blue-700" />
+        <AlertSection title="Vencidos" count={vencidos.overdue.length} items={vencidos.overdue}
+          emptyText="No hay seguimientos vencidos." countClass="bg-red-100 text-red-700"
+          panelId="vencidos" options={options} values={vencidosValues} canSeeAll={canSeeAll} />
+        <AlertSection title="Para hoy" count={hoy.today.length} items={hoy.today}
+          emptyText="No hay seguimientos programados para hoy." countClass="bg-orange-100 text-orange-700"
+          panelId="hoy" options={options} values={hoyValues} canSeeAll={canSeeAll} />
+        <AlertSection title="Próximos 7 días" count={proximos.next7.length} items={proximos.next7}
+          emptyText="No hay seguimientos en los próximos 7 días." countClass="bg-blue-100 text-blue-700"
+          panelId="proximos" options={options} values={proximosValues} canSeeAll={canSeeAll} />
       </div>
     </div>
   )

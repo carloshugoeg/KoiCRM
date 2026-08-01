@@ -6,7 +6,6 @@ import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
 import { resolveActionActor } from "@/lib/auth/action-pin"
 import {
-  requireRole,
   getUserRole,
   canCreateDeal,
   canEditDeal,
@@ -25,15 +24,17 @@ import {
   updateDealSchema,
   moveDealSchema,
   archiveDealSchema,
+  unarchiveDealSchema,
   updateDealFieldSchema,
   transferDealSchema,
   deleteDealSchema,
 } from "@/features/deals/schemas"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
-import { isActiveCatalogItemKeyInTx, isActiveSubcategoryOfCategory } from "@/features/catalogs/queries"
+import { isActiveCatalogItemKeyInTx, activeSubcategoryParentsInTx } from "@/features/catalogs/queries"
 import type { PrismaTx } from "@/lib/db/rls"
 import { z } from "zod"
 import { getDeal } from "@/features/deals/queries"
+import { assertDealInScope, assertDealInScopeInTx, requireDealReaderInScope } from "@/features/deals/guards"
 
 /**
  * Validates an equipo-de-interés selection and flattens it into (categoría, subcategoría) rows.
@@ -48,10 +49,16 @@ async function resolveEquipmentPairs(
   | { ok: true; pairs: { categoryKey: string; subcategoryKey: string }[] }
   | { ok: false; error: string }
 > {
+  // One round trip for every subcategoría across all groups (FINDING-022) instead of one
+  // query per subcategoría in a nested loop.
+  const allSubcategoryKeys = groups.flatMap((g) => g.subcategoryKeys)
+  const parents = await activeSubcategoryParentsInTx(tx, tenantId, allSubcategoryKeys)
+
   const pairs: { categoryKey: string; subcategoryKey: string }[] = []
   for (const group of groups) {
     for (const subcategoryKey of group.subcategoryKeys) {
-      const valid = await isActiveSubcategoryOfCategory(tx, tenantId, group.categoryKey, subcategoryKey)
+      const parent = parents.get(subcategoryKey)
+      const valid = !!parent && parent.active && parent.categoryKey === group.categoryKey
       if (!valid) return { ok: false, error: "La subcategoría seleccionada no es válida o está inactiva." }
       pairs.push({ categoryKey: group.categoryKey, subcategoryKey })
     }
@@ -117,6 +124,7 @@ export async function createDealAction(
         phone: fields.phone,
         whatsapp: fields.whatsapp,
         email: fields.email,
+        address: fields.address,
       })
 
       await tx.deal.create({
@@ -186,6 +194,13 @@ export async function updateDealAction(raw: unknown): Promise<{ ok: boolean; err
   await withTenant(tenantId, async (tx) => {
     const existing = await tx.deal.findUnique({ where: { id: dealId, tenantId } })
     if (!existing) { notFound = true; return }
+    // A restricted actor may not write to a deal they cannot see — the deep link and the PIN
+    // actor swap both let a caller name a foreign dealId directly. Out-of-scope takes the same
+    // "not found" path as a missing deal, so it isn't an existence oracle.
+    if (!(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      notFound = true
+      return
+    }
 
     if (fields.ownerId && fields.ownerId !== existing.ownerId) {
       const ownerMembership = await tx.membership.findUnique({
@@ -264,6 +279,10 @@ export async function moveDealAction(raw: unknown): Promise<{ ok: boolean; error
     ])
 
     if (!deal) { moveError = "Oportunidad no encontrada."; return }
+    if (!(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      moveError = "Oportunidad no encontrada."
+      return
+    }
     if (!targetStage) { moveError = "Etapa no encontrada."; return }
     if (targetStage.locked && !force) {
       if (targetStage.key === "ganado") {
@@ -319,6 +338,63 @@ export async function archiveDealAction(raw: unknown): Promise<{ ok: boolean; er
   const parsed = archiveDealSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
+  const { tenantId, tenantSlug, dealId, archiveReasonKey, archiveNote, pin } = parsed.data
+
+  const actor = await resolveActionActor({ tenantId, pin, dealId })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  const { actorUserId, actorRole } = actor.actor
+  if (!canArchiveDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
+
+  let notFound = false
+  let validationError: string | undefined
+  await withTenant(tenantId, async (tx) => {
+    const deal = await tx.deal.findUnique({ where: { id: dealId, tenantId } })
+    if (!deal) { notFound = true; return }
+    if (!(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      notFound = true
+      return
+    }
+
+    const reason = await tx.catalogItem.findFirst({
+      where: { tenantId, catalogKey: "archiveReason", key: archiveReasonKey, active: true },
+      select: { label: true },
+    })
+    if (!reason) {
+      validationError = "El motivo seleccionado no es válido o está inactivo."
+      return
+    }
+
+    const note = archiveNote?.trim() || null
+    await tx.deal.update({
+      where: { id: dealId, tenantId },
+      data: { isArchived: true, archiveReasonKey, archiveNote: note },
+    })
+    await recordActivity(tx, {
+      tenantId,
+      entity: "Deal",
+      entityId: dealId,
+      type: "archived",
+      payload: { reasonKey: archiveReasonKey, reasonLabel: reason.label, note },
+      userId: actorUserId,
+    })
+  })
+  if (validationError) return { ok: false, error: validationError }
+  if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
+
+  revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
+  revalidatePath(`/app/${tenantSlug}/archive`, "page")
+  return { ok: true }
+}
+
+/**
+ * Restores an archived deal to the pipeline. Deliberately leaves archiveReasonKey/archiveNote
+ * in place rather than clearing them — they stay as a record of the last archival even after
+ * the deal is active again (design spec: "Unarchiving leaves both fields in place as history").
+ */
+export async function unarchiveDealAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
+  const parsed = unarchiveDealSchema.safeParse(raw)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
+
   const { tenantId, tenantSlug, dealId, pin } = parsed.data
 
   const actor = await resolveActionActor({ tenantId, pin, dealId })
@@ -330,12 +406,16 @@ export async function archiveDealAction(raw: unknown): Promise<{ ok: boolean; er
   await withTenant(tenantId, async (tx) => {
     const deal = await tx.deal.findUnique({ where: { id: dealId, tenantId } })
     if (!deal) { notFound = true; return }
-    await tx.deal.update({ where: { id: dealId, tenantId }, data: { isArchived: true } })
+    if (!(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      notFound = true
+      return
+    }
+    await tx.deal.update({ where: { id: dealId, tenantId }, data: { isArchived: false } })
     await recordActivity(tx, {
       tenantId,
       entity: "Deal",
       entityId: dealId,
-      type: "archived",
+      type: "unarchived",
       payload: {},
       userId: actorUserId,
     })
@@ -365,6 +445,10 @@ export async function updateDealFieldAction(raw: unknown): Promise<{ ok: boolean
       select: { value: true, statusKey: true, phone: true, whatsapp: true, email: true, name: true, company: true },
     })
     if (!deal) { notFound = true; return }
+    if (!(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      notFound = true
+      return
+    }
     await tx.deal.update({ where: { id: dealId, tenantId }, data: { [field]: value } })
     if (field === "value") {
       await recordActivity(tx, {
@@ -399,6 +483,10 @@ export async function transferDealAction(raw: unknown): Promise<{ ok: boolean; e
   await withTenant(tenantId, async (tx) => {
     const existing = await tx.deal.findUnique({ where: { id: dealId, tenantId }, select: { ownerId: true } })
     if (!existing) { notFound = true; return }
+    if (!(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      notFound = true
+      return
+    }
     if (existing.ownerId === toUserId) { validationError = "La oportunidad ya pertenece a ese asesor."; return }
 
     const targetMembership = await tx.membership.findUnique({
@@ -440,6 +528,12 @@ export async function deleteDealAction(raw: unknown): Promise<{ ok: boolean; err
   await withTenant(tenantId, async (tx) => {
     const existing = await tx.deal.findUnique({ where: { id: dealId, tenantId }, select: { id: true, name: true } })
     if (!existing) { notFound = true; return }
+    // canDeleteDeal is ADMIN+, a LOCKED_ROLES member, so this is a same-tx no-op in practice —
+    // kept for defense in depth and so no deal-write action skips the scope check.
+    if (!(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      notFound = true
+      return
+    }
     await tx.deal.delete({ where: { id: dealId, tenantId } })
     await recordActivity(tx, {
       tenantId,
@@ -468,6 +562,7 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
     createdById: string | null; createdByName: string | null; createdByImage: string | null
     equipment: { categoryKey: string; subcategoryKey: string }[]
     quoteCount: number; paymentCount: number
+    isArchived: boolean; archiveReasonKey: string | null; archiveNote: string | null
   }
 }> {
   const session = await auth()
@@ -481,7 +576,14 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
   const role = await getUserRole(session, tenantId)
   if (!role) return { ok: false, error: "Acceso denegado." }
 
-  // Embudo abierto: every member can view any deal.
+  // Deal visibility is permission-driven: a role without pipeline.viewAll sees only what is
+  // theirs or ceded to them. Enforced here rather than only in the UI, because this action is
+  // reachable directly — the pipeline ?deal=<id> deep link calls it with an arbitrary id. An
+  // out-of-scope id takes the same not-found path as a missing one, so it is not an existence
+  // oracle.
+  const inScope = await assertDealInScope(tenantId, role, session.user.id, dealId)
+  if (!inScope) return { ok: false, error: "Oportunidad no encontrada." }
+
   const d = await getDeal(tenantId, dealId)
   if (!d) return { ok: false, error: "Oportunidad no encontrada." }
 
@@ -509,6 +611,9 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
       equipment: d.equipment,
       quoteCount: d._count.quotes,
       paymentCount: d._count.payments,
+      isArchived: d.isArchived,
+      archiveReasonKey: d.archiveReasonKey,
+      archiveNote: d.archiveNote,
     },
   }
 }
@@ -516,36 +621,27 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
 export async function getDealActivityAction(tenantId: string, dealId: string, cursor?: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error("No autenticado.")
-  await requireRole(session, tenantId, ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"])
+  await requireDealReaderInScope(session, session.user.id, tenantId, dealId)
   return getDealActivity(tenantId, dealId, cursor)
 }
-
-/**
- * `tenantId` arrives from the client and is what withTenant() feeds to
- * set_config('app.tenant_id'), so RLS cannot vouch for it — every reader below must
- * confirm the caller is actually a member of that tenant first (matches
- * getDealActivityAction above). Without this a removed member keeps read access to the
- * workspace they were offboarded from.
- */
-const DEAL_READER_ROLES = ["OWNER", "ADMIN", "SUPERVISOR", "MEMBER", "VIEWER"] as const
 
 export async function getDealFollowUpsAction(tenantId: string, dealId: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error("No autenticado.")
-  await requireRole(session, tenantId, [...DEAL_READER_ROLES])
+  await requireDealReaderInScope(session, session.user.id, tenantId, dealId)
   return getDealFollowUps(tenantId, dealId)
 }
 
 export async function getQuotesForDealAction(tenantId: string, dealId: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error("No autenticado.")
-  await requireRole(session, tenantId, [...DEAL_READER_ROLES])
+  await requireDealReaderInScope(session, session.user.id, tenantId, dealId)
   return getQuotesForDeal(tenantId, dealId)
 }
 
 export async function getPaymentsForDealAction(tenantId: string, dealId: string) {
   const session = await auth()
   if (!session?.user?.id) throw new Error("No autenticado.")
-  await requireRole(session, tenantId, [...DEAL_READER_ROLES])
+  await requireDealReaderInScope(session, session.user.id, tenantId, dealId)
   return getPaymentsForDeal(tenantId, dealId)
 }

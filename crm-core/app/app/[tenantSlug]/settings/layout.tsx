@@ -1,6 +1,7 @@
 import React from "react"
 import Link from "next/link"
 import { SettingsNav } from "./_nav"
+import { SettingsWidth } from "./_width"
 
 interface Props {
   children: React.ReactNode
@@ -12,9 +13,7 @@ export default function SettingsLayout({ children, params }: Props) {
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <SettingsNav tenantSlug={params.tenantSlug} />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="mx-auto flex w-full max-w-lg min-h-0 flex-1 flex-col overflow-hidden px-5 pt-4">
-          {children}
-        </div>
+        <SettingsWidth>{children}</SettingsWidth>
         <div className="mx-auto w-full max-w-lg shrink-0 border-t border-border/40 px-5 py-3">
           <Link
             href={`/app/${params.tenantSlug}/pipeline`}

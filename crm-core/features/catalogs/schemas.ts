@@ -3,7 +3,7 @@ import { z } from "zod"
 export const createCatalogItemSchema = z.object({
   tenantId: z.string().min(1),
   tenantSlug: z.string().min(1),
-  catalogKey: z.enum(["equipment", "salesChannel", "dealStatus"]),
+  catalogKey: z.enum(["equipment", "salesChannel", "dealStatus", "archiveReason"]),
   key: z.string().min(1).max(120).regex(/^[a-z0-9_-]+$/, "Solo minúsculas, números, guiones o guión bajo"),
   label: z.string().min(1).max(80),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
@@ -30,6 +30,6 @@ export const deleteCatalogItemSchema = z.object({
 export const reorderCatalogItemsSchema = z.object({
   tenantId: z.string().min(1),
   tenantSlug: z.string().min(1),
-  catalogKey: z.enum(["equipment", "salesChannel", "dealStatus"]),
+  catalogKey: z.enum(["equipment", "salesChannel", "dealStatus", "archiveReason"]),
   orderedIds: z.array(z.string()),
 })

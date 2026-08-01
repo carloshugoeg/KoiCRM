@@ -14,6 +14,9 @@ function probeClient(): S3Client | null {
     _probeClient = new S3Client({
       region: process.env.S3_REGION ?? "auto",
       endpoint,
+      // Must match the main client in lib/storage/s3.ts, or the probe reports a
+      // false failure against path-style storage (MinIO) while uploads work fine.
+      forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true",
       credentials: { accessKeyId, secretAccessKey },
     })
   }

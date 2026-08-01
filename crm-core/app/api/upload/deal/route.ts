@@ -6,6 +6,7 @@ import { withTenant } from "@/lib/db/rls"
 import { putObject } from "@/lib/storage/s3"
 import { dealIdSchema } from "@/lib/schemas/deal-id"
 import { extensionForMime, isDealUploadMimeType } from "@/lib/storage/upload-mime"
+import { assertDealInScopeInTx } from "@/features/deals/guards"
 
 export const maxDuration = 30
 
@@ -77,12 +78,17 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const deal = await withTenant(tenantId, (tx) =>
-    tx.deal.findUnique({
+  // Scope check runs in the same transaction as the existence lookup — a restricted member
+  // naming a foreign dealId gets the identical 404 a nonexistent deal would produce.
+  const deal = await withTenant(tenantId, async (tx) => {
+    const found = await tx.deal.findUnique({
       where: { id: dealId, tenantId },
       select: { id: true },
-    }),
-  )
+    })
+    if (!found) return null
+    const inScope = await assertDealInScopeInTx(tx, tenantId, membership.role, session.user.id, dealId)
+    return inScope ? found : null
+  })
   if (!deal) {
     return NextResponse.json({ error: "Deal not found" }, { status: 404 })
   }

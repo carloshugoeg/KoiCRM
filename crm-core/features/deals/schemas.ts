@@ -41,11 +41,11 @@ export const createDealSchema = z
       .nullable()
       .or(z.literal("")),
     email: z.string().email("Email inválido.").optional().nullable().or(z.literal("")),
+    address: z.string().max(500).optional().nullable(),
     equipment: equipmentSelectionSchema.default([]),
     value: z.coerce.number().min(0).default(0),
     statusKey: z.string().min(1).default("activo"),
     customData: z.record(z.string(), z.unknown()).optional(),
-    clientId: z.string().optional(),
     pin: pinField,
   })
   .refine((d) => hasAtLeastOneSubcategory(d.equipment), {
@@ -96,6 +96,15 @@ export const moveDealSchema = z.object({
 })
 
 export const archiveDealSchema = z.object({
+  tenantId: z.string().min(1),
+  tenantSlug: z.string().min(1),
+  dealId: z.string().min(1),
+  archiveReasonKey: z.string().min(1, "El motivo es requerido."),
+  archiveNote: z.string().max(500, "La nota no puede superar 500 caracteres.").optional().nullable(),
+  pin: pinField,
+})
+
+export const unarchiveDealSchema = z.object({
   tenantId: z.string().min(1),
   tenantSlug: z.string().min(1),
   dealId: z.string().min(1),

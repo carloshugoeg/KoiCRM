@@ -11,7 +11,6 @@ export {
   canSeeAllDeals,
   canManageMembers,
   canManageSettings,
-  canEditDealRow,
   ROLE_LABELS,
   ASSIGNABLE_ROLES,
 } from "@/lib/auth/permissions"

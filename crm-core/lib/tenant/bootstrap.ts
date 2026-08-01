@@ -27,6 +27,16 @@ export async function bootstrapTenant(input: {
     await tx.membership.create({
       data: { userId: ownerUserId, tenantId: tenant.id, role: "OWNER" },
     })
+
+    // A new workspace starts with the open funnel, matching every tenant that predates the
+    // permission system — migration 20260727045954 backfilled exactly this row for them.
+    // Without it a new customer's advisors would each see only their own deals on day one,
+    // which reads as the product being broken rather than as a setting. An admin can close
+    // it from Ajustes → Permisos whenever they want to.
+    await tx.rolePermission.create({
+      data: { tenantId: tenant.id, role: "MEMBER", key: "pipeline.viewAll", allowed: true },
+    })
+
     await applyIndustryTemplate(tenant.id, industrySlug, tx)
     return tenant
   })

@@ -101,6 +101,13 @@ const AQUASISTEMAS: IndustryConfig = {
     { catalogKey: "dealStatus", key: "esperando",   label: "Esperando",   color: "#6366f1", order: 2 },
     { catalogKey: "dealStatus", key: "frio",        label: "Frío",        color: "#6b7280", order: 3 },
     { catalogKey: "dealStatus", key: "urgente",     label: "Urgente",     color: "#ef4444", order: 4 },
+    // Archive reasons (6) — why an opportunity was archived, for reporting.
+    { catalogKey: "archiveReason", key: "sin_respuesta", label: "Sin respuesta del cliente", color: "#6b7280", order: 0 },
+    { catalogKey: "archiveReason", key: "precio",        label: "Precio",                    color: "#f59e0b", order: 1 },
+    { catalogKey: "archiveReason", key: "eligio_otro",   label: "Eligió otro proveedor",      color: "#3b82f6", order: 2 },
+    { catalogKey: "archiveReason", key: "no_interesado", label: "Ya no interesado",           color: "#ef4444", order: 3 },
+    { catalogKey: "archiveReason", key: "duplicado",     label: "Duplicado",                  color: "#8b5cf6", order: 4 },
+    { catalogKey: "archiveReason", key: "otro",          label: "Otro",                       color: "#6b7280", order: 5 },
   ],
   settings: {
     dealIdPrefix: "AQX",
@@ -166,6 +173,13 @@ const GENERIC: IndustryConfig = {
     { catalogKey: "dealStatus", key: "esperando", label: "Esperando", color: "#6366f1", order: 2 },
     { catalogKey: "dealStatus", key: "frio", label: "Frío", color: "#6b7280", order: 3 },
     { catalogKey: "dealStatus", key: "urgente", label: "Urgente", color: "#ef4444", order: 4 },
+    // Archive reasons (6) — why an opportunity was archived, for reporting.
+    { catalogKey: "archiveReason", key: "sin_respuesta", label: "Sin respuesta del cliente", color: "#6b7280", order: 0 },
+    { catalogKey: "archiveReason", key: "precio",        label: "Precio",                    color: "#f59e0b", order: 1 },
+    { catalogKey: "archiveReason", key: "eligio_otro",   label: "Eligió otro proveedor",      color: "#3b82f6", order: 2 },
+    { catalogKey: "archiveReason", key: "no_interesado", label: "Ya no interesado",           color: "#ef4444", order: 3 },
+    { catalogKey: "archiveReason", key: "duplicado",     label: "Duplicado",                  color: "#8b5cf6", order: 4 },
+    { catalogKey: "archiveReason", key: "otro",          label: "Otro",                       color: "#6b7280", order: 5 },
   ],
   settings: {
     dealIdPrefix: "TST",

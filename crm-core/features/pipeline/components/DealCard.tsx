@@ -38,6 +38,9 @@ export interface DealCardData {
   paymentCount: number
   latestQuoteNumber?: string | null
   latestPaymentNumber?: string | null
+  isArchived?: boolean
+  archiveReasonKey?: string | null
+  archiveNote?: string | null
 }
 
 interface DealCardProps {
@@ -49,6 +52,7 @@ interface DealCardProps {
   isCompact?: boolean       // column-driven compact mode; undefined = legacy internal-toggle
   isHighlighted?: boolean   // column-driven highlight glow
   onOpenDetail?: () => void // separate callback for opening the modal
+  dragDisabled?: boolean    // mobile: swipe owns the touch gesture, so drag is off
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -89,8 +93,12 @@ export function DealCard({
   isCompact,
   isHighlighted,
   onOpenDetail,
+  dragDisabled = false,
 }: DealCardProps) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id })
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: deal.id,
+    disabled: dragDisabled,
+  })
   const [isExpanded, setIsExpanded] = useState(false)
 
   const sc = stageColor ?? "#6366f1"
@@ -132,7 +140,9 @@ export function DealCard({
       }}
       {...listeners}
       {...attributes}
-      className="relative w-full max-w-full min-w-0 box-border rounded-xl border cursor-grab active:cursor-grabbing select-none overflow-hidden focus-visible:outline-none transition-shadow duration-300 hover:-translate-y-0.5"
+      className={`relative w-full max-w-full min-w-0 box-border rounded-xl border select-none overflow-hidden focus-visible:outline-none transition-shadow duration-300 hover:-translate-y-0.5 ${
+        dragDisabled ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
+      }`}
       onMouseEnter={(e) => {
         if (!isDragging && !isHighlighted) {
           (e.currentTarget as HTMLDivElement).style.boxShadow =
@@ -173,9 +183,17 @@ export function DealCard({
         </div>
       )}
 
-      <div className={`${isCompact ? "p-2.5 space-y-1.5" : "p-3.5 space-y-3"}`}>
+      {/* Tablet-portrait columns run ~250px wide (two side by side, see KanbanColumn), so
+          density tightens there; `board:` restores the untouched desktop sizing. */}
+      <div
+        className={
+          isCompact
+            ? "p-2.5 space-y-1.5 tablet:p-2 tablet:space-y-1 board:p-2.5 board:space-y-1.5"
+            : "p-3.5 space-y-3 tablet:p-2.5 tablet:space-y-2 board:p-3.5 board:space-y-3"
+        }
+      >
         {/* Header: Assigned user avatar + Client Name */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 tablet:gap-2 board:gap-2.5">
           <UserAvatar
             userId={deal.ownerId}
             name={deal.ownerName}
@@ -184,7 +202,7 @@ export function DealCard({
             className="shadow-sm"
           />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold leading-tight truncate text-slate-900">{deal.name}</p>
+            <p className="text-sm font-bold leading-tight truncate text-slate-900 tablet:text-[13px] board:text-sm">{deal.name}</p>
             {deal.company && (
               <p className="text-xs text-slate-500 truncate mt-0.5">{deal.company}</p>
             )}
@@ -193,7 +211,7 @@ export function DealCard({
 
         {/* Value and Equipment */}
         <div className="flex min-w-0 items-center justify-between mt-1 gap-2">
-          <p className="text-[13px] font-black truncate min-w-0 shrink" style={{ color: sc }}>
+          <p className="text-[13px] font-black truncate min-w-0 shrink tablet:text-[12px] board:text-[13px]" style={{ color: sc }}>
             {formatCurrency(deal.value, settings)}
           </p>
           <div className="flex min-w-0 shrink gap-1 justify-end overflow-hidden">
@@ -202,7 +220,7 @@ export function DealCard({
                   {chips.map((e) => (
                     <span
                       key={e.subcategoryKey}
-                      className="text-[10px] font-medium text-slate-500 truncate max-w-[80px]"
+                      className="text-[10px] font-medium text-slate-500 truncate max-w-[80px] tablet:max-w-[60px] board:max-w-[80px]"
                     >
                       {equipmentLabel(e.subcategoryKey, equipmentLabels)}
                     </span>
@@ -290,7 +308,7 @@ export function DealCard({
                 e.stopPropagation()
                 ;(onOpenDetail ?? onClick)()
               }}
-              className="mt-2 w-full py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-md text-xs font-bold transition-colors cursor-pointer"
+              className="mt-2 w-full min-h-[44px] py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-md text-xs font-bold transition-colors cursor-pointer"
             >
               Ver detalle
             </button>

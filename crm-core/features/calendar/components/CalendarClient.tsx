@@ -13,27 +13,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { MonthGrid } from "@/features/calendar/components/MonthGrid"
 import { DayPanel } from "@/features/calendar/components/DayPanel"
 import { DealDetailModal } from "@/features/deals/components/DealDetailModal"
 import { getDealSummaryAction } from "@/features/deals/actions"
+import { MONTH_NAMES } from "@/features/calendar/month-names"
 import type { CalendarFollowUp } from "@/features/calendar/queries"
 import type { IntlSettings } from "@/lib/intl/format"
-import type { PipelineStage } from "@prisma/client"
+import type { PipelineStage, CatalogItem } from "@prisma/client"
 
-const MONTH_NAMES = [
-  "Enero",
-  "Febrero",
-  "Marzo",
-  "Abril",
-  "Mayo",
-  "Junio",
-  "Julio",
-  "Agosto",
-  "Septiembre",
-  "Octubre",
-  "Noviembre",
-  "Diciembre",
+const LEGEND: { className: string; label: string }[] = [
+  { className: "bg-blue-500", label: "Próximo" },
+  { className: "bg-amber-500", label: "Vencido" },
+  { className: "bg-red-500", label: "Urgente" },
+  { className: "bg-green-500", label: "Completado" },
 ]
 
 type SelectedDeal = NonNullable<Awaited<ReturnType<typeof getDealSummaryAction>>["deal"]>
@@ -52,6 +46,7 @@ interface CalendarClientProps {
   canSeeAll: boolean
   canArchive: boolean
   canDelete: boolean
+  archiveReasons: CatalogItem[]
 }
 
 export function CalendarClient({
@@ -68,6 +63,7 @@ export function CalendarClient({
   canSeeAll,
   canArchive,
   canDelete,
+  archiveReasons,
 }: CalendarClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -76,6 +72,10 @@ export function CalendarClient({
   const defaultDay = isCurrentMonth ? today.getDate() : 1
 
   const [selectedDay, setSelectedDay] = useState<number | null>(defaultDay)
+  // The day panel used to sit permanently beside the grid, empty on every day without a
+  // follow-up. It's now a sheet that folds up on demand — the grid keeps the full viewport by
+  // default, and `dayPanelOpen` tracks only whether that sheet is currently raised.
+  const [dayPanelOpen, setDayPanelOpen] = useState(false)
   const [selectedDeal, setSelectedDeal] = useState<SelectedDeal | null>(null)
   const [openingDealId, setOpeningDealId] = useState<string | null>(null)
 
@@ -105,6 +105,16 @@ export function CalendarClient({
     navigate(year, month, value === "__all__" ? undefined : value)
   }
 
+  function handleSelectDay(day: number) {
+    setSelectedDay(day)
+    setDayPanelOpen(true)
+  }
+
+  const dayLabel =
+    selectedDay !== null
+      ? `${selectedDay} de ${MONTH_NAMES[month]} de ${year}`
+      : ""
+
   async function handleOpenDeal(dealId: string) {
     setOpeningDealId(dealId)
     try {
@@ -118,17 +128,40 @@ export function CalendarClient({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center gap-3 border-b px-4 py-3">
-        <h2 className="mr-1 text-xl font-black" style={{ color: "var(--foreground)" }}>
-          Calendario de Seguimientos
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2 short:py-2 tablet:gap-3 tablet:px-4 tablet:py-3">
+        <h2 className="mr-1 text-base font-black tablet:text-xl" style={{ color: "var(--foreground)" }}>
+          Calendario<span className="hidden tablet:inline"> de Seguimientos</span>
         </h2>
-        <Button variant="outline" size="sm" onClick={goToday}>
+        <Button variant="outline" size="sm" className="h-11 tablet:h-8" onClick={goToday}>
           Hoy
         </Button>
+        <div className="ml-auto flex items-center gap-1 tablet:gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 tablet:h-9 tablet:w-9"
+            onClick={goPrev}
+            aria-label="Mes anterior"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="min-w-[104px] text-center text-sm font-bold tablet:min-w-[120px] tablet:text-base">
+            {MONTH_NAMES[month]} {year}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 tablet:h-9 tablet:w-9"
+            onClick={goNext}
+            aria-label="Mes siguiente"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
         {canSeeAll && (
-          <div className="w-48">
+          <div className="order-last w-full tablet:order-none tablet:w-48">
             <Select value={currentOwnerId ?? "__all__"} onValueChange={handleOwnerChange}>
-              <SelectTrigger className="h-8 text-sm">
+              <SelectTrigger className="h-11 text-sm tablet:h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -142,30 +175,30 @@ export function CalendarClient({
             </Select>
           </div>
         )}
-        <div className="ml-auto flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goPrev} aria-label="Mes anterior">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="min-w-[120px] text-center text-base font-bold">
-            {MONTH_NAMES[month]} {year}
-          </span>
-          <Button variant="ghost" size="icon" onClick={goNext} aria-label="Mes siguiente">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+        <div className="hidden items-center gap-3 tablet:flex" aria-hidden="true">
+          {LEGEND.map((item) => (
+            <span key={item.label} className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <span className={`h-1.5 w-1.5 rounded-full ${item.className}`} />
+              {item.label}
+            </span>
+          ))}
         </div>
       </div>
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 overflow-auto">
-          <MonthGrid
-            year={year}
-            month={month}
-            followUps={followUps}
-            selectedDay={selectedDay}
-            onSelectDay={setSelectedDay}
-          />
-        </div>
-        <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l">
-          {selectedDay !== null ? (
+      <div className="min-h-0 flex-1 p-2 tablet:p-3">
+        <MonthGrid
+          year={year}
+          month={month}
+          followUps={followUps}
+          selectedDay={selectedDay}
+          onSelectDay={handleSelectDay}
+        />
+      </div>
+      <Sheet open={dayPanelOpen} onOpenChange={setDayPanelOpen}>
+        <SheetContent side="bottom" className="mx-auto max-w-2xl rounded-t-xl">
+          <SheetHeader>
+            <SheetTitle>{dayLabel}</SheetTitle>
+          </SheetHeader>
+          {selectedDay !== null && (
             <DayPanel
               day={selectedDay}
               month={month}
@@ -174,13 +207,9 @@ export function CalendarClient({
               onOpenDeal={handleOpenDeal}
               loadingDealId={openingDealId}
             />
-          ) : (
-            <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
-              Selecciona un día para ver los seguimientos.
-            </div>
           )}
-        </div>
-      </div>
+        </SheetContent>
+      </Sheet>
       {selectedDeal !== null && (
         <DealDetailModal
           deal={selectedDeal}
@@ -192,6 +221,7 @@ export function CalendarClient({
           canArchive={canArchive}
           canDelete={canDelete}
           members={members}
+          archiveReasons={archiveReasons}
           onClose={() => setSelectedDeal(null)}
           onAction={() => {
             setSelectedDeal(null)

@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { toast } from "sonner"
 import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
-import { Phone, MessageCircle, Mail, Plus } from "lucide-react"
+import Link from "next/link"
+import { Phone, MessageCircle, Mail, MapPin, Plus, ArrowUpRight, ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -35,6 +36,7 @@ interface ClientProfileData {
   phone: string | null
   whatsapp: string | null
   email: string | null
+  address: string | null
 }
 
 interface ClientKpis {
@@ -57,6 +59,9 @@ interface ClientProfileProps {
   statuses: CatalogItem[]
   settings: IntlSettings
   canEdit: boolean
+  /** Below `board`, the profile becomes its own full view — this renders a back link to the
+   * client list. Omit to hide the affordance (e.g. the master-detail pane at `board`+). */
+  backHref?: string
 }
 
 export function ClientProfile({
@@ -72,6 +77,7 @@ export function ClientProfile({
   statuses,
   settings,
   canEdit,
+  backHref,
 }: ClientProfileProps) {
   const [editField, setEditField] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
@@ -88,6 +94,7 @@ export function ClientProfile({
       phone: field === "phone" ? value || null : client.phone,
       whatsapp: field === "whatsapp" ? value || null : client.whatsapp,
       email: field === "email" ? value || null : client.email,
+      address: field === "address" ? value || null : client.address,
     })
     if (!result.ok) toast.error(toastErrorFromResult(result.error, toastMessages.client.errorSave))
     else {
@@ -122,6 +129,15 @@ export function ClientProfile({
   return (
     <PinProvider>
     <div className="flex-1 overflow-y-auto p-6">
+      {backHref && (
+        <Link
+          href={backHref}
+          className="board:hidden -ml-2 mb-3 inline-flex h-11 items-center gap-1 rounded-lg px-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft className="h-4 w-4" aria-hidden />
+          Clientes
+        </Link>
+      )}
       {/* Header */}
       <div className="flex items-start gap-4 mb-6">
         <div
@@ -177,6 +193,10 @@ export function ClientProfile({
             <EditableField field="email" value={client.email} placeholder="Email" />
           </div>
         )}
+        <div className="flex items-center gap-2">
+          <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <EditableField field="address" value={client.address} placeholder="Dirección" />
+        </div>
       </div>
 
       <Separator className="mb-6" />
@@ -213,6 +233,20 @@ export function ClientProfile({
                 </div>
                 <Badge variant="outline" className="text-xs shrink-0">{d.stageLabel}</Badge>
                 <p className="text-sm font-semibold shrink-0">{formatCurrency(d.value, settings)}</p>
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="h-11 shrink-0 px-2 text-xs sm:h-8"
+                >
+                  <Link
+                    href={`/app/${tenantSlug}/pipeline?deal=${encodeURIComponent(d.id)}`}
+                    title={`Abrir ${d.name} en el embudo`}
+                  >
+                    Abrir
+                    <ArrowUpRight className="ml-1 h-3.5 w-3.5" aria-hidden />
+                  </Link>
+                </Button>
               </div>
             ))}
           </div>
@@ -248,6 +282,7 @@ export function ClientProfile({
             phone: client.phone,
             whatsapp: client.whatsapp,
             email: client.email,
+            address: client.address,
           }}
         />
       )}

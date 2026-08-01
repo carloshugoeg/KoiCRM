@@ -1,4 +1,5 @@
 import { withTenant, type PrismaTx } from "@/lib/db/rls"
+import { dealVisibilityWhere } from "@/features/deals/queries"
 
 export async function getDealFollowUps(tenantId: string, dealId: string) {
   return withTenant(tenantId, (tx) =>
@@ -22,10 +23,10 @@ const alertDealSelect = {
 
 export async function getFollowUpAlerts(
   tenantId: string,
-  ownerId?: string,
+  visibleToUserId?: string,
   opts: { from?: Date; to?: Date } = {}
 ) {
-  return withTenant(tenantId, (tx) => getFollowUpAlertsInTx(tx, tenantId, ownerId, opts))
+  return withTenant(tenantId, (tx) => getFollowUpAlertsInTx(tx, tenantId, visibleToUserId, opts))
 }
 
 /**
@@ -40,7 +41,9 @@ export async function getFollowUpAlerts(
 export async function getFollowUpAlertsInTx(
   tx: PrismaTx,
   tenantId: string,
-  ownerId?: string,
+  // Cesión transfers the work, so alerts must show what a person can see (owned or ceded to
+  // them via DealViewer) — the same rule the funnel and every other read path use.
+  visibleToUserId?: string,
   opts: { from?: Date; to?: Date } = {}
 ) {
   const now = new Date()
@@ -60,7 +63,7 @@ export async function getFollowUpAlertsInTx(
     : {}
 
   const dealFilter = {
-    ...(ownerId ? { ownerId } : {}),
+    ...(visibleToUserId ? dealVisibilityWhere(visibleToUserId) : {}),
     isArchived: false,
     ...dateRange,
   }

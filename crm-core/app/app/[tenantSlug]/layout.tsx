@@ -6,9 +6,7 @@ import { canSeeAllDeals } from "@/lib/auth/rbac"
 import { TenantProvider } from "@/lib/tenant/context"
 import { TenantHeader } from "@/components/app/tenant-header"
 import { buildCssVars } from "@/lib/branding/css-vars"
-import { withTenant } from "@/lib/db/rls"
-import { countClientsInTx } from "@/features/clients/queries"
-import { getFollowUpAlertsInTx } from "@/features/follow-ups/queries"
+import { loadTenantLayoutData } from "./layout-data"
 import {
   countFollowUpBannerItems,
   toFollowUpBannerItems,
@@ -41,20 +39,16 @@ export default async function TenantLayout({ children, params }: Props) {
   }
 
   const tenantId = resolved.tenant.id
-  const canSeeAll = canSeeAllDeals(resolved.membership.role)
-  const ownerFilter = canSeeAll ? undefined : session.user.id
 
-  // One transaction for the whole layout. This runs on every /app page, so any fan-out here is
-  // paid by every request before the page's own queries even start.
-  const [{ clientsCount, followUpAlerts }, sessionPin] = await Promise.all([
-    withTenant(tenantId, async (tx) => ({
-      clientsCount: await countClientsInTx(tx, tenantId),
-      followUpAlerts: await getFollowUpAlertsInTx(tx, tenantId, ownerFilter),
-    })),
+  // One transaction for the whole layout — see loadTenantLayoutData's docstring. This runs on
+  // every /app page, so any fan-out here is paid by every request before the page's own
+  // queries even start.
+  const [{ clientsCount, followUpAlerts, timezone }, sessionPin] = await Promise.all([
+    loadTenantLayoutData(tenantId, resolved.membership.role, session.user.id),
     getSessionPinLockStatusAction(tenantId),
   ])
 
-  const followUpBannerItems = toFollowUpBannerItems(followUpAlerts)
+  const followUpBannerItems = toFollowUpBannerItems(followUpAlerts, timezone)
   const followUpBannerTotal = countFollowUpBannerItems(followUpAlerts)
 
   const cssVars = buildCssVars(resolved.tenant.branding)
