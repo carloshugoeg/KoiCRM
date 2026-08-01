@@ -31,6 +31,7 @@ interface PipelineClientProps {
   channels: CatalogItem[]
   equipmentHierarchy: EquipmentCategory[]
   statuses: CatalogItem[]
+  archiveReasons: CatalogItem[]
   currentFilters: PipelineFiltersParams
   intlSettings: IntlSettings
   currentUserId: string
@@ -67,6 +68,9 @@ function cardToModalDeal(deal: DealCardData): DealSummary {
     equipment: deal.equipment,
     quoteCount: deal.quoteCount,
     paymentCount: deal.paymentCount,
+    isArchived: deal.isArchived ?? false,
+    archiveReasonKey: deal.archiveReasonKey ?? null,
+    archiveNote: deal.archiveNote ?? null,
   }
 }
 
@@ -79,6 +83,7 @@ export function PipelineClient({
   channels,
   equipmentHierarchy,
   statuses,
+  archiveReasons,
   currentFilters,
   intlSettings,
   currentUserId,
@@ -322,6 +327,7 @@ export function PipelineClient({
           canDelete={canDelete}
           members={members}
           equipmentHierarchy={equipmentHierarchy}
+          archiveReasons={archiveReasons}
           onClose={closeDealModal}
           onAction={() => {
             closeDealModal()

@@ -2,8 +2,10 @@ import { redirect, notFound } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { resolveTenant } from "@/lib/tenant/resolve"
 import { pipelineScopeFor } from "@/lib/permissions/resolve"
+import { canArchiveDeal } from "@/lib/auth/rbac"
 import { getArchivedDeals } from "@/features/deals/queries"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
+import { getCatalogItemsInTx } from "@/features/catalogs/queries"
 import { withTenant } from "@/lib/db/rls"
 import { ArchiveTable } from "@/features/deals/components/ArchiveTable"
 import { prisma } from "@/lib/db/client"
@@ -32,9 +34,20 @@ export default async function ArchivePage({ params, searchParams }: Props) {
   // route's peak concurrent-transaction count. Sequencing it first keeps the peak at 2.
   const scope = await pipelineScopeFor(tenantId, membership.role, session.user.id)
 
-  const [{ deals, nextCursor }, pipeline, settings] = await Promise.all([
+  const [{ deals, nextCursor }, { pipeline, archiveReasons }, settings] = await Promise.all([
     getArchivedDeals(tenantId, cursor, 10, scope.visibleToUserId ?? undefined),
-    withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
+    // Folded into one transaction (not two) — archiveReasons is fetched alongside the pipeline
+    // lookup that already opened a withTenant() here, rather than opening a second one.
+    withTenant(tenantId, async (tx) => {
+      const [pipeline, archiveReasons] = await Promise.all([
+        getDefaultPipeline(tx, tenantId),
+        // All reasons (active + inactive), unlike the active-only list used to populate the
+        // "archive a deal" select elsewhere — this page only ever displays a reason that was
+        // already recorded, including ones a tenant has since deactivated.
+        getCatalogItemsInTx(tx, tenantId, "archiveReason", false),
+      ])
+      return { pipeline, archiveReasons }
+    }),
     prisma.tenantSettings.findUnique({ where: { tenantId } }),
   ])
 
@@ -43,6 +56,8 @@ export default async function ArchivePage({ params, searchParams }: Props) {
     currency: settings?.currency ?? "GTQ",
     timezone: settings?.timezone ?? "America/Guatemala",
   }
+
+  const archiveReasonLabelByKey = Object.fromEntries(archiveReasons.map((r) => [r.key, r.label]))
 
   const serializedDeals = deals.map((d) => ({
     id: d.id,
@@ -63,6 +78,11 @@ export default async function ArchivePage({ params, searchParams }: Props) {
     stageEnteredAt: d.stageEnteredAt.toISOString(),
     quoteCount: 0,
     paymentCount: 0,
+    archiveReasonKey: d.archiveReasonKey,
+    // Deals archived before this feature existed have archiveReasonKey === null — the table
+    // renders those as "—" rather than guessing a reason (see report).
+    archiveReasonLabel: d.archiveReasonKey ? (archiveReasonLabelByKey[d.archiveReasonKey] ?? d.archiveReasonKey) : null,
+    archiveNote: d.archiveNote,
   }))
 
   return (
@@ -79,6 +99,8 @@ export default async function ArchivePage({ params, searchParams }: Props) {
         hasPrev={!!cursor}
         stages={pipeline?.stages ?? []}
         settings={intlSettings}
+        canArchive={canArchiveDeal(membership.role)}
+        archiveReasons={archiveReasons}
       />
     </div>
   )

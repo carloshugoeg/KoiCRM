@@ -24,6 +24,7 @@ import {
   updateDealSchema,
   moveDealSchema,
   archiveDealSchema,
+  unarchiveDealSchema,
   updateDealFieldSchema,
   transferDealSchema,
   deleteDealSchema,
@@ -336,6 +337,63 @@ export async function archiveDealAction(raw: unknown): Promise<{ ok: boolean; er
   const parsed = archiveDealSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
 
+  const { tenantId, tenantSlug, dealId, archiveReasonKey, archiveNote, pin } = parsed.data
+
+  const actor = await resolveActionActor({ tenantId, pin, dealId })
+  if (!actor.ok) return { ok: false, requiresPin: actor.requiresPin, error: actor.error }
+  const { actorUserId, actorRole } = actor.actor
+  if (!canArchiveDeal(actorRole)) return { ok: false, error: "Acceso denegado." }
+
+  let notFound = false
+  let validationError: string | undefined
+  await withTenant(tenantId, async (tx) => {
+    const deal = await tx.deal.findUnique({ where: { id: dealId, tenantId } })
+    if (!deal) { notFound = true; return }
+    if (!(await assertDealInScopeInTx(tx, tenantId, actorRole, actorUserId, dealId))) {
+      notFound = true
+      return
+    }
+
+    const reason = await tx.catalogItem.findFirst({
+      where: { tenantId, catalogKey: "archiveReason", key: archiveReasonKey, active: true },
+      select: { label: true },
+    })
+    if (!reason) {
+      validationError = "El motivo seleccionado no es válido o está inactivo."
+      return
+    }
+
+    const note = archiveNote?.trim() || null
+    await tx.deal.update({
+      where: { id: dealId, tenantId },
+      data: { isArchived: true, archiveReasonKey, archiveNote: note },
+    })
+    await recordActivity(tx, {
+      tenantId,
+      entity: "Deal",
+      entityId: dealId,
+      type: "archived",
+      payload: { reasonKey: archiveReasonKey, reasonLabel: reason.label, note },
+      userId: actorUserId,
+    })
+  })
+  if (validationError) return { ok: false, error: validationError }
+  if (notFound) return { ok: false, error: "Oportunidad no encontrada." }
+
+  revalidatePath(`/app/${tenantSlug}/pipeline`, "page")
+  revalidatePath(`/app/${tenantSlug}/archive`, "page")
+  return { ok: true }
+}
+
+/**
+ * Restores an archived deal to the pipeline. Deliberately leaves archiveReasonKey/archiveNote
+ * in place rather than clearing them — they stay as a record of the last archival even after
+ * the deal is active again (design spec: "Unarchiving leaves both fields in place as history").
+ */
+export async function unarchiveDealAction(raw: unknown): Promise<{ ok: boolean; error?: string; requiresPin?: boolean }> {
+  const parsed = unarchiveDealSchema.safeParse(raw)
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message }
+
   const { tenantId, tenantSlug, dealId, pin } = parsed.data
 
   const actor = await resolveActionActor({ tenantId, pin, dealId })
@@ -351,12 +409,12 @@ export async function archiveDealAction(raw: unknown): Promise<{ ok: boolean; er
       notFound = true
       return
     }
-    await tx.deal.update({ where: { id: dealId, tenantId }, data: { isArchived: true } })
+    await tx.deal.update({ where: { id: dealId, tenantId }, data: { isArchived: false } })
     await recordActivity(tx, {
       tenantId,
       entity: "Deal",
       entityId: dealId,
-      type: "archived",
+      type: "unarchived",
       payload: {},
       userId: actorUserId,
     })
@@ -503,6 +561,7 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
     createdById: string | null; createdByName: string | null; createdByImage: string | null
     equipment: { categoryKey: string; subcategoryKey: string }[]
     quoteCount: number; paymentCount: number
+    isArchived: boolean; archiveReasonKey: string | null; archiveNote: string | null
   }
 }> {
   const session = await auth()
@@ -551,6 +610,9 @@ export async function getDealSummaryAction(raw: unknown): Promise<{
       equipment: d.equipment,
       quoteCount: d._count.quotes,
       paymentCount: d._count.payments,
+      isArchived: d.isArchived,
+      archiveReasonKey: d.archiveReasonKey,
+      archiveNote: d.archiveNote,
     },
   }
 }

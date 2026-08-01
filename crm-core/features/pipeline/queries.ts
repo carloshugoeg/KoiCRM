@@ -37,7 +37,7 @@ export async function loadPipelineKanbanData(
   return withTenant(
     tenantId,
     async (tx) => {
-    const [pipeline, members, settings, channels, equipmentHierarchy, statuses] =
+    const [pipeline, members, settings, channels, equipmentHierarchy, statuses, archiveReasons] =
       await Promise.all([
         getDefaultPipeline(tx, tenantId),
         tx.membership.findMany({
@@ -48,12 +48,14 @@ export async function loadPipelineKanbanData(
         getCatalogItemsInTx(tx, tenantId, "salesChannel", true),
         getEquipmentHierarchyInTx(tx, tenantId, true),
         getCatalogItemsInTx(tx, tenantId, "dealStatus", true),
+        // Active reasons only — feeds the "Archivar" dialog's required select.
+        getCatalogItemsInTx(tx, tenantId, "archiveReason", true),
       ])
 
     const rawDeals = pipeline ? await fetchPipelineDealsInTx(tx, tenantId, effectiveFilters) : []
     const deals = mapPipelineDeals(rawDeals, effectiveFilters)
 
-    return { pipeline, members, settings, channels, equipmentHierarchy, statuses, deals }
+    return { pipeline, members, settings, channels, equipmentHierarchy, statuses, archiveReasons, deals }
     },
     // Kanban loads many deals + relations; Supabase pooler latency can exceed Prisma's 5s default.
     { timeout: 30_000 },

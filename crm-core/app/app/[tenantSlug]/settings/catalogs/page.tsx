@@ -6,7 +6,7 @@ import { getCatalogItems, getEquipmentHierarchy } from "@/features/catalogs/quer
 import { CatalogSettings } from "@/features/catalogs/components/catalog-settings"
 import type { CatalogKey } from "@/features/catalogs/queries"
 
-const CATALOG_KEYS: CatalogKey[] = ["equipment", "salesChannel", "dealStatus"]
+const CATALOG_KEYS: CatalogKey[] = ["equipment", "salesChannel", "dealStatus", "archiveReason"]
 
 interface Props {
   params: { tenantSlug: string }

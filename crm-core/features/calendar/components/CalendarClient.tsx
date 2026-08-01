@@ -19,7 +19,7 @@ import { DealDetailModal } from "@/features/deals/components/DealDetailModal"
 import { getDealSummaryAction } from "@/features/deals/actions"
 import type { CalendarFollowUp } from "@/features/calendar/queries"
 import type { IntlSettings } from "@/lib/intl/format"
-import type { PipelineStage } from "@prisma/client"
+import type { PipelineStage, CatalogItem } from "@prisma/client"
 
 const MONTH_NAMES = [
   "Enero",
@@ -52,6 +52,7 @@ interface CalendarClientProps {
   canSeeAll: boolean
   canArchive: boolean
   canDelete: boolean
+  archiveReasons: CatalogItem[]
 }
 
 export function CalendarClient({
@@ -68,6 +69,7 @@ export function CalendarClient({
   canSeeAll,
   canArchive,
   canDelete,
+  archiveReasons,
 }: CalendarClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -192,6 +194,7 @@ export function CalendarClient({
           canArchive={canArchive}
           canDelete={canDelete}
           members={members}
+          archiveReasons={archiveReasons}
           onClose={() => setSelectedDeal(null)}
           onAction={() => {
             setSelectedDeal(null)

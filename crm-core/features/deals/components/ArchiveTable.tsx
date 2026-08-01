@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { DealDetailModal } from "@/features/deals/components/DealDetailModal"
 import { formatCurrency, formatDate } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
-import type { PipelineStage } from "@prisma/client"
+import type { PipelineStage, CatalogItem } from "@prisma/client"
 
 interface ArchivedDeal {
   id: string
@@ -29,6 +29,9 @@ interface ArchivedDeal {
   stageEnteredAt: string
   quoteCount: number
   paymentCount: number
+  archiveReasonKey: string | null
+  archiveReasonLabel: string | null
+  archiveNote: string | null
 }
 
 interface ArchiveTableProps {
@@ -39,6 +42,10 @@ interface ArchiveTableProps {
   hasPrev: boolean
   stages: PipelineStage[]
   settings: IntlSettings
+  /** SUPERVISOR+ — gates the "Desarchivar" action in the detail modal. */
+  canArchive: boolean
+  /** All archiveReason catalog items (active + inactive) — resolves historical labels. */
+  archiveReasons: CatalogItem[]
 }
 
 export function ArchiveTable({
@@ -49,6 +56,8 @@ export function ArchiveTable({
   hasPrev,
   stages,
   settings,
+  canArchive,
+  archiveReasons,
 }: ArchiveTableProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -76,6 +85,7 @@ export function ArchiveTable({
               <th className="text-left px-4 py-2 font-medium text-muted-foreground">Oportunidad</th>
               <th className="text-left px-4 py-2 font-medium text-muted-foreground">Empresa</th>
               <th className="text-left px-4 py-2 font-medium text-muted-foreground">Etapa</th>
+              <th className="text-left px-4 py-2 font-medium text-muted-foreground">Motivo</th>
               <th className="text-left px-4 py-2 font-medium text-muted-foreground">Asesor</th>
               <th className="text-right px-4 py-2 font-medium text-muted-foreground">Valor</th>
             </tr>
@@ -83,7 +93,7 @@ export function ArchiveTable({
           <tbody>
             {deals.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center py-12 text-muted-foreground">
+                <td colSpan={7} className="text-center py-12 text-muted-foreground">
                   Sin oportunidades archivadas.
                 </td>
               </tr>
@@ -101,6 +111,11 @@ export function ArchiveTable({
                 <td className="px-4 py-3 text-muted-foreground">{d.company ?? "—"}</td>
                 <td className="px-4 py-3">
                   <Badge variant="outline" className="text-xs">{d.stageLabel}</Badge>
+                </td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  {/* Deals archived before this field existed carry no reason — shown as an
+                      explicit dash rather than guessed at (see report: no backfill). */}
+                  {d.archiveReasonLabel ?? "—"}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{d.ownerName ?? "—"}</td>
                 <td className="px-4 py-3 text-right font-semibold">
@@ -155,12 +170,18 @@ export function ArchiveTable({
             equipment: selectedDeal.equipment,
             quoteCount: selectedDeal.quoteCount,
             paymentCount: selectedDeal.paymentCount,
+            isArchived: true,
+            archiveReasonKey: selectedDeal.archiveReasonKey,
+            archiveNote: selectedDeal.archiveNote,
           }}
           stages={stages}
           tenantId={tenantId}
           tenantSlug={tenantSlug}
           settings={settings}
+          canArchive={canArchive}
+          archiveReasons={archiveReasons}
           onClose={() => setSelectedDealId(null)}
+          onAction={() => router.refresh()}
         />
       )}
     </div>

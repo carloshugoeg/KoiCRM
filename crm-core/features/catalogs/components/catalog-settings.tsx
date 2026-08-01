@@ -18,7 +18,7 @@ import type { CatalogItem, Tenant } from "@prisma/client"
 import type { CatalogKey, EquipmentCategory } from "@/features/catalogs/queries"
 import { toastMessages, toastErrorFromResult } from "@/lib/ui/toast-messages"
 
-const CATALOG_KEYS: CatalogKey[] = ["equipment", "salesChannel", "dealStatus"]
+const CATALOG_KEYS: CatalogKey[] = ["equipment", "salesChannel", "dealStatus", "archiveReason"]
 
 interface Props {
   tenant: Tenant

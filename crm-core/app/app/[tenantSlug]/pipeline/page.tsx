@@ -47,7 +47,7 @@ export default async function PipelinePage({ params, searchParams }: Props) {
   // (per-stage totals + KPIs), never each deal's value.
   const scope = await pipelineScopeFor(tenantId, membership.role, session.user.id)
 
-  const { pipeline, members, channels, equipmentHierarchy, statuses, settings, deals } =
+  const { pipeline, members, channels, equipmentHierarchy, statuses, archiveReasons, settings, deals } =
     await loadPipelineKanbanData(
       tenantId,
       {
@@ -141,6 +141,9 @@ export default async function PipelinePage({ params, searchParams }: Props) {
     latestQuoteNumber: d.quotes?.[0]?.number ?? null,
     latestPaymentNumber: d.payments?.[0]?.number ?? null,
     latestNote: d.notes?.[0]?.text ?? null,
+    isArchived: d.isArchived,
+    archiveReasonKey: d.archiveReasonKey,
+    archiveNote: d.archiveNote,
   }))
 
   const memberList = members.map((m) => ({
@@ -166,6 +169,7 @@ export default async function PipelinePage({ params, searchParams }: Props) {
           channels={channels}
           equipmentHierarchy={equipmentHierarchy}
           statuses={statuses}
+          archiveReasons={archiveReasons}
           currentFilters={filters}
           intlSettings={intlSettings}
           currentUserId={session.user.id}

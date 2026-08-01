@@ -98,6 +98,15 @@ export const archiveDealSchema = z.object({
   tenantId: z.string().min(1),
   tenantSlug: z.string().min(1),
   dealId: z.string().min(1),
+  archiveReasonKey: z.string().min(1, "El motivo es requerido."),
+  archiveNote: z.string().max(500, "La nota no puede superar 500 caracteres.").optional().nullable(),
+  pin: pinField,
+})
+
+export const unarchiveDealSchema = z.object({
+  tenantId: z.string().min(1),
+  tenantSlug: z.string().min(1),
+  dealId: z.string().min(1),
   pin: pinField,
 })
 

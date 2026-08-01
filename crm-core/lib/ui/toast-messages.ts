@@ -22,6 +22,7 @@ export const toastMessages = {
     moved: "¡Oportunidad movida!",
     saved: "¡Cambios guardados!",
     archived: "¡Oportunidad archivada!",
+    unarchived: "¡Oportunidad restaurada!",
     transferred: "¡Oportunidad cedida!",
     deleted: "¡Oportunidad eliminada!",
     errorDelete: "No se pudo eliminar la oportunidad.",
@@ -35,6 +36,7 @@ export const toastMessages = {
     errorSave: "No se pudieron guardar los cambios.",
     errorMove: "No se pudo mover la oportunidad.",
     errorArchive: "No se pudo archivar la oportunidad.",
+    errorUnarchive: "No se pudo restaurar la oportunidad.",
     stageLocked: (stageLabel: string) =>
       `La etapa «${stageLabel}» está bloqueada. Usa el panel de detalle.`,
     paymentDocRequiredForWon:

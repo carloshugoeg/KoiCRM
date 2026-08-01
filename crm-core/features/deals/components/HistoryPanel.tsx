@@ -22,6 +22,7 @@ function activityDescription(type: string, payload: unknown): string {
   if (type === "followUpAdded" && p.date) return `Seguimiento programado para ${p.date}`
   if (type === "followUpCompleted" && p.result) return `Seguimiento completado: ${p.result}`
   if (type === "noteAdded") return "Nota agregada"
+  if (type === "archived" && typeof p.reasonLabel === "string") return `Archivado — ${p.reasonLabel}`
 
   return label
 }
