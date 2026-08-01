@@ -5,6 +5,7 @@ import { canArchiveDeal, canDeleteDeal } from "@/lib/auth/rbac"
 import { pipelineScopeFor } from "@/lib/permissions/resolve"
 import { getCalendarFollowUps } from "@/features/calendar/queries"
 import { getDefaultPipeline } from "@/features/pipeline/queries"
+import { getCatalogItemsInTx } from "@/features/catalogs/queries"
 import { withTenant } from "@/lib/db/rls"
 import { getTenantMembers } from "@/features/tenants/queries"
 import { CalendarClient } from "@/features/calendar/components/CalendarClient"
@@ -40,10 +41,18 @@ export default async function CalendarPage({ params, searchParams }: Props) {
   // anything ceded to them; supervisors/superadmins with the permission may filter by advisor.
   const ownerId = canSeeAll ? (searchParams.owner as string | undefined) : (scope.visibleToUserId ?? undefined)
 
-  const [followUps, members, pipeline, settings] = await Promise.all([
+  const [followUps, members, { pipeline, archiveReasons }, settings] = await Promise.all([
     getCalendarFollowUps(tenantId, year, month, ownerId),
     getTenantMembers(tenantId),
-    withTenant(tenantId, (tx) => getDefaultPipeline(tx, tenantId)),
+    // archiveReasons folded into the same transaction as the pipeline lookup rather than a
+    // separate withTenant() call, so this route's concurrent-transaction count is unchanged.
+    withTenant(tenantId, async (tx) => {
+      const [pipeline, archiveReasons] = await Promise.all([
+        getDefaultPipeline(tx, tenantId),
+        getCatalogItemsInTx(tx, tenantId, "archiveReason", true),
+      ])
+      return { pipeline, archiveReasons }
+    }),
     prisma.tenantSettings.findUnique({ where: { tenantId } }),
   ])
 
@@ -70,6 +79,7 @@ export default async function CalendarPage({ params, searchParams }: Props) {
       canSeeAll={canSeeAll}
       canArchive={canArchiveDeal(membership.role)}
       canDelete={canDeleteDeal(membership.role)}
+      archiveReasons={archiveReasons}
     />
   )
 }

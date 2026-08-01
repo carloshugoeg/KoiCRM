@@ -22,8 +22,9 @@ import { NotesSection } from "@/features/notes/components/NotesSection"
 import { QuoteSection } from "@/features/quotes/components/QuoteSection"
 import { PaymentSection } from "@/features/payments/components/PaymentSection"
 import { DealAttachmentsSection } from "@/features/attachments/components/DealAttachmentsSection"
-import { updateDealAction, updateDealFieldAction, moveDealAction, archiveDealAction, transferDealAction, deleteDealAction } from "@/features/deals/actions"
+import { updateDealAction, updateDealFieldAction, moveDealAction, archiveDealAction, unarchiveDealAction, transferDealAction, deleteDealAction } from "@/features/deals/actions"
 import { EquipmentSelector, rowsToEquipmentGroups, type EquipmentGroup } from "@/features/deals/components/EquipmentSelector"
+import { ArchiveDealDialog } from "@/features/deals/components/ArchiveDealDialog"
 import type { EquipmentCategory } from "@/features/catalogs/queries"
 import { addFollowUpAction, completeFollowUpAction, deleteFollowUpAction } from "@/features/follow-ups/actions"
 import { getDealActivityAction, getDealFollowUpsAction, getQuotesForDealAction, getPaymentsForDealAction } from "@/features/deals/actions"
@@ -33,7 +34,7 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 import { formatPhone } from "@/lib/deals/phone-format"
 import { formatCurrency, formatDate } from "@/lib/intl/format"
 import type { IntlSettings } from "@/lib/intl/format"
-import type { PipelineStage, FollowUp, Quote, Payment } from "@prisma/client"
+import type { PipelineStage, FollowUp, Quote, Payment, CatalogItem } from "@prisma/client"
 
 interface DealDetailData {
   id: string
@@ -57,6 +58,10 @@ interface DealDetailData {
   equipment: { categoryKey: string; subcategoryKey: string }[]
   quoteCount: number
   paymentCount: number
+  /** Archive state. Undefined on callers that predate this field — treated as "not archived". */
+  isArchived?: boolean
+  archiveReasonKey?: string | null
+  archiveNote?: string | null
 }
 
 interface DealDetailModalProps {
@@ -75,6 +80,13 @@ interface DealDetailModalProps {
   members?: { id: string; name: string | null; email: string }[]
   /** Equipo de interés taxonomy; when provided, equipment becomes inline-editable. */
   equipmentHierarchy?: EquipmentCategory[]
+  /**
+   * Archive-reason catalog items — feeds the "Archivar" dialog's required reason select, and
+   * resolves the label shown for a deal already carrying archiveReasonKey. Callers that don't
+   * pass this (yet) just get an empty select, which the dialog surfaces as "sin motivos
+   * configurados" and refuses to submit rather than allowing a reason-less archive.
+   */
+  archiveReasons?: CatalogItem[]
   onClose: () => void
   onAction?: () => void
 }
@@ -117,6 +129,7 @@ function DealDetailModalContent({
   canDelete = false,
   members = [],
   equipmentHierarchy,
+  archiveReasons = [],
   onClose,
   onAction,
 }: DealDetailModalProps) {
@@ -131,7 +144,9 @@ function DealDetailModalContent({
   const [payments, setPayments] = useState<Payment[]>([])
   const [loadingAct, setLoadingAct] = useState(true)
   const [moving, setMoving] = useState(false)
-  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
+  const [archiving, setArchiving] = useState(false)
+  const [unarchiveConfirmOpen, setUnarchiveConfirmOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [transferring, setTransferring] = useState(false)
   const [deleteFollowUpId, setDeleteFollowUpId] = useState<string | null>(null)
@@ -227,6 +242,12 @@ function DealDetailModalContent({
     return cat?.subcategories.find((s) => s.key === subcategoryKey)?.label ?? subcategoryKey
   }
   const groupedEquipment = rowsToEquipmentGroups(deal.equipment)
+  // Falls back to the raw key (same convention as the raw statusKey shown on kanban cards) when
+  // the caller's archiveReasons list doesn't carry this key — e.g. the reason was later
+  // deactivated/removed, or the caller only passes active reasons.
+  const archiveReasonLabel = deal.archiveReasonKey
+    ? (archiveReasons.find((r) => r.key === deal.archiveReasonKey)?.label ?? deal.archiveReasonKey)
+    : null
 
   async function handleMove(toStageId: string, force = false) {
     if (moving) return
@@ -244,15 +265,34 @@ function DealDetailModalContent({
     }
   }
 
-  async function handleArchive() {
-    if (moving) return
-    setMoving(true)
+  async function handleArchive(archiveReasonKey: string, archiveNote: string) {
+    if (archiving) return
+    setArchiving(true)
     try {
-      const result = await guard((pin) => archiveDealAction({ tenantId, tenantSlug, dealId: deal.id, pin }))
+      const result = await guard((pin) =>
+        archiveDealAction({ tenantId, tenantSlug, dealId: deal.id, archiveReasonKey, archiveNote, pin }),
+      )
       if (!result.ok) {
         if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorArchive))
       } else {
         toast.success(toastMessages.deal.archived, { onAutoClose: () => onAction?.() })
+        setArchiveDialogOpen(false)
+        onClose()
+      }
+    } finally {
+      setArchiving(false)
+    }
+  }
+
+  async function handleUnarchive() {
+    if (moving) return
+    setMoving(true)
+    try {
+      const result = await guard((pin) => unarchiveDealAction({ tenantId, tenantSlug, dealId: deal.id, pin }))
+      if (!result.ok) {
+        if (!result.requiresPin) toast.error(toastErrorFromResult(result.error, toastMessages.deal.errorUnarchive))
+      } else {
+        toast.success(toastMessages.deal.unarchived, { onAutoClose: () => onAction?.() })
         onClose()
       }
     } finally {
@@ -622,9 +662,18 @@ function DealDetailModalContent({
         </div>
       )}
 
+      {deal.isArchived && (deal.archiveReasonKey || deal.archiveNote) && (
+        <div className="mb-4 rounded-lg border bg-muted/30 px-3 py-2.5 text-xs">
+          <p className="font-semibold text-foreground">
+            Archivado{archiveReasonLabel ? ` — ${archiveReasonLabel}` : ""}
+          </p>
+          {deal.archiveNote && <p className="mt-1 text-muted-foreground">{deal.archiveNote}</p>}
+        </div>
+      )}
+
       {(canEdit || canArchive || canDelete) && (
         <div className="flex flex-wrap gap-2 mb-4">
-          {canEdit && unlockedStages.length > 0 && (
+          {!deal.isArchived && canEdit && unlockedStages.length > 0 && (
             <Select onValueChange={(v) => handleMove(v)}>
               <SelectTrigger className="w-40 h-8 text-xs" disabled={moving}>
                 <SelectValue placeholder="Mover a..." />
@@ -636,7 +685,7 @@ function DealDetailModalContent({
               </SelectContent>
             </Select>
           )}
-          {canEdit && wonStage && deal.stageKey !== "ganado" && (
+          {!deal.isArchived && canEdit && wonStage && deal.stageKey !== "ganado" && (
             <Button
               size="sm"
               variant="outline"
@@ -654,14 +703,19 @@ function DealDetailModalContent({
               Marcar como ganado
             </Button>
           )}
-          {canEdit && lostStage && deal.stageKey !== "perdido" && (
+          {!deal.isArchived && canEdit && lostStage && deal.stageKey !== "perdido" && (
             <Button size="sm" variant="outline" className="h-8 text-xs text-red-600 border-red-300" onClick={() => handleMove(lostStage.id, true)} disabled={moving}>
               Marcar como perdido
             </Button>
           )}
-          {canArchive && (
-            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setArchiveConfirmOpen(true)} disabled={moving}>
+          {!deal.isArchived && canArchive && (
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setArchiveDialogOpen(true)} disabled={moving}>
               Archivar
+            </Button>
+          )}
+          {deal.isArchived && canArchive && (
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setUnarchiveConfirmOpen(true)} disabled={moving}>
+              Desarchivar
             </Button>
           )}
           {canDelete && (
@@ -877,15 +931,22 @@ function DealDetailModalContent({
       </DialogPortal>
     </DialogPrimitive.Root>
 
-    <AlertDialog
-      open={archiveConfirmOpen}
-      onOpenChange={setArchiveConfirmOpen}
-      title="¿Archivar oportunidad?"
-      description="La oportunidad se moverá al archivo y no aparecerá en el pipeline."
-      confirmLabel="Archivar"
-      cancelLabel="Cancelar"
-      destructive
+    <ArchiveDealDialog
+      open={archiveDialogOpen}
+      onOpenChange={setArchiveDialogOpen}
+      reasons={archiveReasons.filter((r) => r.active)}
+      submitting={archiving}
       onConfirm={handleArchive}
+    />
+
+    <AlertDialog
+      open={unarchiveConfirmOpen}
+      onOpenChange={setUnarchiveConfirmOpen}
+      title="¿Restaurar oportunidad?"
+      description="La oportunidad volverá al pipeline. El motivo y la nota de archivo quedan guardados como historial."
+      confirmLabel="Desarchivar"
+      cancelLabel="Cancelar"
+      onConfirm={handleUnarchive}
     />
 
     <AlertDialog

@@ -1,12 +1,13 @@
 import { withTenant, type PrismaTx } from "@/lib/db/rls"
 import type { CatalogItem } from "@prisma/client"
 
-export type CatalogKey = "equipment" | "salesChannel" | "dealStatus"
+export type CatalogKey = "equipment" | "salesChannel" | "dealStatus" | "archiveReason"
 
 export const CATALOG_LABELS: Record<CatalogKey, string> = {
   equipment: "Equipos",
   salesChannel: "Canal de ventas",
   dealStatus: "Estado de oportunidad",
+  archiveReason: "Motivo de archivo",
 }
 
 export type GetCatalogItemsOptions = {
@@ -171,6 +172,9 @@ export async function getCatalogItemUsageCount(
     }
     if (catalogKey === "dealStatus") {
       return tx.deal.count({ where: { tenantId, statusKey: key } })
+    }
+    if (catalogKey === "archiveReason") {
+      return tx.deal.count({ where: { tenantId, archiveReasonKey: key } })
     }
     return 0
   })

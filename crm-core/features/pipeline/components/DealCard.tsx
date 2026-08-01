@@ -38,6 +38,9 @@ export interface DealCardData {
   paymentCount: number
   latestQuoteNumber?: string | null
   latestPaymentNumber?: string | null
+  isArchived?: boolean
+  archiveReasonKey?: string | null
+  archiveNote?: string | null
 }
 
 interface DealCardProps {

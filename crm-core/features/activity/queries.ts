@@ -9,6 +9,7 @@ export type ActivityType =
   | "quoteAdded"
   | "paymentAdded"
   | "archived"
+  | "unarchived"
   | "deleted"
   | "followUpAdded"
   | "followUpCompleted"
@@ -114,6 +115,7 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   quoteAdded: "Cotización agregada",
   paymentAdded: "Pago agregado",
   archived: "Archivado",
+  unarchived: "Desarchivado",
   deleted: "Oportunidad eliminada",
   followUpAdded: "Seguimiento programado",
   followUpCompleted: "Seguimiento completado",

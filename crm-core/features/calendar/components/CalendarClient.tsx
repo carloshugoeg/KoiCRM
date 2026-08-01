@@ -21,7 +21,7 @@ import { getDealSummaryAction } from "@/features/deals/actions"
 import { MONTH_NAMES } from "@/features/calendar/month-names"
 import type { CalendarFollowUp } from "@/features/calendar/queries"
 import type { IntlSettings } from "@/lib/intl/format"
-import type { PipelineStage } from "@prisma/client"
+import type { PipelineStage, CatalogItem } from "@prisma/client"
 
 const LEGEND: { className: string; label: string }[] = [
   { className: "bg-blue-500", label: "Próximo" },
@@ -46,6 +46,7 @@ interface CalendarClientProps {
   canSeeAll: boolean
   canArchive: boolean
   canDelete: boolean
+  archiveReasons: CatalogItem[]
 }
 
 export function CalendarClient({
@@ -62,6 +63,7 @@ export function CalendarClient({
   canSeeAll,
   canArchive,
   canDelete,
+  archiveReasons,
 }: CalendarClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -219,6 +221,7 @@ export function CalendarClient({
           canArchive={canArchive}
           canDelete={canDelete}
           members={members}
+          archiveReasons={archiveReasons}
           onClose={() => setSelectedDeal(null)}
           onAction={() => {
             setSelectedDeal(null)

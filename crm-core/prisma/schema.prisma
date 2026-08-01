@@ -298,6 +298,10 @@ model Deal {
   email          String?
   value          Decimal  @db.Decimal(14, 2)
   isArchived     Boolean  @default(false)
+  // Set together when a deal is archived (archiveDealAction requires a reason; note is
+  // optional). Unarchiving does NOT clear these — they stay as history of the last archival.
+  archiveReasonKey String?
+  archiveNote      String?
   customData     Json?
   createdAt      DateTime @default(now())
   stageEnteredAt DateTime @default(now())
