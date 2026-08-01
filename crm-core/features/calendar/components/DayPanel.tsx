@@ -23,15 +23,17 @@ export function DayPanel({ day, month, year, followUps, onOpenDeal, loadingDealI
 
   if (dayFus.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground p-6 text-center">
+      <div className="flex flex-col items-center justify-center gap-3 py-10 text-center text-muted-foreground">
         <CalendarCheck className="w-8 h-8 opacity-40" />
         <p className="text-sm">No hay seguimientos programados para este día.</p>
       </div>
     )
   }
 
+  // Flat, divided list rather than a card per row — the sheet itself is already the
+  // "container"; boxing each follow-up again inside it would be a nested-card stack.
   return (
-    <div className="flex flex-col gap-3 p-3 overflow-y-auto h-full">
+    <div className="flex max-h-[50vh] flex-col divide-y divide-border overflow-y-auto pr-1">
       {dayFus.map((fu) => {
         const isOverdue = !fu.completed && new Date(fu.date) < todayMidnight
         const initials = avatarInitials(fu.deal.owner.name)
@@ -41,7 +43,7 @@ export function DayPanel({ day, month, year, followUps, onOpenDeal, loadingDealI
         return (
           <div
             key={fu.id}
-            className={`rounded-lg border p-3 flex flex-col gap-2 ${fu.completed ? "opacity-50 grayscale" : ""}`}
+            className={`flex flex-col gap-2 py-3 first:pt-0 last:pb-0 ${fu.completed ? "opacity-50 grayscale" : ""}`}
           >
             <div className="flex items-start gap-2">
               <div
@@ -76,7 +78,7 @@ export function DayPanel({ day, month, year, followUps, onOpenDeal, loadingDealI
             <Button
               size="sm"
               variant="outline"
-              className="h-7 text-xs shrink-0"
+              className="h-11 shrink-0 text-xs board:h-7"
               onClick={() => onOpenDeal(fu.deal.id)}
               disabled={loadingDealId === fu.deal.id}
             >
