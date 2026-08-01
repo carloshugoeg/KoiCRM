@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Clock,
   FileText,
+  MapPin,
   Paperclip,
   Plus,
   Save,
@@ -59,6 +60,7 @@ interface ClientFormModalProps {
     phone?: string | null
     whatsapp?: string | null
     email?: string | null
+    address?: string | null
   }
 }
 
@@ -112,6 +114,7 @@ export function ClientFormModal({
   const [phone, setPhone] = useState(prefill?.phone ?? "")
   const [whatsapp, setWhatsapp] = useState(prefill?.whatsapp ?? "")
   const [email, setEmail] = useState(prefill?.email ?? "")
+  const [address, setAddress] = useState(prefill?.address ?? "")
   const [equipmentGroups, setEquipmentGroups] = useState<EquipmentGroup[]>([])
   const [valueDisplay, setValueDisplay] = useState("")
   const [value, setValue] = useState(0)
@@ -139,6 +142,7 @@ export function ClientFormModal({
     setPhone(prefill?.phone ?? "")
     setWhatsapp(prefill?.whatsapp ?? "")
     setEmail(prefill?.email ?? "")
+    setAddress(prefill?.address ?? "")
     setEquipmentGroups([])
     setValueDisplay("")
     setValue(0)
@@ -273,6 +277,7 @@ export function ClientFormModal({
       phone,
       whatsapp: whatsapp || null,
       email: email || null,
+      address: address || null,
       equipment: equipmentGroups.filter((g) => g.subcategoryKeys.length > 0),
       value,
       statusKey,
@@ -558,6 +563,22 @@ export function ClientFormModal({
                         if (!whatsapp.trim()) setWhatsapp("+502 ")
                       }}
                       placeholder="+502 5500-0000"
+                      className={fieldClass()}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label
+                      htmlFor="address"
+                      className="text-xs font-bold uppercase tracking-wider block mb-1 text-muted-foreground"
+                    >
+                      <MapPin size={10} className="inline mr-1" />
+                      Dirección
+                    </label>
+                    <input
+                      id="address"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Ej. 5ta avenida 10-20, zona 10"
                       className={fieldClass()}
                     />
                   </div>

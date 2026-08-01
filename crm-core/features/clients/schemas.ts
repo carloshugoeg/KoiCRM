@@ -8,6 +8,7 @@ const clientBaseFields = {
   phone: z.string().max(30).optional().nullable(),
   whatsapp: z.string().max(40).optional().nullable(),
   email: z.string().email("Email inválido.").optional().nullable().or(z.literal("")),
+  address: z.string().max(500).optional().nullable(),
   customData: z.record(z.string(), z.unknown()).optional(),
 }
 

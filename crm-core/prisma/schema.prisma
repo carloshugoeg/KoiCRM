@@ -267,6 +267,7 @@ model Client {
   phone      String?
   whatsapp   String?
   email      String?
+  address    String?
   notes      String?
   customData Json?
   createdAt  DateTime @default(now())
