@@ -228,6 +228,10 @@ Items movidos desde `DECISIONS_AND_OPEN_QUESTIONS.md` §2 (DP-*) y preguntas del
 
 - **Referencia**: DP-02
 - **Prioridad**: P2
+- **Nota**: la exportación CSV del tenant actual está hecha. Importar CSV y Excel siguen abiertos.
+- [x] Exportación CSV del tenant actual (ZIP con un CSV por entidad, solo OWNER o ADMIN activos, sin secretos). 2026-11-17.
+- [ ] Import CSV
+- [ ] Excel
 
 ### V2-F02 i18n multi-idioma
 
