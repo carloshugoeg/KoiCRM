@@ -1,0 +1,380 @@
+#!/usr/bin/env bash
+# control-koicrm — Launch / Doctor / Drive / Evidence / Cleanup for KoiCRM verification.
+# VERIFY-ONLY. Never targets production. See ../SKILL.md.
+set -euo pipefail
+
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$SKILL_DIR/../../.." && pwd)"
+CRM_CORE="$REPO_ROOT/crm-core"
+VERIFY_SCRIPTS="$CRM_CORE/scripts/verify"
+COMPOSE_FILE="$CRM_CORE/docker-compose.verify.yml"
+COMPOSE_PROJECT="koicrm-verify"
+
+usage() {
+  cat <<'EOF'
+Usage: control-koicrm <command> [args]
+
+Commands:
+  launch [--seed=test|demo]   Start isolated DB/storage + Next on verify ports, migrate, seed
+  doctor                      Read-only health check of the current verify run
+  browser <action> [args...]  Drive Chromium via Playwright (goto|fill|click|press|snapshot|screenshot|download|eval)
+  evidence-dir                Print evidence directory for this run (survives cleanup)
+  cleanup                     Tear down only what this verify run started; keep evidence
+  run-id                      Print current RUN_ID
+
+Environment:
+  KOICRM_VERIFY_RUN_ID        Sticky run id (default: generated once and stored)
+  KOICRM_VERIFY_ENV_FILE      Override path to .env.verify
+  KOICRM_VERIFY_DB_MODE       docker | local-postgres | auto (default auto)
+EOF
+}
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+
+require_crm_core() {
+  [[ -d "$CRM_CORE" ]] || die "crm-core not found at $CRM_CORE"
+  [[ -f "$VERIFY_SCRIPTS/guard-env.sh" ]] || die "verify scripts missing"
+}
+
+init_run() {
+  require_crm_core
+  mkdir -p "$CRM_CORE/.verify/runs" /tmp/koicrm-verify-evidence
+
+  if [[ -z "${KOICRM_VERIFY_RUN_ID:-}" ]]; then
+    if [[ -f "$CRM_CORE/.verify/current-run-id" ]]; then
+      KOICRM_VERIFY_RUN_ID="$(cat "$CRM_CORE/.verify/current-run-id")"
+    else
+      KOICRM_VERIFY_RUN_ID="$(date +%Y%m%dT%H%M%SZ)-$$"
+      echo "$KOICRM_VERIFY_RUN_ID" > "$CRM_CORE/.verify/current-run-id"
+    fi
+  else
+    echo "$KOICRM_VERIFY_RUN_ID" > "$CRM_CORE/.verify/current-run-id"
+  fi
+  export KOICRM_VERIFY_RUN_ID
+
+  RUN_DIR="$CRM_CORE/.verify/runs/$KOICRM_VERIFY_RUN_ID"
+  EVIDENCE_DIR="/tmp/koicrm-verify-evidence/$KOICRM_VERIFY_RUN_ID"
+  mkdir -p "$RUN_DIR" "$EVIDENCE_DIR"
+  export KOICRM_VERIFY_RUN_DIR="$RUN_DIR"
+  export KOICRM_VERIFY_EVIDENCE_DIR="$EVIDENCE_DIR"
+}
+
+ensure_env_file() {
+  local env_file="${KOICRM_VERIFY_ENV_FILE:-$CRM_CORE/.env.verify}"
+  if [[ ! -f "$env_file" ]]; then
+    cp "$CRM_CORE/.env.verify.example" "$env_file"
+    echo "Created $env_file from example (VERIFY-ONLY scaffolding)."
+  fi
+  if [[ -f "$CRM_CORE/.env" ]]; then
+    if ! grep -Eqi 'koicrm_verify|KOICRM_VERIFY=1' "$CRM_CORE/.env"; then
+      die "crm-core/.env exists without verify markers. Move it aside so Next/Prisma cannot load prod URLs during verification."
+    fi
+  fi
+  # shellcheck disable=SC1091
+  source "$VERIFY_SCRIPTS/load-env.sh"
+}
+
+have_docker() {
+  command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1
+}
+
+have_local_postgres() {
+  command -v psql >/dev/null 2>&1 && pg_isready -h 127.0.0.1 -p "${LOCAL_PG_PORT:-5432}" >/dev/null 2>&1
+}
+
+resolve_db_mode() {
+  local mode="${KOICRM_VERIFY_DB_MODE:-auto}"
+  case "$mode" in
+    docker|local-postgres) echo "$mode" ;;
+    auto)
+      if have_docker; then echo docker
+      elif have_local_postgres || command -v psql >/dev/null 2>&1; then echo local-postgres
+      else die "No Docker and no local Postgres. Install one before launch."
+      fi
+      ;;
+    *) die "Unknown KOICRM_VERIFY_DB_MODE=$mode" ;;
+  esac
+}
+
+rewrite_env_for_local_pg() {
+  # Stand-in when Docker is unavailable: dedicated DB name on local Postgres :5432.
+  local env_file="${KOICRM_VERIFY_ENV_FILE:-$CRM_CORE/.env.verify}"
+  sed -i.bak \
+    -e 's#@127.0.0.1:5436/koicrm_verify#@127.0.0.1:5432/koicrm_verify#g' \
+    -e 's#@localhost:5436/koicrm_verify#@localhost:5432/koicrm_verify#g' \
+    "$env_file"
+  rm -f "${env_file}.bak"
+  # Reload
+  set -a
+  # shellcheck disable=SC1090
+  source "$env_file"
+  set +a
+  # shellcheck disable=SC1091
+  source "$VERIFY_SCRIPTS/guard-env.sh"
+  guard_verify_env "$env_file"
+}
+
+start_local_postgres_db() {
+  echo "DB mode: local-postgres (stand-in; preferred path is Docker Compose verify)"
+  if ! pg_isready -h 127.0.0.1 -p 5432 >/dev/null 2>&1; then
+    if command -v pg_ctlcluster >/dev/null 2>&1; then
+      sudo pg_ctlcluster 16 main start || sudo pg_ctlcluster 15 main start || true
+      echo "1" > "$RUN_DIR/started-local-pg"
+    else
+      die "Local Postgres is not running and pg_ctlcluster is unavailable."
+    fi
+  fi
+
+  rewrite_env_for_local_pg
+
+  sudo -u postgres psql -v ON_ERROR_STOP=1 <<'SQL'
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_user') THEN
+    CREATE USER app_user WITH PASSWORD 'app_pass';
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'admin_user') THEN
+    CREATE USER admin_user WITH PASSWORD 'admin_pass' CREATEDB;
+    ALTER ROLE admin_user BYPASSRLS;
+  ELSE
+    ALTER ROLE admin_user WITH BYPASSRLS;
+  END IF;
+END$$;
+GRANT app_user TO admin_user;
+SELECT 'ok' WHERE EXISTS (SELECT 1 FROM pg_database WHERE datname = 'koicrm_verify');
+SQL
+
+  if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='koicrm_verify'" | grep -q 1; then
+    sudo -u postgres psql -v ON_ERROR_STOP=1 -c "CREATE DATABASE koicrm_verify OWNER admin_user;"
+  fi
+
+  sudo -u postgres psql -v ON_ERROR_STOP=1 -d koicrm_verify <<'SQL'
+GRANT ALL PRIVILEGES ON DATABASE koicrm_verify TO admin_user;
+GRANT CONNECT ON DATABASE koicrm_verify TO app_user;
+GRANT ALL PRIVILEGES ON SCHEMA public TO admin_user;
+GRANT USAGE ON SCHEMA public TO app_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO app_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO app_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO app_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO app_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO admin_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO admin_user;
+SQL
+
+  echo "local-postgres" > "$RUN_DIR/db-mode"
+  echo "WARNING: MinIO not started in local-postgres mode. Upload journeys will fail until Docker MinIO is available." | tee "$RUN_DIR/storage-warning.txt"
+}
+
+start_docker_stack() {
+  echo "DB mode: docker compose project $COMPOSE_PROJECT"
+  docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" up -d
+  echo "docker" > "$RUN_DIR/db-mode"
+  # Wait for postgres healthy
+  local i=0
+  until docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" exec -T postgres pg_isready -U postgres -d koicrm_verify >/dev/null 2>&1; do
+    i=$((i + 1))
+    [[ $i -lt 60 ]] || die "Postgres verify container not ready"
+    sleep 1
+  done
+}
+
+cmd_launch() {
+  init_run
+  ensure_env_file
+  local seed="test"
+  for arg in "$@"; do
+    case "$arg" in
+      --seed=demo) seed="demo" ;;
+      --seed=test) seed="test" ;;
+    esac
+  done
+
+  local mode
+  mode="$(resolve_db_mode)"
+  echo "$mode" > "$RUN_DIR/db-mode-requested"
+
+  if [[ "$mode" == "docker" ]]; then
+    start_docker_stack
+  else
+    start_local_postgres_db
+  fi
+
+  cd "$CRM_CORE"
+  if [[ ! -d node_modules ]]; then
+    pnpm install
+  fi
+
+  echo "Running migrations against koicrm_verify..."
+  pnpm exec prisma generate
+  pnpm exec prisma migrate deploy
+
+  if [[ "$seed" == "demo" ]]; then
+    pnpm seed:demo
+  else
+    pnpm seed:test
+  fi
+  echo "$seed" > "$RUN_DIR/seed"
+
+  local port="${PORT:-3100}"
+  if [[ -f "$RUN_DIR/next.pid" ]] && kill -0 "$(cat "$RUN_DIR/next.pid")" 2>/dev/null; then
+    echo "Next already running pid=$(cat "$RUN_DIR/next.pid")"
+  else
+    echo "Starting Next.js on $port..."
+    # Inherit verify env from this shell; do not rely on crm-core/.env.
+    nohup pnpm exec next dev -p "$port" -H 127.0.0.1 > "$RUN_DIR/next.log" 2>&1 &
+    echo $! > "$RUN_DIR/next.pid"
+  fi
+
+  local ready=0
+  for _ in $(seq 1 90); do
+    if curl -fsS "http://127.0.0.1:${port}/signin" >/dev/null 2>&1; then
+      ready=1
+      break
+    fi
+    sleep 1
+  done
+  [[ $ready -eq 1 ]] || die "App did not become ready on :$port — see $RUN_DIR/next.log"
+
+  # Usable-state check: health may not exist for all builds; sign-in HTML is the gate.
+  if curl -fsS "http://127.0.0.1:${port}/api/health" >/dev/null 2>&1; then
+    echo "health: ok" | tee "$RUN_DIR/ready.txt"
+  else
+    echo "health: missing-or-failing; signin reachable" | tee "$RUN_DIR/ready.txt"
+  fi
+
+  echo "LAUNCH_OK run=$KOICRM_VERIFY_RUN_ID url=http://127.0.0.1:${port} evidence=$EVIDENCE_DIR"
+}
+
+cmd_doctor() {
+  init_run
+  ensure_env_file
+  local port="${PORT:-3100}"
+  local ok=1
+
+  echo "== control-koicrm doctor =="
+  echo "run_id: $KOICRM_VERIFY_RUN_ID"
+  echo "evidence: $EVIDENCE_DIR"
+  echo "env_file: ${KOICRM_VERIFY_ENV_FILE:-$CRM_CORE/.env.verify}"
+  echo "auth_url: $AUTH_URL"
+  echo "database: (host localhost, name koicrm_verify)"
+
+  if [[ -f "$RUN_DIR/next.pid" ]] && kill -0 "$(cat "$RUN_DIR/next.pid")" 2>/dev/null; then
+    echo "next_pid: $(cat "$RUN_DIR/next.pid") alive"
+  else
+    echo "next_pid: MISSING_OR_DEAD"
+    ok=0
+  fi
+
+  if curl -fsS "http://127.0.0.1:${port}/signin" >/dev/null 2>&1; then
+    echo "signin: reachable"
+  else
+    echo "signin: NOT_REACHABLE"
+    ok=0
+  fi
+
+  # Confirm port listener is our process when possible
+  if command -v ss >/dev/null 2>&1; then
+    ss -tlnp 2>/dev/null | grep -E ":${port}\\b" || echo "port_${port}: no listener listed"
+  fi
+
+  if [[ -f "$RUN_DIR/db-mode" ]]; then
+    echo "db_mode: $(cat "$RUN_DIR/db-mode")"
+  fi
+
+  # DB connectivity via prisma
+  if pnpm --dir "$CRM_CORE" exec prisma db execute --stdin <<<"SELECT 1;" >/dev/null 2>&1 \
+    || PGPASSWORD=admin_pass psql -h 127.0.0.1 -p "$(echo "$DATABASE_ADMIN_URL" | sed -n 's/.*:\([0-9]\+\)\/.*/\1/p')" -U admin_user -d koicrm_verify -c 'SELECT 1' >/dev/null 2>&1; then
+    echo "db: reachable"
+  else
+    # Fallback parse port
+    local dbport=5436
+    [[ "$(cat "$RUN_DIR/db-mode" 2>/dev/null || true)" == "local-postgres" ]] && dbport=5432
+    if PGPASSWORD=admin_pass psql -h 127.0.0.1 -p "$dbport" -U admin_user -d koicrm_verify -c 'SELECT 1' >/dev/null 2>&1; then
+      echo "db: reachable"
+    else
+      echo "db: NOT_REACHABLE"
+      ok=0
+    fi
+  fi
+
+  if [[ $ok -eq 1 ]]; then
+    echo "DOCTOR_OK"
+    return 0
+  fi
+  echo "DOCTOR_FAIL"
+  return 1
+}
+
+cmd_browser() {
+  init_run
+  ensure_env_file
+  export PLAYWRIGHT_BASE_URL="${AUTH_URL:-http://127.0.0.1:3100}"
+  export KOICRM_VERIFY_EVIDENCE_DIR
+  export KOICRM_VERIFY_RUN_DIR
+  export NODE_PATH="$CRM_CORE/node_modules${NODE_PATH:+:$NODE_PATH}"
+  node "$SKILL_DIR/scripts/browser.mjs" "$@"
+}
+
+cmd_cleanup() {
+  init_run
+  # Load env if present for guards, but cleanup must still work if env is broken.
+  if [[ -f "${KOICRM_VERIFY_ENV_FILE:-$CRM_CORE/.env.verify}" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "${KOICRM_VERIFY_ENV_FILE:-$CRM_CORE/.env.verify}"
+    set +a
+  fi
+
+  if [[ -f "$RUN_DIR/next.pid" ]]; then
+    local pid
+    pid="$(cat "$RUN_DIR/next.pid")"
+    if kill -0 "$pid" 2>/dev/null; then
+      kill "$pid" 2>/dev/null || true
+      sleep 1
+      kill -9 "$pid" 2>/dev/null || true
+      echo "Stopped Next pid=$pid"
+    fi
+    rm -f "$RUN_DIR/next.pid"
+  fi
+
+  local mode
+  mode="$(cat "$RUN_DIR/db-mode" 2>/dev/null || echo "")"
+  if [[ "$mode" == "docker" ]] && have_docker; then
+    docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" down -v
+    echo "Stopped compose project $COMPOSE_PROJECT (volumes removed)."
+  elif [[ "$mode" == "local-postgres" ]]; then
+    # Drop only the verify database. Never drop other DBs. Never stop system Postgres
+    # unless this run started the cluster AND VERIFY_STOP_LOCAL_PG=1.
+    local dbport=5432
+    sudo -u postgres psql -v ON_ERROR_STOP=0 <<SQL
+SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'koicrm_verify' AND pid <> pg_backend_pid();
+DROP DATABASE IF EXISTS koicrm_verify;
+SQL
+    echo "Dropped database koicrm_verify only."
+    if [[ -f "$RUN_DIR/started-local-pg" && "${VERIFY_STOP_LOCAL_PG:-0}" == "1" ]]; then
+      sudo pg_ctlcluster 16 main stop || true
+    fi
+  fi
+
+  # Remove scratch under run dir except a pointer note; NEVER delete evidence.
+  rm -f "$CRM_CORE/.verify/current-run-id"
+  echo "CLEANUP_OK evidence_retained=$EVIDENCE_DIR"
+  ls -la "$EVIDENCE_DIR" || true
+}
+
+main() {
+  local cmd="${1:-}"
+  shift || true
+  case "$cmd" in
+    launch) cmd_launch "$@" ;;
+    doctor) cmd_doctor "$@" ;;
+    browser) cmd_browser "$@" ;;
+    evidence-dir) init_run; echo "$EVIDENCE_DIR" ;;
+    run-id) init_run; echo "$KOICRM_VERIFY_RUN_ID" ;;
+    cleanup) cmd_cleanup "$@" ;;
+    -h|--help|help|"") usage ;;
+    *) usage; die "unknown command: $cmd" ;;
+  esac
+}
+
+main "$@"
