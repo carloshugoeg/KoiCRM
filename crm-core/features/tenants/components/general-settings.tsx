@@ -204,6 +204,18 @@ export function GeneralSettings({ tenant, settings, canManage }: Props) {
           </Button>
         )}
       </form>
+      {canManage && (
+        <section className="space-y-2">
+          <h2 className="text-lg font-semibold">Exportar datos</h2>
+          <p className="text-sm text-muted-foreground">
+            Descarga un ZIP con un CSV por entidad de este espacio. No incluye contraseñas, PIN ni
+            tokens.
+          </p>
+          <Button asChild variant="outline">
+            <a href={`/api/tenants/${tenant.slug}/export`}>Descargar CSV</a>
+          </Button>
+        </section>
+      )}
     </div>
   )
 }
