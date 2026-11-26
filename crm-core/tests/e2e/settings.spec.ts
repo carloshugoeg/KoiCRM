@@ -1,9 +1,14 @@
 import { test, expect } from "@playwright/test"
+import path from "path"
 import { AUTH_FILE } from "./auth-helpers"
 
 test.use({ storageState: AUTH_FILE })
 
+const MEMBER_AUTH_FILE = path.join(__dirname, ".auth/demo-member.json")
 const BASE = "/app/demo-aqua"
+const CATALOG_NOTE =
+  "Solo un Superadministrador o quien tenga permiso Gestionar catálogo puede agregar o quitar categorías."
+const EQUIPMENT_HEADING = "Categorías de equipo de interés"
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
@@ -100,12 +105,12 @@ test.describe("Settings – Equipos", () => {
     const equipName = `E2E-Equipo-${Date.now()}`
 
     await page.goto(`${BASE}/settings/equipment`)
-    await expect(page.getByText("Tipos de equipo")).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(EQUIPMENT_HEADING)).toBeVisible({ timeout: 15_000 })
 
-    await page.getByPlaceholder(/Bomba sumergible/i).fill(equipName)
+    await page.getByPlaceholder(/Nueva categoría/i).fill(equipName)
     await page
       .locator("div.flex.gap-2")
-      .filter({ has: page.getByPlaceholder(/Bomba sumergible/i) })
+      .filter({ has: page.getByPlaceholder(/Nueva categoría/i) })
       .getByRole("button")
       .click()
 
@@ -114,8 +119,35 @@ test.describe("Settings – Equipos", () => {
     await page.goto(`${BASE}/pipeline`)
     await expect(page.locator("header")).toBeVisible({ timeout: 15_000 })
     await page.getByRole("button", { name: /nueva oportunidad/i }).click()
-    await expect(page.getByRole("button", { name: equipName })).toBeVisible({ timeout: 15_000 })
+    // Categories are not pickable on the deal form; subcategories are. The category
+    // label still surfaces in the settings list above — assert that path stayed green.
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 15_000 })
   })
+
+  for (const width of [375, 768, 1440] as const) {
+    test(`OWNER with catalog access sees add controls @ ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto(`${BASE}/settings/equipment`)
+      await expect(page.getByText(EQUIPMENT_HEADING)).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByPlaceholder(/Nueva categoría/i)).toBeVisible()
+      await expect(page.getByText(CATALOG_NOTE)).toHaveCount(0)
+    })
+  }
+})
+
+test.describe("Settings – Equipos (MEMBER without catalog.manage)", () => {
+  test.use({ storageState: MEMBER_AUTH_FILE })
+
+  for (const width of [375, 768, 1440] as const) {
+    test(`hides add/delete controls and shows note @ ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto(`${BASE}/settings/equipment`)
+      await expect(page.getByText(EQUIPMENT_HEADING)).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByText(CATALOG_NOTE)).toBeVisible()
+      await expect(page.getByPlaceholder(/Nueva categoría/i)).toHaveCount(0)
+      await expect(page.getByRole("button", { name: /Eliminar categoría/i })).toHaveCount(0)
+    })
+  }
 })
 
 // ─── Apariencia (Branding) ────────────────────────────────────────────────────

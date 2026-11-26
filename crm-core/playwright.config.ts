@@ -18,9 +18,13 @@ export default defineConfig({
       testMatch: "**/auth.setup.ts",
     },
     {
+      name: "setup-member",
+      testMatch: "**/auth-member.setup.ts",
+    },
+    {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      dependencies: ["setup"],
+      dependencies: ["setup", "setup-member"],
     },
   ],
   webServer: process.env.CI
