@@ -4,7 +4,7 @@ White-label multitenant CRM. Cada tenant tiene su propia configuración de marca
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 24.x
 - pnpm (`npm i -g pnpm`)
 - Docker (para Postgres local)
 
