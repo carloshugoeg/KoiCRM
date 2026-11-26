@@ -41,6 +41,7 @@ Estas decisiones ya están consolidadas en `ARCHITECTURE_PLAN.md` y no requieren
 | D27 | PIN por propiedad del lead | **`TenantSettings.pinEnabled`**: PIN solo al tocar leads de otro asesor; leads propios sin PIN. **Session PIN lock** (barra superior): PIN en todos los cambios del usuario mientras esté activo. | Solicitud producto 2026-06-09                                    | `resolveActionActor` recibe `dealId` o `targetOwnerId`; `isPinRequiredForDealAction` centraliza la regla. |
 | D28 | Seguimientos con texto libre | **`FollowUp.note` reemplaza `reasonKey`**; no se siembran ni administran motivos predefinidos (`followupReason`) para seguimientos. | Solicitud producto 2026-06-09                                    | Alta de lead y detalle usan fecha + textbox libre; alertas/calendario/banners muestran `note` sin lookup de catálogo. |
 | D29 | Export CSV del tenant     | **ZIP de un CSV por entidad del tenant actual.** Solo un miembro ACTIVE con rol OWNER o ADMIN. Sin contraseñas, PIN, tokens ni bytes de archivos. | 2026-11-17                                                       | Importar CSV y Excel siguen abiertos en DP-02 y V2-F01. DP-02 no se cierra. |
+| D31 | Node runtime (Vercel/CI)  | **`engines.node` = `24.x`** (`.nvmrc`, GitHub Actions, ops docs alineados). Coincide con Project Settings de `koi-crm` en Vercel. Node 20.x está discontinued en Vercel (`BUILD_UTILS_NODE_VERSION_INVALID`). | 2026-11-26 — fix preview builds | No subir a 26.x hasta cambiar el setting del proyecto; `engines` overridea Project Settings. |
 
 ---
 

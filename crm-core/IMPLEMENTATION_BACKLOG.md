@@ -122,7 +122,7 @@ Cada task usa este formato:
   - `tsc --noEmit` pasa con `"strict": true`.
 - **Tests requeridos**: ninguno aún.
 - **Notas**: §1, §2 de ARCHITECTURE_PLAN.
-- **Riesgos**: Node version mismatch — fijar `engines.node` en package.json.
+- **Riesgos**: Node version mismatch — fijar `engines.node` en package.json. **Mitigado (2026-11-26, D31):** `engines.node` / `.nvmrc` / CI = `24.x` (alineado a Vercel Project Settings; 20.x discontinued).
 - **Subtasks**:
   - [x] Inicializar `package.json` con `next@14`, `react@18`, `typescript`.
   - [x] `tsconfig.json` con `strict: true`, paths alias `@/*`.
