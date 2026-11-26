@@ -10,6 +10,7 @@ export const PERMISSION_KEYS = [
   "pipeline.viewTotals",
   "reports.viewAll",
   "stats.viewTotals",
+  "catalog.manage",
 ] as const
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number]
@@ -51,6 +52,13 @@ export const PERMISSION_DEFS: PermissionDef[] = [
     label: "Ver montos en estadísticas",
     description: "Oculta las cifras de dinero en los paneles de estadísticas cuando está apagado.",
   },
+  {
+    key: "catalog.manage",
+    group: "Catálogos",
+    label: "Gestionar catálogo",
+    description:
+      "Permite agregar o quitar categorías y subcategorías de equipos. Sin este permiso solo un Superadministrador puede hacerlo.",
+  },
 ]
 
 /**
@@ -64,30 +72,35 @@ const DEFAULTS: Record<Role, Record<PermissionKey, boolean>> = {
     "pipeline.viewTotals": true,
     "reports.viewAll": true,
     "stats.viewTotals": true,
+    "catalog.manage": true,
   },
   ADMIN: {
     "pipeline.viewAll": true,
     "pipeline.viewTotals": true,
     "reports.viewAll": true,
     "stats.viewTotals": true,
+    "catalog.manage": true,
   },
   SUPERVISOR: {
     "pipeline.viewAll": true,
     "pipeline.viewTotals": true,
     "reports.viewAll": true,
     "stats.viewTotals": true,
+    "catalog.manage": false,
   },
   MEMBER: {
     "pipeline.viewAll": false,
     "pipeline.viewTotals": false,
     "reports.viewAll": false,
     "stats.viewTotals": false,
+    "catalog.manage": false,
   },
   VIEWER: {
     "pipeline.viewAll": true,
     "pipeline.viewTotals": false,
     "reports.viewAll": false,
     "stats.viewTotals": false,
+    "catalog.manage": false,
   },
 }
 
