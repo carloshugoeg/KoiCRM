@@ -7,7 +7,7 @@
 | Repository | `KoiCRM` (this repo) |
 | **Root Directory** | **`crm-core`** |
 | Framework Preset | Next.js |
-| Node.js Version | 20.x |
+| Node.js Version | 24.x |
 
 Vercel reads [`vercel.json`](../../vercel.json) inside `crm-core` for install/build commands and region (`iad1`).
 

@@ -6,7 +6,7 @@ One-command bootstrap for **Supabase Postgres + Vercel** (no Sentry required).
 
 ### Prerequisites
 
-- Node.js 20+, pnpm, `jq`, `curl`, `openssl` (`psql` optional — bootstrap uses Prisma if missing)
+- Node.js 24.x, pnpm, `jq`, `curl`, `openssl` (`psql` optional — bootstrap uses Prisma if missing)
 - Vercel token: [vercel.com/account/tokens](https://vercel.com/account/tokens)
 - Supabase access token: [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens)
 - R2 bucket + API keys (app fails startup without them)
@@ -66,7 +66,7 @@ The sections below cover the 8 manual steps for deploy without the bootstrap scr
 
 ## Prerequisites
 
-- Node.js 20+ and pnpm installed locally
+- Node.js 24.x and pnpm installed locally
 - Access to the GitHub repo
 - A Vercel account connected to GitHub
 
