@@ -39,6 +39,7 @@ Nada se marca como done hasta que funcione al 100% según criterios de aceptaci�
 - [ ] [V2-U01 Edición de perfil propio fuera de Settings → Usuarios](#v2-u01-edición-de-perfil-propio-fuera-de-settings--usuarios)
 - [ ] [V2-U02 Avatar visible en header, pipeline y calendario](#v2-u02-avatar-visible-en-header-pipeline-y-calendario)
 - [ ] [V2-U03 Cancelar invitaciones pendientes](#v2-u03-cancelar-invitaciones-pendientes)
+- [x] [V2-U04 Permiso fino Gestionar catálogo (`catalog.manage`)](#v2-u04-permiso-fino-gestionar-catálogo-catalogmanage)
 
 ### Funcionalidades diferidas desde V1 (DP-* y gaps del demo)
 
@@ -217,6 +218,16 @@ Nada se marca como done hasta que funcione al 100% según criterios de aceptaci�
 
 - **Objetivo**: botón “Cancelar” en invitaciones pendientes de Settings → Usuarios.
 - **Prioridad**: P2
+
+### V2-U04 Permiso fino Gestionar catálogo (`catalog.manage`)
+
+- **Objetivo**: roles bajos pueden administrar el catálogo de Equipos sin ser OWNER/ADMIN.
+- **Prioridad**: P1
+- **Estado**: done 2026-11-26. Clave en `PERMISSION_KEYS`, gate en create/delete + UI Equipos, nota cuando falta el permiso. Ver D30.
+- **Criterios de aceptación**:
+  - [x] Clave `catalog.manage` / label "Gestionar catálogo" en la pestaña Permisos.
+  - [x] Create/delete Equipos: ADMIN+ o `catalog.manage`; server-side rechaza sin permiso.
+  - [x] Sin permiso: nota "Solo un Superadministrador o quien tenga permiso Gestionar catálogo…".
 
 ---
 

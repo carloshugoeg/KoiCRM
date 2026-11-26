@@ -110,7 +110,7 @@ export function EquipmentSettings({ tenant, categories: initial, canManage }: Pr
           Cada categoría agrupa subcategorías. Las oportunidades eligen una o más subcategorías.
         </p>
 
-        {canManage && (
+        {canManage ? (
           <div className="flex gap-2">
             <Input
               value={newCategory}
@@ -134,6 +134,11 @@ export function EquipmentSettings({ tenant, categories: initial, canManage }: Pr
               <Plus className="h-3.5 w-3.5" />
             </Button>
           </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Solo un Superadministrador o quien tenga permiso Gestionar catálogo puede agregar o
+            quitar categorías.
+          </p>
         )}
       </div>
 

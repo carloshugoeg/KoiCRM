@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache"
 import { Prisma } from "@prisma/client"
+import type { Session } from "next-auth"
 import { auth } from "@/lib/auth/auth"
 import { withTenant } from "@/lib/db/rls"
-import { requireRole } from "@/lib/auth/rbac"
+import { getUserRole, requireRole } from "@/lib/auth/rbac"
+import { can } from "@/lib/permissions/resolve"
 import { getCatalogItemUsageCount } from "@/features/catalogs/queries"
 import {
   createCatalogItemSchema,
@@ -22,6 +24,18 @@ function revalidateCatalogPaths(tenantSlug: string) {
   revalidatePath(`/app/${tenantSlug}/clients`, "page")
 }
 
+async function requireCatalogManage(
+  session: Session,
+  tenantId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const role = await getUserRole(session, tenantId)
+  if (!role || !session.user?.id) return { ok: false, error: "Acceso denegado." }
+  if (!(await can(tenantId, role, session.user.id, "catalog.manage"))) {
+    return { ok: false, error: "Acceso denegado." }
+  }
+  return { ok: true }
+}
+
 export async function createCatalogItemAction(raw: unknown): Promise<{ ok: boolean; error?: string }> {
   const session = await auth()
   if (!session?.user?.id) return { ok: false, error: "No autenticado." }
@@ -31,11 +45,8 @@ export async function createCatalogItemAction(raw: unknown): Promise<{ ok: boole
 
   const { tenantId, tenantSlug, ...data } = parsed.data
 
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN"])
-  } catch {
-    return { ok: false, error: "Acceso denegado." }
-  }
+  const gate = await requireCatalogManage(session, tenantId)
+  if (!gate.ok) return gate
 
   try {
     await withTenant(tenantId, async (tx) => {
@@ -89,11 +100,8 @@ export async function deleteCatalogItemAction(raw: unknown): Promise<{ ok: boole
 
   const { tenantId, tenantSlug, id } = parsed.data
 
-  try {
-    await requireRole(session, tenantId, ["OWNER", "ADMIN"])
-  } catch {
-    return { ok: false, error: "Acceso denegado." }
-  }
+  const gate = await requireCatalogManage(session, tenantId)
+  if (!gate.ok) return gate
 
   const item = await withTenant(tenantId, (tx) =>
     tx.catalogItem.findFirst({ where: { id, tenantId } }),
